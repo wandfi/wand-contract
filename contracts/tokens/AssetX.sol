@@ -4,23 +4,23 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract AssetX is ERC20 {
-  address public wandPool;
+  address public assetPool;
 
-  constructor(address _wandPool, string memory _name, string memory _symbol) ERC20(_name, _symbol) {
-    require(_wandPool != address(0), "Zero address detected");
-    wandPool = _wandPool;
+  constructor(address _assetPool, string memory _name, string memory _symbol) ERC20(_name, _symbol) {
+    require(_assetPool != address(0), "Zero address detected");
+    assetPool = _assetPool;
   }
 
-  function mint(address to, uint256 amount) public onlyWandPool {
+  function mint(address to, uint256 amount) public onlyAssetPool {
     _mint(to, amount);
   }
 
-  function burn(address account, uint256 amount) public onlyWandPool {
+  function burn(address account, uint256 amount) public onlyAssetPool {
     _burn(account, amount);
   }
 
-  modifier onlyWandPool() {
-    require(wandPool == _msgSender(), "Caller is not the WandPool contract");
+  modifier onlyAssetPool() {
+    require(assetPool == _msgSender(), "Caller is not the AssetPool contract");
     _;
   }
 }
