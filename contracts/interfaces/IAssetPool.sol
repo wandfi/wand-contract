@@ -13,6 +13,10 @@ interface IAssetPool {
    */
   function currentAssetAdequencyRatio() external view returns (uint256);
 
+  function setRedemptionFeeWithUSBTokens(uint256 newRedemptionFeeWithUSBTokens) external;
+
+  function setRedemptionFeeWithXTokens(uint256 newRedemptionFeeWithXTokens) external;
+  
   function mintUSB(uint256 assetAmount) external payable;
 
   function mintXTokens(uint256 assetAmount) external payable;

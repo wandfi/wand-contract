@@ -7,9 +7,11 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IAssetPool.sol";
+import "../interfaces/IPriceFeed.sol";
+import "../interfaces/IProtocolSettings.sol";
 import "../libs/Constants.sol";
+import "../libs/TokensTransfer.sol";
 import "../tokens/AssetX.sol";
 import "../tokens/USB.sol";
 
@@ -17,7 +19,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
-  // address public immutable assetPoolFactory;
+  address public immutable wandProtocol;
+  address public immutable assetPoolFactory;
   address public immutable assetToken;
   address public immutable assetTokenPriceFeed;
   address public immutable usbToken;
@@ -25,23 +28,35 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   uint256 private _usbTotalSupply;
 
+  uint256 private immutable _settingsDecimals;
+  uint256 private _redemptionFeeWithUSBTokens;
+  uint256 private _redemptionFeeWithXTokens;
+
   constructor(
-    // address _assetPoolFactory,
+    address _wandProtocol,
+    address _assetPoolFactory,
     address _assetToken,
     address _assetTokenPriceFeed,
     address _usbToken,
     string memory _xTokenName,
     string memory _xTokenSymbol
   ) {
-    // require(_assetPoolFactory != address(0), "Zero address detected");
+    require(_wandProtocol != address(0), "Zero address detected");
+    require(_assetPoolFactory != address(0), "Zero address detected");
     require(_assetToken != address(0), "Zero address detected");
     require(_assetTokenPriceFeed != address(0), "Zero address detected");
     require(_usbToken != address(0), "Zero address detected");
-    // assetPoolFactory = _assetPoolFactory;
+    wandProtocol = _wandProtocol;
+    assetPoolFactory = _assetPoolFactory;
     assetToken = _assetToken;
     assetTokenPriceFeed = _assetTokenPriceFeed;
     usbToken = _usbToken;
     xToken = address(new AssetX(address(this), _xTokenName, _xTokenSymbol));
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    _settingsDecimals = settings.settingDecimals();
+    _redemptionFeeWithUSBTokens = settings.defaultRedemptionFeeWithUSBTokens();
+    _redemptionFeeWithXTokens = settings.defaultRedemptionFeeWithXTokens();
   }
 
   /* ================= VIEWS ================ */
@@ -54,7 +69,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   /**
-   * @notice Current adequency ratio of the pool, with 18 decimals
+   * @notice Current adequency ratio of the pool
    * @dev AAReth = (Meth * Peth / Musb-eth) * 100%
    */
   function currentAssetAdequencyRatio() public view returns (uint256) {
@@ -63,7 +78,11 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     uint256 assetTotalAmount = _getAssetTotalAmount();
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(1e18).div(xTokenTotalAmount);
+    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(xTokenTotalAmount);
+  }
+
+  function currentAssetAdequencyRatioDecimals() public pure returns (uint256) {
+    return Constants.PROTOCOL_DECIMALS;
   }
 
   /* ========== MUTATIVE FUNCTIONS ========== */
@@ -74,10 +93,10 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param assetAmount: Amount of asset token used to mint
    */
   function mintUSB(uint256 assetAmount) external payable override nonReentrant {
-    _transferAssetTokens(assetAmount);
-
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
     uint256 tokenAmount = assetAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals);
+
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     USB(usbToken).mint(_msgSender(), tokenAmount);
     _usbTotalSupply = _usbTotalSupply.add(tokenAmount);
 
@@ -89,8 +108,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param assetAmount: Amount of asset token used to mint
    */
   function mintXTokens(uint256 assetAmount) external payable override nonReentrant {
-    _transferAssetTokens(assetAmount);
-
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
 
     // Initial mint: Δethx = Δeth
@@ -105,6 +122,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
       );
     }
 
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     AssetX(xToken).mint(_msgSender(), xTokenAmount);
     emit XTokenMinted(_msgSender(), assetAmount, assetTokenPrice, assetTokenPriceDecimals, xTokenAmount);
   }
@@ -114,7 +132,34 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param usbAmount: Amount of $USB tokens used to redeem for asset tokens
    */
   function redeemByUSB(uint256 usbAmount) external override nonReentrant {
+    require(usbAmount > 0, "Amount must be greater than 0");
 
+    uint256 assetAmount = 0;
+    // IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+
+    uint256 aar = currentAssetAdequencyRatio();
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
+
+    // if AAR >= 100%,  Δeth = (Δusb / Peth) * (1 -C1)
+    if (aar >= 10 ** currentAssetAdequencyRatioDecimals()) {
+      assetAmount = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice).mul(
+        (10 ** _settingsDecimals).sub(_redemptionFeeWithUSBTokens)
+      ).div(10 ** _settingsDecimals);
+    }
+    // else if AAR < 100%, Δeth = (Δusb * Meth / Musb-eth) * (1 -C1)
+    else {
+      uint256 assetTotalAmount = _getAssetTotalAmount();
+      uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
+      assetAmount = usbAmount.mul(assetTotalAmount).div(xTokenTotalAmount).mul(
+        (10 ** _settingsDecimals).sub(_redemptionFeeWithUSBTokens)
+      ).div(10 ** _settingsDecimals);
+    }
+
+    USB(usbToken).burn(_msgSender(), usbAmount);
+    _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
+    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
+
+    emit AssetRedeemedWithUSB(_msgSender(), usbAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
   }
 
   /**
@@ -124,6 +169,29 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   function redeemByXTokens(uint256 xTokenAmount) external override nonReentrant {
 
   }
+
+  /* ========== RESTRICTED FUNCTIONS ========== */
+
+  function setRedemptionFeeWithUSBTokens(uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyAssetPoolFactory {
+    require(newRedemptionFeeWithUSBTokens != _redemptionFeeWithUSBTokens, "Same redemption fee");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertRedemptionFeeWithUSBTokens(newRedemptionFeeWithUSBTokens);
+    
+    _redemptionFeeWithUSBTokens = newRedemptionFeeWithUSBTokens;
+    emit RedemptionFeeWithUSBTokensUpdated(_redemptionFeeWithUSBTokens, newRedemptionFeeWithUSBTokens);
+  }
+
+  function setRedemptionFeeWithXTokens(uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyAssetPoolFactory {
+    require(newRedemptionFeeWithXTokens != _redemptionFeeWithXTokens, "Same redemption fee");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertRedemptionFeeWithXTokens(newRedemptionFeeWithXTokens);
+
+    _redemptionFeeWithXTokens = newRedemptionFeeWithXTokens;
+    emit RedemptionFeeWithXTokensUpdated(_redemptionFeeWithXTokens, newRedemptionFeeWithXTokens);
+  }
+
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
@@ -143,27 +211,19 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return (price, priceDecimals);
   }
 
-  function _transferAssetTokens(uint256 amount) internal {
-    require(amount > 0, "Amount must be greater than 0");
-
-    if (assetToken == Constants.NATIVE_TOKEN) {
-      require(msg.value == amount, "Incorrect msg.value");
-    }
-    else {
-      IERC20(assetToken).safeTransferFrom(_msgSender(), address(this), amount);
-    }
-  }
-
   /* ============== MODIFIERS =============== */
 
-  // modifier onlyAssetPoolFactory() {
-  //   require(msg.sender == assetPoolFactory, "Caller is not AssetPoolFactory");
-  //   _;
-  // }
+  modifier onlyAssetPoolFactory() {
+    require(_msgSender() == assetPoolFactory, "Caller is not AssetPoolFactory");
+    _;
+  }
 
   /* =============== EVENTS ============= */
 
+  event RedemptionFeeWithUSBTokensUpdated(uint256 prevRedemptionFeeWithUSBTokens, uint256 newDefaultRedemptionFeeWithUSBTokens);
+  event RedemptionFeeWithXTokensUpdated(uint256 prevRedemptionFeeWithXTokens, uint256 newDefaultRedemptionFeeWithXTokens);
+
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);
-
+  event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
 }

@@ -6,20 +6,19 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 import "../WandProtocol.sol";
 import "../interfaces/IProtocolSettings.sol";
+import "../libs/Constants.sol";
 
 contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   address public immutable wandProtocol;
 
-  uint256 public constant DECIMALS_DENOMINATOR = 10 ** 10;
-
   // Default to 0.3%. [0.1%, 1%]
-  uint256 private _redemptionFeeWithUSBTokens = 3 * 10 ** 7;
+  uint256 private _defaultRedemptionFeeWithUSBTokens = 3 * 10 ** 7;
   uint256 public constant MIN_REDEMPTION_FEE_WITH_USB_TOKENS = 10 ** 7;
   uint256 public constant MAX_REDEMPTION_FEE_WITH_USB_TOKENS = 10 ** 8;
 
   // Default to 0.3%. [0.1%, 1%]
-  uint256 private _redemptionFeeWithXTokens = 3 * 10 ** 7;
+  uint256 private _defaultRedemptionFeeWithXTokens = 3 * 10 ** 7;
   uint256 public constant MIN_REDEMPTION_FEE_WITH_X_TOKENS = 10 ** 7;
   uint256 public constant MAX_REDEMPTION_FEE_WITH_X_TOKENS = 10 ** 8;
 
@@ -30,33 +29,45 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   /* ============== VIEWS =============== */
 
-  function redemptionFeeWithUSBTokens() public view returns (uint256) {
-    return _redemptionFeeWithUSBTokens;
+  function settingDecimals() public pure returns (uint256) {
+    return Constants.PROTOCOL_DECIMALS;
   }
 
-  function redemptionFeeWithXTokens() public view returns (uint256) {
-    return _redemptionFeeWithXTokens;
+  function defaultRedemptionFeeWithUSBTokens() public view returns (uint256) {
+    return _defaultRedemptionFeeWithUSBTokens;
+  }
+
+  function defaultRedemptionFeeWithXTokens() public view returns (uint256) {
+    return _defaultRedemptionFeeWithXTokens;
+  }
+
+  function assertRedemptionFeeWithUSBTokens(uint256 redemptionFeeWithUSBTokens) external view override {
+    require(redemptionFeeWithUSBTokens >= MIN_REDEMPTION_FEE_WITH_USB_TOKENS, "Redemption fee too low");
+    require(redemptionFeeWithUSBTokens <= MAX_REDEMPTION_FEE_WITH_USB_TOKENS, "Redemption fee too high");
+  }
+
+  function assertRedemptionFeeWithXTokens(uint256 redemptionFeeWithXTokens) external view override {
+    require(redemptionFeeWithXTokens >= MIN_REDEMPTION_FEE_WITH_X_TOKENS, "Redemption fee too low");
+    require(redemptionFeeWithXTokens <= MAX_REDEMPTION_FEE_WITH_X_TOKENS, "Redemption fee too high");
   }
 
 
   /* ============ MUTATIVE FUNCTIONS =========== */
 
-  function setRedemptionFeeWithUSBTokens(uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyProtocol {
-    require(newRedemptionFeeWithUSBTokens != _redemptionFeeWithUSBTokens, "Same redemption fee");
-    require(newRedemptionFeeWithUSBTokens >= MIN_REDEMPTION_FEE_WITH_USB_TOKENS, "Redemption fee too low");
-    require(newRedemptionFeeWithUSBTokens <= MAX_REDEMPTION_FEE_WITH_USB_TOKENS, "Redemption fee too high");
+  function setDefaultRedemptionFeeWithUSBTokens(uint256 newDefaultRedemptionFeeWithUSBTokens) external nonReentrant onlyProtocol {
+    require(newDefaultRedemptionFeeWithUSBTokens != _defaultRedemptionFeeWithUSBTokens, "Same redemption fee");
+    assertRedemptionFeeWithUSBTokens(newDefaultRedemptionFeeWithUSBTokens);
     
-    _redemptionFeeWithUSBTokens = newRedemptionFeeWithUSBTokens;
-    emit RedemptionFeeWithUSBTokensUpdated(_redemptionFeeWithUSBTokens, newRedemptionFeeWithUSBTokens);
+    _defaultRedemptionFeeWithUSBTokens = newDefaultRedemptionFeeWithUSBTokens;
+    emit DefaultRedemptionFeeWithUSBTokensUpdated(_defaultRedemptionFeeWithUSBTokens, newDefaultRedemptionFeeWithUSBTokens);
   }
 
-  function setRedemptionFeeWithXTokens(uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyProtocol {
-    require(newRedemptionFeeWithXTokens != _redemptionFeeWithXTokens, "Same redemption fee");
-    require(newRedemptionFeeWithXTokens >= MIN_REDEMPTION_FEE_WITH_X_TOKENS, "Redemption fee too low");
-    require(newRedemptionFeeWithXTokens <= MAX_REDEMPTION_FEE_WITH_X_TOKENS, "Redemption fee too high");
+  function setDefaultRedemptionFeeWithXTokens(uint256 newDefaultRedemptionFeeWithXTokens) external nonReentrant onlyProtocol {
+    require(newDefaultRedemptionFeeWithXTokens != _defaultRedemptionFeeWithXTokens, "Same redemption fee");
+    assertRedemptionFeeWithXTokens(newDefaultRedemptionFeeWithXTokens);
     
-    _redemptionFeeWithXTokens = newRedemptionFeeWithXTokens;
-    emit RedemptionFeeWithXTokensUpdated(_redemptionFeeWithXTokens, newRedemptionFeeWithXTokens);
+    _defaultRedemptionFeeWithXTokens = newDefaultRedemptionFeeWithXTokens;
+    emit DefaultRedemptionFeeWithXTokensUpdated(_defaultRedemptionFeeWithXTokens, newDefaultRedemptionFeeWithXTokens);
   }
 
   /* ============== MODIFIERS =============== */
@@ -68,8 +79,8 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   /* =============== EVENTS ============= */
 
-  event RedemptionFeeWithUSBTokensUpdated(uint256 prevRedemptionFeeWithUSBTokens, uint256 newRedemptionFeeWithUSBTokens);
+  event DefaultRedemptionFeeWithUSBTokensUpdated(uint256 prevRedemptionFeeWithUSBTokens, uint256 newDefaultRedemptionFeeWithUSBTokens);
 
-  event RedemptionFeeWithXTokensUpdated(uint256 prevRedemptionFeeWithXTokens, uint256 newRedemptionFeeWithXTokens);
+  event DefaultRedemptionFeeWithXTokensUpdated(uint256 prevRedemptionFeeWithXTokens, uint256 newDefaultRedemptionFeeWithXTokens);
 
 }

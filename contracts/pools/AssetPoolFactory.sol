@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-// import "./tokens/USB.sol";
 import "./AssetPool.sol";
+import "../interfaces/IAssetPool.sol";
 import "../interfaces/IAssetPoolFactory.sol";
 import "../WandProtocol.sol";
 
@@ -56,8 +56,7 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     AssetPoolInfo storage poolInfo = _assetPoolsByAssetToken[assetToken];
     require(poolInfo.pool == address(0), "AssetPool already exists");
 
-    // poolInfo.pool = address(new AssetPool(address(this), assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol));
-    poolInfo.pool = address(new AssetPool(assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol));
+    poolInfo.pool = address(new AssetPool(wandProtocol, address(this), assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol));
     poolInfo.assetToken = assetToken;
     poolInfo.assetPriceFeed = assetPriceFeed;
 
@@ -74,10 +73,25 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     return _assetPools.contains(poolAddress);
   }
 
+  function setRedemptionFeeWithUSBTokens(address assetToken, uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setRedemptionFeeWithUSBTokens(newRedemptionFeeWithUSBTokens);
+  }
+
+  function setRedemptionFeeWithXTokens(address assetToken,  uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setRedemptionFeeWithXTokens(newRedemptionFeeWithXTokens);
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {
     require(_msgSender() == wandProtocol, "Caller is not protocol");
+    _;
+  }
+
+  modifier onlyValidAssetToken(address assetToken) {
+    require(_assetPoolsByAssetToken[assetToken].pool != address(0), "Invalid asset token");
     _;
   }
 

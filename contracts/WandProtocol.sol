@@ -24,5 +24,19 @@ contract WandProtocol is Ownable, ReentrancyGuard {
     IAssetPoolFactory(assetPoolFactory).addAssetPool(assetToken, assetPriceFeed, xTokenName, xTokenSymbol);
   }
 
-  
+  function setDefaultRedemptionFeeWithUSBTokens(uint256 newDefaultRedemptionFeeWithUSBTokens) external nonReentrant onlyOwner {
+    IProtocolSettings(settings).setDefaultRedemptionFeeWithUSBTokens(newDefaultRedemptionFeeWithUSBTokens);
+  }
+
+  function setDefaultRedemptionFeeWithXTokens(uint256 newDefaultRedemptionFeeWithXTokens) external nonReentrant onlyOwner {
+    IProtocolSettings(settings).setDefaultRedemptionFeeWithXTokens(newDefaultRedemptionFeeWithXTokens);
+  }
+
+  function setRedemptionFeeWithUSBTokens(address assetToken, uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setRedemptionFeeWithUSBTokens(assetToken, newRedemptionFeeWithUSBTokens);
+  }
+
+  function setRedemptionFeeWithXTokens(address assetToken,  uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setRedemptionFeeWithXTokens(assetToken, newRedemptionFeeWithXTokens);
+  }
 }
