@@ -41,12 +41,12 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     return _defaultRedemptionFeeWithXTokens;
   }
 
-  function assertRedemptionFeeWithUSBTokens(uint256 redemptionFeeWithUSBTokens) external view override {
+  function assertRedemptionFeeWithUSBTokens(uint256 redemptionFeeWithUSBTokens) public pure override {
     require(redemptionFeeWithUSBTokens >= MIN_REDEMPTION_FEE_WITH_USB_TOKENS, "Redemption fee too low");
     require(redemptionFeeWithUSBTokens <= MAX_REDEMPTION_FEE_WITH_USB_TOKENS, "Redemption fee too high");
   }
 
-  function assertRedemptionFeeWithXTokens(uint256 redemptionFeeWithXTokens) external view override {
+  function assertRedemptionFeeWithXTokens(uint256 redemptionFeeWithXTokens) public pure override {
     require(redemptionFeeWithXTokens >= MIN_REDEMPTION_FEE_WITH_X_TOKENS, "Redemption fee too low");
     require(redemptionFeeWithXTokens <= MAX_REDEMPTION_FEE_WITH_X_TOKENS, "Redemption fee too high");
   }
