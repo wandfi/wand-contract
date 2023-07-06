@@ -85,6 +85,14 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return Constants.PROTOCOL_DECIMALS;
   }
 
+  function pairedUSBAmountToDedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
+    require(xTokenAmount > 0, "Amount must be greater than 0");
+    require(AssetX(xToken).totalSupply() > 0, "No x tokens minted yet");
+
+    // Δusb = Δethx * Musb-eth / Methx
+    return xTokenAmount.mul(_usbTotalSupply).div(AssetX(xToken).totalSupply());
+  }
+
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   /**
@@ -135,7 +143,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     require(usbAmount > 0, "Amount must be greater than 0");
 
     uint256 assetAmount = 0;
-    // IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
 
     uint256 aar = currentAssetAdequencyRatio();
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
@@ -167,7 +174,19 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param xTokenAmount: Amount of X tokens used to redeem for asset tokens
    */
   function redeemByXTokens(uint256 xTokenAmount) external override nonReentrant {
+    uint256 pairedUSBAmount = pairedUSBAmountToDedeemByXTokens(xTokenAmount);
 
+    // Δeth = Δethx * Meth / Methx * (1 -C2)
+    uint256 assetAmount = xTokenAmount.mul(_getAssetTotalAmount()).div(AssetX(xToken).totalSupply()).mul(
+      (10 ** _settingsDecimals).sub(_redemptionFeeWithXTokens)
+    ).div(10 ** _settingsDecimals);
+
+    USB(usbToken).burn(_msgSender(), pairedUSBAmount);
+    _usbTotalSupply = _usbTotalSupply.sub(pairedUSBAmount);
+    AssetX(xToken).burn(_msgSender(), xTokenAmount);
+    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
+
+    emit AssetRedeemedWithXTokens(_msgSender(), xTokenAmount, pairedUSBAmount, assetAmount);
   }
 
   /* ========== RESTRICTED FUNCTIONS ========== */
@@ -226,4 +245,5 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithXTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount);
 }
