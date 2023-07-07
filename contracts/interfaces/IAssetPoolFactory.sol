@@ -7,11 +7,13 @@ interface IAssetPoolFactory {
 
   function assetTokens() external view returns (address[] memory);
   
-  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol) external;
+  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y) external;
 
   function getAssetPoolXToken(address assetToken) external view returns (address);
 
-  function setRedemptionFeeWithUSBTokens(address assetToken, uint256 newRedemptionFeeWithUSBTokens) external;
+  function setC1(address assetToken, uint256 newC1) external;
 
-  function setRedemptionFeeWithXTokens(address assetToken,  uint256 newRedemptionFeeWithXTokens) external;
+  function setC2(address assetToken,  uint256 newC2) external;
+
+  function setY(address assetToken, uint256 newY) external;
 }

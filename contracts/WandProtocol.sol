@@ -28,8 +28,8 @@ contract WandProtocol is Ownable, ReentrancyGuard {
 
   /* ========== Asset Pool Operations ========== */
 
-  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol) external nonReentrant onlyOwner {
-    IAssetPoolFactory(assetPoolFactory).addAssetPool(assetToken, assetPriceFeed, xTokenName, xTokenSymbol);
+  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).addAssetPool(assetToken, assetPriceFeed, xTokenName, xTokenSymbol, Y);
 
     // Add newly created X token to all interest pools
     address xToken = IAssetPoolFactory(assetPoolFactory).getAssetPoolXToken(assetToken);
@@ -48,17 +48,17 @@ contract WandProtocol is Ownable, ReentrancyGuard {
   /* ========== Interest Pool Operations ========== */
 
   function addUsbInterestPool() external nonReentrant onlyOwner {
-    address[] memory rewardTokens = _getInterestPoolRewardTokens();
+    address[] memory rewardTokens = _getXTokenList();
     IInterestPoolFactory(interestPoolFactory).addInterestPool(usbToken, Constants.InterestPoolStakingTokenType.Usb, address(0), 0, rewardTokens);
   }
 
   function addUniLpInterestPool(address lpToken) external nonReentrant onlyOwner {
-    address[] memory rewardTokens = _getInterestPoolRewardTokens();
+    address[] memory rewardTokens = _getXTokenList();
     IInterestPoolFactory(interestPoolFactory).addInterestPool(lpToken, Constants.InterestPoolStakingTokenType.UniswapV2PairLp, address(0), 0, rewardTokens);
   }
 
   function addCurveLpInterestPool(address lpToken, address swapPool, uint256 swapPoolCoinsCount) external nonReentrant onlyOwner {
-    address[] memory rewardTokens = _getInterestPoolRewardTokens();
+    address[] memory rewardTokens = _getXTokenList();
     IInterestPoolFactory(interestPoolFactory).addInterestPool(lpToken, Constants.InterestPoolStakingTokenType.CurvePlainPoolLp, swapPool, swapPoolCoinsCount, rewardTokens);
   }
 
@@ -66,35 +66,39 @@ contract WandProtocol is Ownable, ReentrancyGuard {
     IInterestPoolFactory(interestPoolFactory).addRewardToken(stakingToken, rewardToken);
   }
 
-  function _getInterestPoolRewardTokens() internal view returns (address[] memory) {
+  function _getXTokenList() internal view returns (address[] memory) {
     // Get reward token list (currently only x tokens)
     IAssetPoolFactory iAssetPoolFactory = IAssetPoolFactory(assetPoolFactory);
     address[] memory assetTokens = iAssetPoolFactory.assetTokens();
     require(assetTokens.length > 0, "No asset pools created yet");
 
-    address[] memory rewardTokens = new address[](assetTokens.length);
+    address[] memory xTokens = new address[](assetTokens.length);
     for (uint256 i = 0; i < assetTokens.length; i++) {
-      rewardTokens[i] = iAssetPoolFactory.getAssetPoolXToken(assetTokens[i]);
+      xTokens[i] = iAssetPoolFactory.getAssetPoolXToken(assetTokens[i]);
     }
 
-    return rewardTokens;
+    return xTokens;
   }
 
   /* ========== Update Protocol Settings ========== */
 
-  function setDefaultRedemptionFeeWithUSBTokens(uint256 newDefaultRedemptionFeeWithUSBTokens) external nonReentrant onlyOwner {
-    IProtocolSettings(settings).setDefaultRedemptionFeeWithUSBTokens(newDefaultRedemptionFeeWithUSBTokens);
+  function setDefaultC1(uint256 newDefaultC1) external nonReentrant onlyOwner {
+    IProtocolSettings(settings).setDefaultC1(newDefaultC1);
   }
 
-  function setDefaultRedemptionFeeWithXTokens(uint256 newDefaultRedemptionFeeWithXTokens) external nonReentrant onlyOwner {
-    IProtocolSettings(settings).setDefaultRedemptionFeeWithXTokens(newDefaultRedemptionFeeWithXTokens);
+  function setDefaultC2(uint256 newDefaultC2) external nonReentrant onlyOwner {
+    IProtocolSettings(settings).setDefaultC2(newDefaultC2);
   }
 
-  function setRedemptionFeeWithUSBTokens(address assetToken, uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyOwner {
-    IAssetPoolFactory(assetPoolFactory).setRedemptionFeeWithUSBTokens(assetToken, newRedemptionFeeWithUSBTokens);
+  function setC1(address assetToken, uint256 newC1) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setC1(assetToken, newC1);
   }
 
-  function setRedemptionFeeWithXTokens(address assetToken,  uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyOwner {
-    IAssetPoolFactory(assetPoolFactory).setRedemptionFeeWithXTokens(assetToken, newRedemptionFeeWithXTokens);
+  function setC2(address assetToken,  uint256 newC2) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setC2(assetToken, newC2);
+  }
+
+  function setY(address assetToken, uint256 newY) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setY(assetToken, newY);
   }
 }

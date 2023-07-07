@@ -26,11 +26,13 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   address public immutable usbToken;
   address public immutable xToken;
 
-  uint256 private _usbTotalSupply;
+  uint256 internal _usbTotalSupply;
 
-  uint256 private immutable _settingsDecimals;
-  uint256 private _redemptionFeeWithUSBTokens;
-  uint256 private _redemptionFeeWithXTokens;
+  uint256 internal immutable _settingsDecimals;
+
+  uint256 public C1;
+  uint256 public C2;
+  uint256 public Y;
 
   constructor(
     address _wandProtocol,
@@ -39,7 +41,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     address _assetTokenPriceFeed,
     address _usbToken,
     string memory _xTokenName,
-    string memory _xTokenSymbol
+    string memory _xTokenSymbol,
+    uint256 _Y
   ) {
     require(_wandProtocol != address(0), "Zero address detected");
     require(_assetPoolFactory != address(0), "Zero address detected");
@@ -54,9 +57,12 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     xToken = address(new AssetX(address(this), _xTokenName, _xTokenSymbol));
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
-    _settingsDecimals = settings.settingDecimals();
-    _redemptionFeeWithUSBTokens = settings.defaultRedemptionFeeWithUSBTokens();
-    _redemptionFeeWithXTokens = settings.defaultRedemptionFeeWithXTokens();
+    _settingsDecimals = settings.decimals();
+    C1 = settings.defaultC1();
+    C2 = settings.defaultC2();
+    
+    settings.assertY(_Y);
+    Y = _Y;
   }
 
   /* ================= VIEWS ================ */
@@ -150,7 +156,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // if AAR >= 100%,  Δeth = (Δusb / Peth) * (1 -C1)
     if (aar >= 10 ** currentAssetAdequencyRatioDecimals()) {
       assetAmount = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice).mul(
-        (10 ** _settingsDecimals).sub(_redemptionFeeWithUSBTokens)
+        (10 ** _settingsDecimals).sub(C1)
       ).div(10 ** _settingsDecimals);
     }
     // else if AAR < 100%, Δeth = (Δusb * Meth) / Musb-eth
@@ -175,7 +181,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     // Δeth = Δethx * Meth / Methx * (1 -C2)
     uint256 assetAmount = xTokenAmount.mul(_getAssetTotalAmount()).div(AssetX(xToken).totalSupply()).mul(
-      (10 ** _settingsDecimals).sub(_redemptionFeeWithXTokens)
+      (10 ** _settingsDecimals).sub(C2)
     ).div(10 ** _settingsDecimals);
 
     USB(usbToken).burn(_msgSender(), pairedUSBAmount);
@@ -188,26 +194,35 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function setRedemptionFeeWithUSBTokens(uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyAssetPoolFactory {
-    require(newRedemptionFeeWithUSBTokens != _redemptionFeeWithUSBTokens, "Same redemption fee");
+  function setC1(uint256 newC1) external nonReentrant onlyAssetPoolFactory {
+    require(newC1 != C1, "Same redemption fee");
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
-    settings.assertRedemptionFeeWithUSBTokens(newRedemptionFeeWithUSBTokens);
+    settings.assertC1(newC1);
     
-    _redemptionFeeWithUSBTokens = newRedemptionFeeWithUSBTokens;
-    emit RedemptionFeeWithUSBTokensUpdated(_redemptionFeeWithUSBTokens, newRedemptionFeeWithUSBTokens);
+    C1 = newC1;
+    emit UpdatedC1(C1, newC1);
   }
 
-  function setRedemptionFeeWithXTokens(uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyAssetPoolFactory {
-    require(newRedemptionFeeWithXTokens != _redemptionFeeWithXTokens, "Same redemption fee");
+  function setC2(uint256 newC2) external nonReentrant onlyAssetPoolFactory {
+    require(newC2 != C2, "Same redemption fee");
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
-    settings.assertRedemptionFeeWithXTokens(newRedemptionFeeWithXTokens);
+    settings.assertC2(newC2);
 
-    _redemptionFeeWithXTokens = newRedemptionFeeWithXTokens;
-    emit RedemptionFeeWithXTokensUpdated(_redemptionFeeWithXTokens, newRedemptionFeeWithXTokens);
+    C2 = newC2;
+    emit UpdatedC2(C2, newC2);
   }
 
+  function setY(uint256 newY) external nonReentrant onlyAssetPoolFactory {
+    require(newY != Y, "Same yield rate");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertY(newY);
+
+    Y = newY;
+    emit UpdatedY(Y, newY);
+  }
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
@@ -236,8 +251,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   /* =============== EVENTS ============= */
 
-  event RedemptionFeeWithUSBTokensUpdated(uint256 prevRedemptionFeeWithUSBTokens, uint256 newDefaultRedemptionFeeWithUSBTokens);
-  event RedemptionFeeWithXTokensUpdated(uint256 prevRedemptionFeeWithXTokens, uint256 newDefaultRedemptionFeeWithXTokens);
+  event UpdatedC1(uint256 prevC1, uint256 newC1);
+  event UpdatedC2(uint256 prevC2, uint256 newC2);
+  event UpdatedY(uint256 prevY, uint256 newY);
 
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);

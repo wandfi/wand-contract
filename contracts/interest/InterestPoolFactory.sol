@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-// import "./InterestPool.sol";
 import "./UsbInterestPool.sol";
 import "./UniLpInterestPool.sol";
 import "./CurveLpInterestPool.sol";

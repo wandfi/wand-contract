@@ -5,20 +5,26 @@ interface IProtocolSettings {
 
   /* ============ VIEWS =========== */
 
-  function settingDecimals() external view returns (uint256);
+  function decimals() external view returns (uint256);
 
-  function defaultRedemptionFeeWithUSBTokens() external view returns (uint256);
+  function defaultC1() external view returns (uint256);
 
-  function defaultRedemptionFeeWithXTokens() external view returns (uint256);
+  function defaultC2() external view returns (uint256);
 
-  function assertRedemptionFeeWithUSBTokens(uint256 redemptionFeeWithUSBTokens) external view;
+  function defaultY() external view returns (uint256);
 
-  function assertRedemptionFeeWithXTokens(uint256 redemptionFeeWithXTokens) external view;
+  function assertC1(uint256 C1) external view;
+
+  function assertC2(uint256 C2) external view;
+
+  function assertY(uint256 Y) external view;
 
   /* ============ MUTATIVE FUNCTIONS =========== */
 
-  function setDefaultRedemptionFeeWithUSBTokens(uint256 newRedemptionFeeWithUSBTokens) external;
+  function setDefaultC1(uint256 defaultC1) external;
 
-  function setDefaultRedemptionFeeWithXTokens(uint256 newRedemptionFeeWithXTokens) external;
+  function setDefaultC2(uint256 defaultC2) external;
+
+  function setDefaultY(uint256 defaultY) external;
 
 }

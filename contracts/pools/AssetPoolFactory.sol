@@ -16,10 +16,10 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
   address public immutable wandProtocol;
   address public immutable usbToken;
 
-  EnumerableSet.AddressSet private _assetTokens;
-  EnumerableSet.AddressSet private _assetPools;
+  EnumerableSet.AddressSet internal _assetTokens;
+  EnumerableSet.AddressSet internal _assetPools;
   /// @dev Mapping from asset token to AssetPoolInfo.
-  mapping(address => AssetPoolInfo) private _assetPoolsByAssetToken;
+  mapping(address => AssetPoolInfo) internal _assetPoolsByAssetToken;
 
   struct AssetPoolInfo {
     address pool;
@@ -52,7 +52,7 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     return _assetPoolsByAssetToken[assetToken].xToken;
   }
 
-  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol) external nonReentrant onlyProtocol {
+  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y) external nonReentrant onlyProtocol {
     require(assetToken != address(0), "Zero address detected");
     require(assetPriceFeed != address(0), "Zero address detected");
     require(bytes(xTokenName).length > 0, "Empty x token name");
@@ -62,7 +62,7 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     AssetPoolInfo storage poolInfo = _assetPoolsByAssetToken[assetToken];
     require(poolInfo.pool == address(0), "AssetPool already exists");
 
-    poolInfo.pool = address(new AssetPool(wandProtocol, address(this), assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol));
+    poolInfo.pool = address(new AssetPool(wandProtocol, address(this), assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol, Y));
     poolInfo.assetToken = assetToken;
     poolInfo.assetPriceFeed = assetPriceFeed;
     poolInfo.xToken = AssetPool(poolInfo.pool).xToken();
@@ -80,14 +80,19 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     return _assetPools.contains(poolAddress);
   }
 
-  function setRedemptionFeeWithUSBTokens(address assetToken, uint256 newRedemptionFeeWithUSBTokens) external nonReentrant onlyValidAssetToken(assetToken) {
+  function setC1(address assetToken, uint256 newC1) external nonReentrant onlyValidAssetToken(assetToken) {
     AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
-    IAssetPool(poolInfo.pool).setRedemptionFeeWithUSBTokens(newRedemptionFeeWithUSBTokens);
+    IAssetPool(poolInfo.pool).setC1(newC1);
   }
 
-  function setRedemptionFeeWithXTokens(address assetToken,  uint256 newRedemptionFeeWithXTokens) external nonReentrant onlyValidAssetToken(assetToken) {
+  function setC2(address assetToken,  uint256 newC2) external nonReentrant onlyValidAssetToken(assetToken) {
     AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
-    IAssetPool(poolInfo.pool).setRedemptionFeeWithXTokens(newRedemptionFeeWithXTokens);
+    IAssetPool(poolInfo.pool).setC2(newC2);
+  }
+
+  function setY(address assetToken, uint256 newY) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setY(newY);
   }
 
   /* ============== MODIFIERS =============== */

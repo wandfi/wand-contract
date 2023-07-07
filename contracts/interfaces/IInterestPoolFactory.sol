@@ -18,4 +18,5 @@ interface IInterestPoolFactory {
   function addRewardTokenToAllPools(address rewardToken) external;
 
   function addInterestRewards(address stakingToken, address rewardToken, uint256 amount) external;
+
 }
