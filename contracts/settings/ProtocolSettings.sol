@@ -26,6 +26,18 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MIN_Y = 0;
   uint256 public constant MAX_Y = 5 * 10 ** 9;
 
+  // Target AAR. Default 200%, [100%, 1000%]
+  uint256 public constant MIN_AART = 10 ** 10;
+  uint256 public constant MAX_AART = 10 ** 11;
+
+  // Safe AAR. Default 150%, [100%, 1000%]
+  uint256 public constant MIN_AARS = 10 ** 10;
+  uint256 public constant MAX_AARS = 10 ** 11;
+
+  // Circuit Breaker AAR. Default 110%, [100%, 1000%]
+  uint256 public constant MIN_AARC = 10 ** 10;
+  uint256 public constant MAX_AARC = 10 ** 11;
+
   constructor(address _wandProtocol) {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
@@ -60,6 +72,20 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     require(y <= MAX_Y, "Y too high");
   }
 
+  function assertAART(uint256 aart) public pure {
+    require(aart >= MIN_AART, "AART too low");
+    require(aart <= MAX_AART, "AART too high");
+  }
+
+  function assertAARS(uint256 aars) public pure {
+    require(aars >= MIN_AARS, "AARS too low");
+    require(aars <= MAX_AARS, "AARS too high");
+  }
+
+  function assertAARC(uint256 aarc) public pure {
+    require(aarc >= MIN_AARC, "AARC too low");
+    require(aarc <= MAX_AARC, "AARC too high");
+  }
 
   /* ============ MUTATIVE FUNCTIONS =========== */
 
@@ -79,14 +105,6 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     emit UpdateDefaultC2(_defaultC2, newC2);
   }
 
-  // function setDefaultY(uint256 newY) external nonReentrant onlyProtocol {
-  //   require(newY != _defaultY, "Same yield rate");
-  //   assertY(newY);
-    
-  //   _defaultY = newY;
-  //   emit UpdateDefaultY(_defaultY, newY);
-  // }
-
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {
@@ -98,5 +116,4 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   event UpdateDefaultC1(uint256 prevDefaultC1, uint256 defaultC1);
   event UpdateDefaultC2(uint256 prevDeaultC2, uint256 defaultC2);
-  // event UpdateDefaultY(uint256 prevDefaultY, uint256 defaultY);
 }

@@ -28,8 +28,11 @@ contract WandProtocol is Ownable, ReentrancyGuard {
 
   /* ========== Asset Pool Operations ========== */
 
-  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y) external nonReentrant onlyOwner {
-    IAssetPoolFactory(assetPoolFactory).addAssetPool(assetToken, assetPriceFeed, xTokenName, xTokenSymbol, Y);
+  function addAssetPool(
+    address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol,
+    uint256 Y, uint256 AART, uint256 AARS, uint256 AARC
+  ) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).addAssetPool(assetToken, assetPriceFeed, xTokenName, xTokenSymbol, Y, AART, AARS, AARC);
 
     // Add newly created X token to all interest pools
     address xToken = IAssetPoolFactory(assetPoolFactory).getAssetPoolXToken(assetToken);

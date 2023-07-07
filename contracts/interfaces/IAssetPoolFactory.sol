@@ -7,7 +7,7 @@ interface IAssetPoolFactory {
 
   function assetTokens() external view returns (address[] memory);
   
-  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y) external;
+  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y, uint256 AART, uint256 AARS, uint256 AARC) external;
 
   function getAssetPoolXToken(address assetToken) external view returns (address);
 

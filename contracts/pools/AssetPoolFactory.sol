@@ -52,7 +52,10 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     return _assetPoolsByAssetToken[assetToken].xToken;
   }
 
-  function addAssetPool(address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol, uint256 Y) external nonReentrant onlyProtocol {
+  function addAssetPool(
+    address assetToken, address assetPriceFeed, string memory xTokenName, string memory xTokenSymbol,
+    uint256 Y, uint256 AART, uint256 AARS, uint256 AARC
+  ) external nonReentrant onlyProtocol {
     require(assetToken != address(0), "Zero address detected");
     require(assetPriceFeed != address(0), "Zero address detected");
     require(bytes(xTokenName).length > 0, "Empty x token name");
@@ -62,7 +65,7 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     AssetPoolInfo storage poolInfo = _assetPoolsByAssetToken[assetToken];
     require(poolInfo.pool == address(0), "AssetPool already exists");
 
-    poolInfo.pool = address(new AssetPool(wandProtocol, address(this), assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol, Y));
+    poolInfo.pool = address(new AssetPool(wandProtocol, address(this), assetToken, assetPriceFeed, usbToken, xTokenName, xTokenSymbol, Y, AART, AARS, AARC));
     poolInfo.assetToken = assetToken;
     poolInfo.assetPriceFeed = assetPriceFeed;
     poolInfo.xToken = AssetPool(poolInfo.pool).xToken();

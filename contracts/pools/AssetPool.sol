@@ -36,6 +36,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   uint256 public C1;
   uint256 public C2;
   uint256 public Y;
+  uint256 public AART;
+  uint256 public AARS;
+  uint256 public AARC;
 
   constructor(
     address _wandProtocol,
@@ -45,7 +48,10 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     address _usbToken,
     string memory _xTokenName,
     string memory _xTokenSymbol,
-    uint256 _Y
+    uint256 _Y,
+    uint256 _AART,
+    uint256 _AARS,
+    uint256 _AARC
   ) {
     require(_wandProtocol != address(0), "Zero address detected");
     require(_assetPoolFactory != address(0), "Zero address detected");
@@ -66,6 +72,13 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     settings.assertY(_Y);
     Y = _Y;
+
+    settings.assertAART(_AART);
+    AART = _AART;
+    settings.assertAARS(_AARS);
+    AARS = _AARS;
+    settings.assertAARC(_AARC);
+    AARC = _AARC;
   }
 
   /* ================= VIEWS ================ */
@@ -239,6 +252,36 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     emit UpdatedY(Y, newY);
   }
 
+  function setAART(uint256 newAART) external nonReentrant onlyAssetPoolFactory {
+    require(newAART != AART, "Same target AAR");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertAART(newAART);
+
+    AART = newAART;
+    emit UpdatedAART(AART, newAART);
+  }
+
+  function setAARS(uint256 newAARS) external nonReentrant onlyAssetPoolFactory {
+    require(newAARS != AARS, "Same safe AAR");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertAARS(newAARS);
+
+    AARS = newAARS;
+    emit UpdatedAARS(AARS, newAARS);
+  }
+
+  function setAARC(uint256 newAARC) external nonReentrant onlyAssetPoolFactory {
+    require(newAARC != AARC, "Same circuit breaker AAR");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertAARC(newAARC);
+
+    AARC = newAARC;
+    emit UpdatedAARC(AARC, newAARC);
+  }
+
   /* ========== INTERNAL FUNCTIONS ========== */
 
   function _getAssetTotalAmount() internal view returns (uint256) {
@@ -303,6 +346,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   event UpdatedC1(uint256 prevC1, uint256 newC1);
   event UpdatedC2(uint256 prevC2, uint256 newC2);
   event UpdatedY(uint256 prevY, uint256 newY);
+  event UpdatedAART(uint256 prevAART, uint256 newAART);
+  event UpdatedAARS(uint256 prevAARS, uint256 newAARS);
+  event UpdatedAARC(uint256 prevAARC, uint256 newAARC);
 
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);

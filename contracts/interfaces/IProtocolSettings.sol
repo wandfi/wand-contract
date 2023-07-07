@@ -17,6 +17,12 @@ interface IProtocolSettings {
 
   function assertY(uint256 Y) external view;
 
+  function assertAART(uint256 targetAAR) external view;
+
+  function assertAARS(uint256 safeAAR) external view;
+
+  function assertAARC(uint256 safeAAR) external view;
+
   /* ============ MUTATIVE FUNCTIONS =========== */
 
   function setDefaultC1(uint256 defaultC1) external;
