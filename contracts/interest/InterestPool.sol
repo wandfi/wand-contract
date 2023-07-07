@@ -9,25 +9,20 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../WandProtocol.sol";
+import "../interfaces/IInterestPool.sol";
+import "../libs/Constants.sol";
 
-contract InterestPool is Context, ReentrancyGuard {
+contract InterestPool is IInterestPool, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
-
-  enum StakingTokenType {
-    USB,
-    UniswapV2PairLP,
-    CurvePlainPoolLP
-  }
-
 
   /* ========== STATE VARIABLES ========== */
 
   address public immutable wandProtocol;
   address public immutable interestPoolFactory;
   address public immutable stakingToken;
-  StakingTokenType public immutable stakingTokenType;
+  Constants.InterestPoolStakingTokenType public immutable stakingTokenType;
 
   EnumerableSet.AddressSet private _rewardTokensSet;
 
@@ -45,14 +40,14 @@ contract InterestPool is Context, ReentrancyGuard {
     address _wandProtocol,
     address _interestPoolFactory,
     address _stakingToken,
-    StakingTokenType _stakingTokenType,
+    Constants.InterestPoolStakingTokenType _stakingTokenType,
     address[] memory _rewardTokens
   ) {
     require(_wandProtocol != address(0), "Zero address detected");
     require(_interestPoolFactory != address(0), "Zero address detected");
     require(_stakingToken != address(0), "Zero address detected");
     if (_stakingToken == (WandProtocol(_wandProtocol).usbToken())) {
-      require(_stakingTokenType == StakingTokenType.USB, "Invalid staking token type");
+      require(_stakingTokenType == Constants.InterestPoolStakingTokenType.USB, "Invalid staking token type");
     }
     require(_rewardTokens.length > 0, "No reward tokens");
 
@@ -81,6 +76,10 @@ contract InterestPool is Context, ReentrancyGuard {
         .mul(stakingRewardsPerToken[rewardToken].sub(userStakingRewardsPerTokenPaid[rewardToken][account]))
         .div(1e18)
         .add(userStakingRewards[rewardToken][account]);
+  }
+
+  function rewardTokenAdded(address rewardToken) public view returns (bool) {
+    return _rewardTokensSet.contains(rewardToken);
   }
 
   /**

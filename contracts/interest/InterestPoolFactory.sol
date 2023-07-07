@@ -9,8 +9,11 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "./InterestPool.sol";
+import "../interfaces/IAssetPoolFactory.sol";
+import "../interfaces/IInterestPool.sol";
+import "../interfaces/IInterestPoolFactory.sol";
 
-contract InterestPoolFactory is Context, ReentrancyGuard {
+contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -36,14 +39,18 @@ contract InterestPoolFactory is Context, ReentrancyGuard {
     return _stakingTokens.values();
   }
 
-  function getInterestPoolAddress(address stakingToken) public virtual view returns (address) {
-    require(_interestPoolsByStakingToken[stakingToken] != address(0), 'InterestPool does not exist');
+  function poolExists(address stakingToken) public view returns (bool) {
+    return _interestPoolsByStakingToken[stakingToken] != address(0);
+  }
+
+  function getInterestPoolAddress(address stakingToken) public view returns (address) {
+    require(poolExists(stakingToken), 'InterestPool does not exist');
     return _interestPoolsByStakingToken[stakingToken];
   }
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function addInterestPool(address stakingToken, InterestPool.StakingTokenType stakingTokenType, address[] memory rewardTokens) external nonReentrant onlyProtocol {
+  function addInterestPool(address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType, address[] memory rewardTokens) external nonReentrant onlyProtocol {
     require(stakingToken != address(0), "Zero address detected");
     require(_interestPoolsByStakingToken[stakingToken] == address(0), "InterestPool already exists");
 
@@ -53,12 +60,27 @@ contract InterestPoolFactory is Context, ReentrancyGuard {
     emit InterestPoolAdded(stakingToken, stakingTokenType, rewardTokens, pool);
   }
 
+  function addRewardToken(address stakingToken, address rewardToken) public nonReentrant onlyProtocol {
+    require(_stakingTokens.contains(stakingToken), "Invalid staking token");
+    IInterestPool(_interestPoolsByStakingToken[stakingToken]).addRewardToken(rewardToken);
+  }
+
+  function addRewardTokenToAllPools(address rewardToken) public nonReentrant onlyProtocol {
+    require(rewardToken != address(0), "Zero address detected");
+    
+    for (uint256 i = 0; i < _stakingTokens.length(); i++) {
+      if (!IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]).rewardTokenAdded(rewardToken)) {
+        IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]).addRewardToken(rewardToken);
+      }
+    }
+  }
+
   function addInterestRewards(address stakingToken, address rewardToken, uint256 amount) external nonReentrant onlyAssetPool  {
     require(amount > 0, "Reward amount should be greater than 0");
     require(stakingToken != address(0), "Zero address detected");
     require(_stakingTokens.contains(stakingToken), "Invalid staking token");
 
-    InterestPool(_interestPoolsByStakingToken[stakingToken]).addRewards(rewardToken, amount);
+    IInterestPool(_interestPoolsByStakingToken[stakingToken]).addRewards(rewardToken, amount);
   }
 
   /* ============== MODIFIERS =============== */
@@ -75,6 +97,6 @@ contract InterestPoolFactory is Context, ReentrancyGuard {
 
   /* =============== EVENTS ============= */
 
-  event InterestPoolAdded(address indexed stakingToken, InterestPool.StakingTokenType stakingTokenType, address[] rewardTokens, address interestPool);
+  event InterestPoolAdded(address indexed stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType, address[] rewardTokens, address interestPool);
 
 }

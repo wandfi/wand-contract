@@ -153,13 +153,10 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
         (10 ** _settingsDecimals).sub(_redemptionFeeWithUSBTokens)
       ).div(10 ** _settingsDecimals);
     }
-    // else if AAR < 100%, Δeth = (Δusb * Meth / Musb-eth) * (1 -C1)
+    // else if AAR < 100%, Δeth = (Δusb * Meth) / Musb-eth
     else {
       uint256 assetTotalAmount = _getAssetTotalAmount();
-      uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
-      assetAmount = usbAmount.mul(assetTotalAmount).div(xTokenTotalAmount).mul(
-        (10 ** _settingsDecimals).sub(_redemptionFeeWithUSBTokens)
-      ).div(10 ** _settingsDecimals);
+      assetAmount = usbAmount.mul(assetTotalAmount).div(_usbTotalSupply);
     }
 
     USB(usbToken).burn(_msgSender(), usbAmount);
