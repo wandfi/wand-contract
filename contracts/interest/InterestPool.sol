@@ -12,7 +12,7 @@ import "../WandProtocol.sol";
 import "../interfaces/IInterestPool.sol";
 import "../libs/Constants.sol";
 
-contract InterestPool is IInterestPool, Context, ReentrancyGuard {
+abstract contract InterestPool is IInterestPool, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -22,12 +22,12 @@ contract InterestPool is IInterestPool, Context, ReentrancyGuard {
   address public immutable wandProtocol;
   address public immutable interestPoolFactory;
   address public immutable stakingToken;
-  Constants.InterestPoolStakingTokenType public immutable stakingTokenType;
+  Constants.InterestPoolStakingTokenInfo internal _stakingTokenInfo;
 
-  EnumerableSet.AddressSet private _rewardTokensSet;
+  EnumerableSet.AddressSet internal _rewardTokensSet;
 
-  uint256 private _totalStakingAmount;
-  mapping(address => uint256) private _userStakingAmount;
+  uint256 internal _totalStakingAmount;
+  mapping(address => uint256) internal _userStakingAmount;
 
   // Reward token => Amount
   mapping(address => uint256) public stakingRewardsPerToken;
@@ -40,21 +40,18 @@ contract InterestPool is IInterestPool, Context, ReentrancyGuard {
     address _wandProtocol,
     address _interestPoolFactory,
     address _stakingToken,
-    Constants.InterestPoolStakingTokenType _stakingTokenType,
     address[] memory _rewardTokens
   ) {
     require(_wandProtocol != address(0), "Zero address detected");
     require(_interestPoolFactory != address(0), "Zero address detected");
     require(_stakingToken != address(0), "Zero address detected");
-    if (_stakingToken == (WandProtocol(_wandProtocol).usbToken())) {
-      require(_stakingTokenType == Constants.InterestPoolStakingTokenType.USB, "Invalid staking token type");
-    }
     require(_rewardTokens.length > 0, "No reward tokens");
 
     wandProtocol = _wandProtocol;
     interestPoolFactory = _interestPoolFactory;
+
     stakingToken = _stakingToken;
-    stakingTokenType = _stakingTokenType;
+
     for (uint256 i = 0; i < _rewardTokens.length; i++) {
       addRewardToken(_rewardTokens[i]);
     }
@@ -81,6 +78,12 @@ contract InterestPool is IInterestPool, Context, ReentrancyGuard {
   function rewardTokenAdded(address rewardToken) public view returns (bool) {
     return _rewardTokensSet.contains(rewardToken);
   }
+
+  function stakingTokenInfo() public view returns (Constants.InterestPoolStakingTokenInfo memory) {
+    return _stakingTokenInfo;
+  }
+
+  function totalStakingAmountInUSB() public virtual view returns (uint256);
 
   /**
    * @dev No guarantees are made on the ordering

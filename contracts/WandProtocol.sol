@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
 import "./interest/InterestPoolFactory.sol";
 import "./interfaces/IAssetPoolFactory.sol";
@@ -37,7 +38,7 @@ contract WandProtocol is Ownable, ReentrancyGuard {
     if (!IInterestPoolFactory(interestPoolFactory).poolExists(usbToken)) {
       address[] memory rewardTokons = new address[](1);
       rewardTokons[0] = xToken;
-      IInterestPoolFactory(interestPoolFactory).addInterestPool(usbToken, Constants.InterestPoolStakingTokenType.USB, rewardTokons);
+      IInterestPoolFactory(interestPoolFactory).addInterestPool(usbToken, Constants.InterestPoolStakingTokenType.Usb, address(0), 0, rewardTokons);
     }
     
     // Now iterate all interest pools and add the new X token (if not already added)
@@ -46,7 +47,26 @@ contract WandProtocol is Ownable, ReentrancyGuard {
 
   /* ========== Interest Pool Operations ========== */
 
-  function addInterestPool(address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType) external nonReentrant onlyOwner {
+  function addUsbInterestPool() external nonReentrant onlyOwner {
+    address[] memory rewardTokens = _getInterestPoolRewardTokens();
+    IInterestPoolFactory(interestPoolFactory).addInterestPool(usbToken, Constants.InterestPoolStakingTokenType.Usb, address(0), 0, rewardTokens);
+  }
+
+  function addUniLpInterestPool(address lpToken) external nonReentrant onlyOwner {
+    address[] memory rewardTokens = _getInterestPoolRewardTokens();
+    IInterestPoolFactory(interestPoolFactory).addInterestPool(lpToken, Constants.InterestPoolStakingTokenType.UniswapV2PairLp, address(0), 0, rewardTokens);
+  }
+
+  function addCurveLpInterestPool(address lpToken, address swapPool, uint256 swapPoolCoinsCount) external nonReentrant onlyOwner {
+    address[] memory rewardTokens = _getInterestPoolRewardTokens();
+    IInterestPoolFactory(interestPoolFactory).addInterestPool(lpToken, Constants.InterestPoolStakingTokenType.CurvePlainPoolLp, swapPool, swapPoolCoinsCount, rewardTokens);
+  }
+
+  function addRewardTokenToInterestPool(address stakingToken, address rewardToken) public nonReentrant onlyOwner {
+    IInterestPoolFactory(interestPoolFactory).addRewardToken(stakingToken, rewardToken);
+  }
+
+  function _getInterestPoolRewardTokens() internal view returns (address[] memory) {
     // Get reward token list (currently only x tokens)
     IAssetPoolFactory iAssetPoolFactory = IAssetPoolFactory(assetPoolFactory);
     address[] memory assetTokens = iAssetPoolFactory.assetTokens();
@@ -57,11 +77,7 @@ contract WandProtocol is Ownable, ReentrancyGuard {
       rewardTokens[i] = iAssetPoolFactory.getAssetPoolXToken(assetTokens[i]);
     }
 
-    IInterestPoolFactory(interestPoolFactory).addInterestPool(stakingToken, stakingTokenType, rewardTokens);
-  }
-
-  function addRewardTokenToInterestPool(address stakingToken, address rewardToken) public nonReentrant onlyOwner {
-    IInterestPoolFactory(interestPoolFactory).addRewardToken(stakingToken, rewardToken);
+    return rewardTokens;
   }
 
   /* ========== Update Protocol Settings ========== */

@@ -8,7 +8,10 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "./InterestPool.sol";
+// import "./InterestPool.sol";
+import "./UsbInterestPool.sol";
+import "./UniLpInterestPool.sol";
+import "./CurveLpInterestPool.sol";
 import "../interfaces/IAssetPoolFactory.sol";
 import "../interfaces/IInterestPool.sol";
 import "../interfaces/IInterestPoolFactory.sol";
@@ -50,11 +53,27 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function addInterestPool(address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType, address[] memory rewardTokens) external nonReentrant onlyProtocol {
+  function addInterestPool(
+    address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType,
+    address swapPool, uint256 swapPoolCoinsCount, address[] memory rewardTokens
+  ) external nonReentrant onlyProtocol {
     require(stakingToken != address(0), "Zero address detected");
     require(_interestPoolsByStakingToken[stakingToken] == address(0), "InterestPool already exists");
 
-    address pool = address(new InterestPool(wandProtocol, address(this), stakingToken, stakingTokenType, rewardTokens));
+    address pool;
+    if (stakingTokenType == Constants.InterestPoolStakingTokenType.Usb) {
+      pool = address(new UsbInterestPool(wandProtocol, address(this), stakingToken, rewardTokens));
+    }
+    else if (stakingTokenType == Constants.InterestPoolStakingTokenType.UniswapV2PairLp) {
+      pool = address(new UniLpInterestPool(wandProtocol, address(this), stakingToken, rewardTokens));
+    }
+    else if (stakingTokenType == Constants.InterestPoolStakingTokenType.CurvePlainPoolLp) {
+      pool = address(new CurveLpInterestPool(wandProtocol, address(this), stakingToken, swapPool, swapPoolCoinsCount, rewardTokens));
+    }
+    else {
+      revert("Invalid staking token type");
+    }
+    
     _interestPoolsByStakingToken[stakingToken] = pool;
 
     emit InterestPoolAdded(stakingToken, stakingTokenType, rewardTokens, pool);
@@ -67,7 +86,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
 
   function addRewardTokenToAllPools(address rewardToken) public nonReentrant onlyProtocol {
     require(rewardToken != address(0), "Zero address detected");
-    
+
     for (uint256 i = 0; i < _stakingTokens.length(); i++) {
       if (!IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]).rewardTokenAdded(rewardToken)) {
         IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]).addRewardToken(rewardToken);

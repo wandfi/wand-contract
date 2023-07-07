@@ -11,7 +11,7 @@ interface IInterestPoolFactory {
 
   function getInterestPoolAddress(address stakingToken) external view returns (address);
 
-  function addInterestPool(address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType, address[] memory rewardTokens) external;
+  function addInterestPool(address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType, address swapPool, uint256 swapPoolCoinsCount, address[] memory rewardTokens) external;
 
   function addRewardToken(address stakingToken, address rewardToken) external;
 

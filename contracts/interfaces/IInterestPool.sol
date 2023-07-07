@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "../libs/Constants.sol";
+
 interface IInterestPool {
 
   function totalStakingAmount() external view returns (uint256);
@@ -8,6 +10,10 @@ interface IInterestPool {
   function userStakingAmount(address user) external view returns (uint256);
 
   function rewardTokenAdded(address rewardToken) external view returns (bool);
+
+  function stakingTokenInfo() external view returns (Constants.InterestPoolStakingTokenInfo memory);
+
+  function totalStakingAmountInUSB() external view returns (uint256);
 
   function rewardTokens() external view returns (address[] memory);
 

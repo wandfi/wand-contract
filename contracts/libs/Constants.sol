@@ -10,8 +10,16 @@ library Constants {
   uint256 public constant PROTOCOL_DECIMALS = 10;
 
   enum InterestPoolStakingTokenType {
-    USB,
-    UniswapV2PairLP,
-    CurvePlainPoolLP
+    Usb,
+    UniswapV2PairLp,
+    CurvePlainPoolLp
+  }
+
+  struct InterestPoolStakingTokenInfo {
+    address stakingToken;
+    InterestPoolStakingTokenType stakingTokenType;
+    // Needed if staking token is Uniswap V2 or Curve PlainPool LP token
+    address swapPool;
+    uint256 swapPoolCoinsCount;
   }
 }
