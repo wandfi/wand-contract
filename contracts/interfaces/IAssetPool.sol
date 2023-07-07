@@ -11,7 +11,9 @@ interface IAssetPool {
   /**
    * @notice Current adequency ratio of the pool, with 18 decimals
    */
-  function currentAssetAdequencyRatio() external view returns (uint256);
+  function AAR() external view returns (uint256);
+
+  function AARDecimals() external view returns (uint256);
 
   function setC1(uint256 newC1) external;
 
@@ -26,5 +28,7 @@ interface IAssetPool {
   function redeemByUSB(uint256 usbAmount) external;
 
   function redeemByXTokens(uint256 xTokenAmount) external;
+
+  function interestSettlement() external;
 
 }

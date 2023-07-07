@@ -22,8 +22,7 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MIN_C2 = 0;
   uint256 public constant MAX_C2 = 10 ** 9;
 
-  // Yield rate. Default to 3%. [0, 50%]
-  uint256 private _defaultY = 3 * 10 ** 8;
+  // Yield rate. [0, 50%]
   uint256 public constant MIN_Y = 0;
   uint256 public constant MAX_Y = 5 * 10 ** 9;
 
@@ -44,10 +43,6 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   function defaultC2() public view returns (uint256) {
     return _defaultC2;
-  }
-
-  function defaultY() public view returns (uint256) {
-    return _defaultY;
   }
 
   function assertC1(uint256 c1) public pure override {
@@ -84,13 +79,13 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     emit UpdateDefaultC2(_defaultC2, newC2);
   }
 
-  function setDefaultY(uint256 newY) external nonReentrant onlyProtocol {
-    require(newY != _defaultY, "Same yield rate");
-    assertY(newY);
+  // function setDefaultY(uint256 newY) external nonReentrant onlyProtocol {
+  //   require(newY != _defaultY, "Same yield rate");
+  //   assertY(newY);
     
-    _defaultY = newY;
-    emit UpdateDefaultY(_defaultY, newY);
-  }
+  //   _defaultY = newY;
+  //   emit UpdateDefaultY(_defaultY, newY);
+  // }
 
   /* ============== MODIFIERS =============== */
 
@@ -103,5 +98,5 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   event UpdateDefaultC1(uint256 prevDefaultC1, uint256 defaultC1);
   event UpdateDefaultC2(uint256 prevDeaultC2, uint256 defaultC2);
-  event UpdateDefaultY(uint256 prevDefaultY, uint256 defaultY);
+  // event UpdateDefaultY(uint256 prevDefaultY, uint256 defaultY);
 }

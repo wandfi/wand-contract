@@ -93,12 +93,30 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
     }
   }
 
-  function addInterestRewards(address stakingToken, address rewardToken, uint256 amount) external nonReentrant onlyAssetPool  {
-    require(amount > 0, "Reward amount should be greater than 0");
-    require(stakingToken != address(0), "Zero address detected");
-    require(_stakingTokens.contains(stakingToken), "Invalid staking token");
+  function distributeInterestRewards(address rewardToken, uint256 totalAmount) external nonReentrant onlyAssetPool {
+    require(rewardToken != address(0), "Zero address detected");
+    require(totalAmount > 0, "Reward amount should be greater than 0");
 
-    IInterestPool(_interestPoolsByStakingToken[stakingToken]).addRewards(rewardToken, amount);
+    uint256 totalStakingAmountInUSB = 0;
+    for (uint256 i = 0; i < _stakingTokens.length(); i++) {
+      IInterestPool pool = IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]);
+      if (pool.rewardTokenAdded(rewardToken)) {
+        totalStakingAmountInUSB = totalStakingAmountInUSB.add(pool.totalStakingAmountInUSB());
+      }
+    }
+
+    if (totalStakingAmountInUSB == 0) {
+      return;
+    }
+    for (uint256 i = 0; i < _stakingTokens.length(); i++) {
+      IInterestPool pool = IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]);
+      if (pool.rewardTokenAdded(rewardToken)) {
+        uint256 amount = totalAmount.mul(pool.totalStakingAmountInUSB()).div(totalStakingAmountInUSB);
+        if (amount > 0) {
+          pool.addRewards(rewardToken, amount);
+        }
+      }
+    }
   }
 
   /* ============== MODIFIERS =============== */
