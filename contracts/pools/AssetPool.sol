@@ -33,12 +33,17 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   uint256 internal _lastInterestSettlementTime;
 
+  uint256 internal _aarBelowSafeThresholdTime;
+
   uint256 public C1;
   uint256 public C2;
   uint256 public Y;
   uint256 public AART;
   uint256 public AARS;
   uint256 public AARC;
+  uint256 public BasisR;
+  uint256 public RateR;
+  uint256 public BasisR2;
 
   constructor(
     address _wandProtocol,
@@ -58,6 +63,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     require(_assetToken != address(0), "Zero address detected");
     require(_assetTokenPriceFeed != address(0), "Zero address detected");
     require(_usbToken != address(0), "Zero address detected");
+    require(_AARS <= _AART, "Safe AAR must be less than or equal to target AAR");
+    require(_AARC <= _AARS, "Circuit breaker AAR must be less than or equal to safe AAR");
     wandProtocol = _wandProtocol;
     assetPoolFactory = _assetPoolFactory;
     assetToken = _assetToken;
@@ -79,6 +86,10 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     AARS = _AARS;
     settings.assertAARC(_AARC);
     AARC = _AARC;
+
+    BasisR = settings.defaultBasisR();
+    BasisR2 = settings.defaultBasisR2();
+    RateR = settings.defaultRateR();
   }
 
   /* ================= VIEWS ================ */
@@ -94,19 +105,17 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @notice Current adequency ratio of the pool
    * @dev AAReth = (Meth * Peth / Musb-eth) * 100%
    */
-  function AAR() public view returns (uint256) {
-    uint256 assetTotalAmount = _getAssetTotalAmount();
-    if (assetTotalAmount == 0) {
-      return 0;
+  function AAR() public returns (uint256) {
+    uint256 aar = _AAR();
+    if (_aarBelowSafeThresholdTime == 0) {
+      if (aar < AARS) {
+        _aarBelowSafeThresholdTime = block.timestamp;
+      }
+    } else if (aar >= AARS) {
+      _aarBelowSafeThresholdTime = 0;
     }
 
-    uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
-    if (xTokenTotalAmount == 0) {
-      return type(uint256).max;
-    }
-
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(xTokenTotalAmount);
+    return aar;
   }
 
   function AARDecimals() public pure returns (uint256) {
@@ -216,6 +225,40 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     emit AssetRedeemedWithXTokens(_msgSender(), xTokenAmount, pairedUSBAmount, assetAmount);
   }
 
+  function usbToXTokens(uint256 usbAmount) external override nonReentrant doInterestSettlement {
+    require(usbAmount > 0, "Amount must be greater than 0");
+
+    // 𝑟 = 0 𝑖𝑓 𝐴𝐴𝑅 ≥ 2
+    // 𝑟 = 0.1 × (𝑡𝑎𝑟𝑔𝑒𝑡𝐴𝐴𝑅 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2; more specifically, 0.1 is BasisR
+    // 𝑟 = 0.05 + 0.001 × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5；more specifically, 0.05 = 0.1 x (AART - AARS), 0.001 is RateR
+    uint256 aar = AAR();
+    uint256 r;
+    if (aar >= AART) {
+      r = 0;
+    }
+    else if (aar >= AARS) {
+      r = (aar - AARS).mul(BasisR).div(10 ** _settingsDecimals);
+    }
+    else {
+      require(_aarBelowSafeThresholdTime > 0, "AAR dropping below safe threshold time should be recorded");
+      uint256 base = (AART - AARS).mul(BasisR).div(10 ** _settingsDecimals);
+      uint256 timeElapsed = block.timestamp.sub(_aarBelowSafeThresholdTime);
+      r = base.add(RateR.mul(timeElapsed).div(1 hours));
+    }
+
+    // Δethx = (Δusb * Methx * (1 + r)) / (Meth * Peth - Musb-eth)
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
+    uint256 ethxAmount = usbAmount.mul(AssetX(xToken).totalSupply()).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
+      _getAssetTotalAmount().mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(_usbTotalSupply)
+    );
+
+    USB(usbToken).burn(_msgSender(), usbAmount);
+    _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
+    AssetX(xToken).mint(_msgSender(), ethxAmount);
+
+    emit UsbToXTokens(_msgSender(), usbAmount, ethxAmount, aar, r, assetTokenPrice, assetTokenPriceDecimals);
+  }
+
   function interestSettlement() external nonReentrant doInterestSettlement {
     // Nothing to do here
   }
@@ -252,8 +295,39 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     emit UpdatedY(Y, newY);
   }
 
+  function setBasisR(uint256 newBasisR) external nonReentrant onlyAssetPoolFactory {
+    require(newBasisR != BasisR, "Same basis of r");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertBasisR(newBasisR);
+
+    BasisR = newBasisR;
+    emit UpdatedBasisR(BasisR, newBasisR);
+  }
+
+  function setRateR(uint256 newRateR) external nonReentrant onlyAssetPoolFactory {
+    require(newRateR != RateR, "Same rate of r");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertRateR(newRateR);
+
+    RateR = newRateR;
+    emit UpdatedRateR(RateR, newRateR);
+  }
+
+  function setBasisR2(uint256 newBasisR2) external nonReentrant onlyAssetPoolFactory {
+    require(newBasisR2 != BasisR2, "Same basis of R2");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertBasisR2(newBasisR2);
+
+    BasisR2 = newBasisR2;
+    emit UpdatedBasisR2(BasisR2, newBasisR2);
+  }
+
   function setAART(uint256 newAART) external nonReentrant onlyAssetPoolFactory {
     require(newAART != AART, "Same target AAR");
+    require(newAART >= AARS, "Target AAR must be greater than or equal to safe AAR");
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
     settings.assertAART(newAART);
@@ -264,6 +338,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   function setAARS(uint256 newAARS) external nonReentrant onlyAssetPoolFactory {
     require(newAARS != AARS, "Same safe AAR");
+    require(newAARS <= AART, "Safe AAR must be less than or equal to target AAR");
+    require(newAARS >= AARC, "Safe AAR must be greater than or equal to circuit breaker AAR");
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
     settings.assertAARS(newAARS);
@@ -274,6 +350,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   function setAARC(uint256 newAARC) external nonReentrant onlyAssetPoolFactory {
     require(newAARC != AARC, "Same circuit breaker AAR");
+    require(newAARC <= AARS, "Circuit breaker AAR must be less than or equal to safe AAR");
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
     settings.assertAARC(newAARC);
@@ -298,6 +375,21 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 priceDecimals = IPriceFeed(assetTokenPriceFeed).decimals();
 
     return (price, priceDecimals);
+  }
+
+  function _AAR() internal view returns (uint256) {
+    uint256 assetTotalAmount = _getAssetTotalAmount();
+    if (assetTotalAmount == 0) {
+      return 0;
+    }
+
+    uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
+    if (xTokenTotalAmount == 0) {
+      return type(uint256).max;
+    }
+
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
+    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(xTokenTotalAmount);
   }
 
   function _interestSettlement() internal {
@@ -349,11 +441,15 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   event UpdatedAART(uint256 prevAART, uint256 newAART);
   event UpdatedAARS(uint256 prevAARS, uint256 newAARS);
   event UpdatedAARC(uint256 prevAARC, uint256 newAARC);
+  event UpdatedBasisR(uint256 prevBasisR, uint256 newBasisR);
+  event UpdatedRateR(uint256 prevRateR, uint256 newRateR);
+  event UpdatedBasisR2(uint256 prevBasisR2, uint256 newBasisR2);
 
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithXTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount);
+  event UsbToXTokens(address indexed user, uint256 usbAmount, uint256 xTokenAmount, uint256 aar, uint256 r, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
 
   event InterestSettlement(uint256 interestAmount);
 }

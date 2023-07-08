@@ -16,4 +16,10 @@ interface IAssetPoolFactory {
   function setC2(address assetToken,  uint256 newC2) external;
 
   function setY(address assetToken, uint256 newY) external;
+
+  function setBasisR(address assetToken, uint256 newBasisR) external;
+
+  function setRateR(address assetToken, uint256 newRateR) external;
+
+  function setBasisR2(address assetToken, uint256 newBasisR2) external;
 }

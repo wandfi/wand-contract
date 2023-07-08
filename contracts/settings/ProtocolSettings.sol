@@ -38,6 +38,21 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MIN_AARC = 10 ** 10;
   uint256 public constant MAX_AARC = 10 ** 11;
 
+  // Basis of r. Default to 0.1, [0, 1]
+  uint256 private _defaultBasisR = 10 ** 9;
+  uint256 public constant MIN_BASIS_R = 0;
+  uint256 public constant MAX_BASIS_R = 10 ** 10;
+
+  // Rate of r change per hour. Default to 0.001, [0.01, 0.1]
+  uint256 private _defaultRateR = 10 ** 7;
+  uint256 public constant MIN_RATE_R = 10 ** 8;
+  uint256 public constant MAX_RATE_R = 10 ** 9;
+
+  // Basis of R2. Default to 0.06, [0, 1]
+  uint256 private _defaultBasisR2 = 6 * 10 ** 8;
+  uint256 public constant MIN_BASIS_R2 = 0;
+  uint256 public constant MAX_BASIS_R2 = 10 ** 10;
+
   constructor(address _wandProtocol) {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
@@ -87,6 +102,33 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     require(aarc <= MAX_AARC, "AARC too high");
   }
 
+  function defaultBasisR() public view returns (uint256) {
+    return _defaultBasisR;
+  }
+
+  function assertBasisR(uint256 basisR) public pure {
+    require(basisR >= MIN_BASIS_R, "Basis r too low");
+    require(basisR <= MAX_BASIS_R, "Basis r too high");
+  }
+
+  function defaultRateR() public view returns (uint256) {
+    return _defaultRateR;
+  }
+
+  function assertRateR(uint256 rateR) public pure {
+    require(rateR >= MIN_RATE_R, "Rate r too low");
+    require(rateR <= MAX_RATE_R, "Rate r too high");
+  }
+
+  function defaultBasisR2() public view returns (uint256) {
+    return _defaultBasisR2;
+  }
+
+  function assertBasisR2(uint256 basisR2) public pure {
+    require(basisR2 >= MIN_BASIS_R2, "Basis R2 too low");
+    require(basisR2 <= MAX_BASIS_R2, "Basis R2 too high");
+  }
+
   /* ============ MUTATIVE FUNCTIONS =========== */
 
   function setDefaultC1(uint256 newC1) external nonReentrant onlyProtocol {
@@ -105,6 +147,30 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     emit UpdateDefaultC2(_defaultC2, newC2);
   }
 
+  function setDefaultBasisR(uint256 newBasisR) external nonReentrant onlyProtocol {
+    require(newBasisR != _defaultBasisR, "Same basis r");
+    assertBasisR(newBasisR);
+    
+    _defaultBasisR = newBasisR;
+    emit UpdateDefaultBasisR(_defaultBasisR, newBasisR);
+  }
+
+  function setDefaultRateR(uint256 newRateR) external nonReentrant onlyProtocol {
+    require(newRateR != _defaultRateR, "Same rate r");
+    assertRateR(newRateR);
+    
+    _defaultRateR = newRateR;
+    emit UpdateDefaultRateR(_defaultRateR, newRateR);
+  }
+
+  function setDefaultBasisR2(uint256 newBasisR2) external nonReentrant onlyProtocol {
+    require(newBasisR2 != _defaultBasisR2, "Same basis R2");
+    assertBasisR2(newBasisR2);
+    
+    _defaultBasisR2 = newBasisR2;
+    emit UpdateDefaultBasisR2(_defaultBasisR2, newBasisR2);
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {
@@ -116,4 +182,7 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   event UpdateDefaultC1(uint256 prevDefaultC1, uint256 defaultC1);
   event UpdateDefaultC2(uint256 prevDeaultC2, uint256 defaultC2);
+  event UpdateDefaultBasisR(uint256 prevDefaultBasisR, uint256 defaultBasisR);
+  event UpdateDefaultRateR(uint256 prevDefaultRateR, uint256 defaultRateR);
+  event UpdateDefaultBasisR2(uint256 prevDefaultBasisR2, uint256 defaultBasisR2);
 }

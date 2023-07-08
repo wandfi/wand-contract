@@ -98,6 +98,21 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     IAssetPool(poolInfo.pool).setY(newY);
   }
 
+  function setBasisR(address assetToken, uint256 newBasisR) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setBasisR(newBasisR);
+  }
+
+  function setRateR(address assetToken, uint256 newRateR) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setRateR(newRateR);
+  }
+
+  function setBasisR2(address assetToken, uint256 newBasisR2) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setBasisR2(newBasisR2);
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {

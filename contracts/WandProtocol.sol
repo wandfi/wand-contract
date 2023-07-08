@@ -104,4 +104,17 @@ contract WandProtocol is Ownable, ReentrancyGuard {
   function setY(address assetToken, uint256 newY) external nonReentrant onlyOwner {
     IAssetPoolFactory(assetPoolFactory).setY(assetToken, newY);
   }
+
+  function setBasisR(address assetToken, uint256 newBasisR) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setBasisR(assetToken, newBasisR);
+  }
+
+  function setRateR(address assetToken, uint256 newRateR) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setRateR(assetToken, newRateR);
+  }
+
+  function setBasisR2(address assetToken, uint256 newBasisR2) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setBasisR2(assetToken, newBasisR2);
+  }
+
 }
