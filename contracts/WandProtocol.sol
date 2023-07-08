@@ -117,4 +117,8 @@ contract WandProtocol is Ownable, ReentrancyGuard {
     IAssetPoolFactory(assetPoolFactory).setBasisR2(assetToken, newBasisR2);
   }
 
+  function setCiruitBreakPeriod(address assetToken, uint256 newCiruitBreakPeriod) external nonReentrant onlyOwner {
+    IAssetPoolFactory(assetPoolFactory).setCiruitBreakPeriod(assetToken, newCiruitBreakPeriod);
+  }
+
 }

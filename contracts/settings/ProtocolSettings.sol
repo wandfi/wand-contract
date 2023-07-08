@@ -53,6 +53,11 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MIN_BASIS_R2 = 0;
   uint256 public constant MAX_BASIS_R2 = 10 ** 10;
 
+  // Circuit breaker period. Default to 1 hour
+  uint256 private _defaultCiruitBreakPeriod = 1 hours;
+  uint256 public constant MIN_CIRCUIT_BREAK_PERIOD = 1 minutes;
+  uint256 public constant MAX_CIRCUIT_BREAK_PERIOD = 1 days;
+
   constructor(address _wandProtocol) {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
@@ -129,6 +134,15 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     require(basisR2 <= MAX_BASIS_R2, "Basis R2 too high");
   }
 
+  function defaultCiruitBreakPeriod() public view returns (uint256) {
+    return _defaultCiruitBreakPeriod;
+  }
+
+  function assertCiruitBreakPeriod(uint256 circuitBreakPeriod) public pure {
+    require(circuitBreakPeriod >= MIN_CIRCUIT_BREAK_PERIOD, "Circuit break period too short");
+    require(circuitBreakPeriod <= MAX_CIRCUIT_BREAK_PERIOD, "Circuit break period too long");
+  }
+
   /* ============ MUTATIVE FUNCTIONS =========== */
 
   function setDefaultC1(uint256 newC1) external nonReentrant onlyProtocol {
@@ -171,6 +185,14 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     emit UpdateDefaultBasisR2(_defaultBasisR2, newBasisR2);
   }
 
+  function setDefaultCiruitBreakPeriod(uint256 newDefaultCircuitBreakPeriod) external nonReentrant onlyProtocol {
+    require(newDefaultCircuitBreakPeriod != _defaultCiruitBreakPeriod, "Same default circuit break period");
+    assertCiruitBreakPeriod(newDefaultCircuitBreakPeriod);
+    
+    _defaultCiruitBreakPeriod = newDefaultCircuitBreakPeriod;
+    emit UpdateDefaultCircuitBreakPeriod(_defaultCiruitBreakPeriod, newDefaultCircuitBreakPeriod);
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {
@@ -185,4 +207,5 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   event UpdateDefaultBasisR(uint256 prevDefaultBasisR, uint256 defaultBasisR);
   event UpdateDefaultRateR(uint256 prevDefaultRateR, uint256 defaultRateR);
   event UpdateDefaultBasisR2(uint256 prevDefaultBasisR2, uint256 defaultBasisR2);
+  event UpdateDefaultCircuitBreakPeriod(uint256 prevDefaultCircuitBreakPeriod, uint256 circuitDefaultBreakPeriod);
 }

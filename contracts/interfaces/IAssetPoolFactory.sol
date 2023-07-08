@@ -22,4 +22,6 @@ interface IAssetPoolFactory {
   function setRateR(address assetToken, uint256 newRateR) external;
 
   function setBasisR2(address assetToken, uint256 newBasisR2) external;
+
+  function setCiruitBreakPeriod(address assetToken, uint256 newCiruitBreakPeriod) external;
 }

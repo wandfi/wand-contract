@@ -35,6 +35,10 @@ interface IProtocolSettings {
 
   function assertBasisR2(uint256 basisR2) external view;
 
+  function defaultCiruitBreakPeriod() external view returns (uint256);
+
+  function assertCiruitBreakPeriod(uint256 circuitBreakPeriod) external view;
+
   /* ============ MUTATIVE FUNCTIONS =========== */
 
   function setDefaultC1(uint256 defaultC1) external;
@@ -46,5 +50,7 @@ interface IProtocolSettings {
   function setDefaultRateR(uint256 newRateR) external;
 
   function setDefaultBasisR2(uint256 newBasisR2) external;
+
+  function setDefaultCiruitBreakPeriod(uint256 newCircuitBreakPeriod) external;
 
 }

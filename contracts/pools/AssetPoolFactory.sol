@@ -113,6 +113,11 @@ contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
     IAssetPool(poolInfo.pool).setBasisR2(newBasisR2);
   }
 
+  function setCiruitBreakPeriod(address assetToken, uint256 newCiruitBreakPeriod) external nonReentrant onlyValidAssetToken(assetToken) {
+    AssetPoolInfo memory poolInfo = _assetPoolsByAssetToken[assetToken];
+    IAssetPool(poolInfo.pool).setCiruitBreakPeriod(newCiruitBreakPeriod);
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {

@@ -34,6 +34,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   uint256 internal _lastInterestSettlementTime;
 
   uint256 internal _aarBelowSafeThresholdTime;
+  uint256 internal _aarBelowCircuitBreakerThresholdTime;
 
   uint256 public C1;
   uint256 public C2;
@@ -44,6 +45,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   uint256 public BasisR;
   uint256 public RateR;
   uint256 public BasisR2;
+  uint256 public CiruitBreakPeriod;
 
   constructor(
     address _wandProtocol,
@@ -90,6 +92,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     BasisR = settings.defaultBasisR();
     BasisR2 = settings.defaultBasisR2();
     RateR = settings.defaultRateR();
+    CiruitBreakPeriod = settings.defaultCiruitBreakPeriod();
   }
 
   /* ================= VIEWS ================ */
@@ -107,12 +110,21 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    */
   function AAR() public returns (uint256) {
     uint256 aar = _AAR();
+
     if (_aarBelowSafeThresholdTime == 0) {
       if (aar < AARS) {
         _aarBelowSafeThresholdTime = block.timestamp;
       }
     } else if (aar >= AARS) {
       _aarBelowSafeThresholdTime = 0;
+    }
+
+    if (_aarBelowCircuitBreakerThresholdTime == 0) {
+      if (aar < AARC) {
+        _aarBelowCircuitBreakerThresholdTime = block.timestamp;
+      }
+    } else if (aar >= AARC) {
+      _aarBelowCircuitBreakerThresholdTime = 0;
     }
 
     return aar;
@@ -134,12 +146,25 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   /**
    * @notice Mint $USB tokens using asset token
-   * @dev Δusb = Δeth * Peth
    * @param assetAmount: Amount of asset token used to mint
    */
   function mintUSB(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
+    uint256 aar = AAR();
+    require(aar >= AARS, "Safe AAR reached");
+
+    uint256 R2;
+    if (aar >= AART) {
+      R2 = 0;
+    }
+    else {
+      R2 = AART.sub(aar).mul(BasisR2).div(10 ** _settingsDecimals);
+    }
+
+    // Δusb = Δeth * Peth * (1 - R2)
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    uint256 tokenAmount = assetAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals);
+    uint256 tokenAmount = assetAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(
+      (10 ** _settingsDecimals).sub(R2)
+    ).div(10 ** _settingsDecimals);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     USB(usbToken).mint(_msgSender(), tokenAmount);
@@ -153,6 +178,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param assetAmount: Amount of asset token used to mint
    */
   function mintXTokens(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
+    uint256 aar = AAR();
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerThresholdTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
+
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
 
     // Initial mint: Δethx = Δeth
@@ -232,16 +260,17 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // 𝑟 = 0.1 × (𝑡𝑎𝑟𝑔𝑒𝑡𝐴𝐴𝑅 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2; more specifically, 0.1 is BasisR
     // 𝑟 = 0.05 + 0.001 × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5；more specifically, 0.05 = 0.1 x (AART - AARS), 0.001 is RateR
     uint256 aar = AAR();
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerThresholdTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
     uint256 r;
     if (aar >= AART) {
       r = 0;
     }
     else if (aar >= AARS) {
-      r = (aar - AARS).mul(BasisR).div(10 ** _settingsDecimals);
+      r = aar.sub(AARS).mul(BasisR).div(10 ** _settingsDecimals);
     }
     else {
       require(_aarBelowSafeThresholdTime > 0, "AAR dropping below safe threshold time should be recorded");
-      uint256 base = (AART - AARS).mul(BasisR).div(10 ** _settingsDecimals);
+      uint256 base = AART.sub(AARS).mul(BasisR).div(10 ** _settingsDecimals);
       uint256 timeElapsed = block.timestamp.sub(_aarBelowSafeThresholdTime);
       r = base.add(RateR.mul(timeElapsed).div(1 hours));
     }
@@ -323,6 +352,16 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     BasisR2 = newBasisR2;
     emit UpdatedBasisR2(BasisR2, newBasisR2);
+  }
+
+  function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external nonReentrant onlyAssetPoolFactory {
+    require(newCiruitBreakPeriod != CiruitBreakPeriod, "Same circuit breaker period");
+
+    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    settings.assertCiruitBreakPeriod(newCiruitBreakPeriod);
+
+    CiruitBreakPeriod = newCiruitBreakPeriod;
+    emit UpdateCiruitBreakPeriod(CiruitBreakPeriod, newCiruitBreakPeriod);
   }
 
   function setAART(uint256 newAART) external nonReentrant onlyAssetPoolFactory {
@@ -444,6 +483,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   event UpdatedBasisR(uint256 prevBasisR, uint256 newBasisR);
   event UpdatedRateR(uint256 prevRateR, uint256 newRateR);
   event UpdatedBasisR2(uint256 prevBasisR2, uint256 newBasisR2);
+  event UpdateCiruitBreakPeriod(uint256 prevCiruitBreakPeriod, uint256 newCiruitBreakPeriod);
 
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);

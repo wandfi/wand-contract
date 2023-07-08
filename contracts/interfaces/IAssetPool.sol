@@ -26,6 +26,8 @@ interface IAssetPool {
   function setRateR(uint256 newRateR) external;
 
   function setBasisR2(uint256 newBasisR2) external;
+
+  function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external; 
   
   function mintUSB(uint256 assetAmount) external payable;
 
