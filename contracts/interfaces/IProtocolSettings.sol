@@ -5,6 +5,8 @@ interface IProtocolSettings {
 
   /* ============ VIEWS =========== */
 
+  function treasury() external view returns (address);
+
   function decimals() external view returns (uint256);
 
   function defaultC1() external view returns (uint256);
@@ -39,7 +41,13 @@ interface IProtocolSettings {
 
   function assertCiruitBreakPeriod(uint256 circuitBreakPeriod) external view;
 
+  function defaultXTokensTransferFee() external view returns (uint256);
+
+  function assertXTokensTransferFee(uint256 xTokensTransferFee) external pure;
+
   /* ============ MUTATIVE FUNCTIONS =========== */
+
+  function setTreasury(address newTreasury) external;
 
   function setDefaultC1(uint256 defaultC1) external;
 
@@ -52,5 +60,7 @@ interface IProtocolSettings {
   function setDefaultBasisR2(uint256 newBasisR2) external;
 
   function setDefaultCiruitBreakPeriod(uint256 newCircuitBreakPeriod) external;
+
+  function setDefaultXTokensTransferFee(uint256 newDefaultXTokensTransferFee) external;
 
 }

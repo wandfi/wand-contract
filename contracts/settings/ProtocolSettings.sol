@@ -12,13 +12,15 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   address public immutable wandProtocol;
 
+  address internal _treasury;
+
   // Redemption fee rate with $USB. Default to 0.1%. [0, 10%]
-  uint256 private _defaultC1 = 1 * 10 ** 7;
+  uint256 internal _defaultC1 = 1 * 10 ** 7;
   uint256 public constant MIN_C1 = 0;
   uint256 public constant MAX_C1 = 10 ** 9;
 
   // Redemption fee rate with X tokens paired with $USB. Default to 0.5%. [0, 10%]
-  uint256 private _defaultC2 = 5 * 10 ** 7;
+  uint256 internal _defaultC2 = 5 * 10 ** 7;
   uint256 public constant MIN_C2 = 0;
   uint256 public constant MAX_C2 = 10 ** 9;
 
@@ -39,31 +41,42 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MAX_AARC = 10 ** 11;
 
   // Basis of r. Default to 0.1, [0, 1]
-  uint256 private _defaultBasisR = 10 ** 9;
+  uint256 internal _defaultBasisR = 10 ** 9;
   uint256 public constant MIN_BASIS_R = 0;
   uint256 public constant MAX_BASIS_R = 10 ** 10;
 
   // Rate of r change per hour. Default to 0.001, [0.01, 0.1]
-  uint256 private _defaultRateR = 10 ** 7;
+  uint256 internal _defaultRateR = 10 ** 7;
   uint256 public constant MIN_RATE_R = 10 ** 8;
   uint256 public constant MAX_RATE_R = 10 ** 9;
 
   // Basis of R2. Default to 0.06, [0, 1]
-  uint256 private _defaultBasisR2 = 6 * 10 ** 8;
+  uint256 internal _defaultBasisR2 = 6 * 10 ** 8;
   uint256 public constant MIN_BASIS_R2 = 0;
   uint256 public constant MAX_BASIS_R2 = 10 ** 10;
 
   // Circuit breaker period. Default to 1 hour
-  uint256 private _defaultCiruitBreakPeriod = 1 hours;
+  uint256 internal _defaultCiruitBreakPeriod = 1 hours;
   uint256 public constant MIN_CIRCUIT_BREAK_PERIOD = 1 minutes;
   uint256 public constant MAX_CIRCUIT_BREAK_PERIOD = 1 days;
 
-  constructor(address _wandProtocol) {
+  // X Tokens transfer fee. Default to 0.05%, [0, 10%]
+  uint256 internal _defaultXTokensTransferFee = 5 * 10 ** 6;
+  uint256 public constant MIN_X_TOKENS_TRANSFER_FEE = 0;
+  uint256 public constant MAX_X_TOKENS_TRANSFER_FEE = 10 ** 9;
+
+
+  constructor(address _wandProtocol, address _treasury_) {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
+    setTreasury(_treasury_);
   }
 
   /* ============== VIEWS =============== */
+
+  function treasury() public view override returns (address) {
+    return _treasury;
+  }
 
   function decimals() public pure returns (uint256) {
     return Constants.PROTOCOL_DECIMALS;
@@ -143,7 +156,23 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     require(circuitBreakPeriod <= MAX_CIRCUIT_BREAK_PERIOD, "Circuit break period too long");
   }
 
+  function defaultXTokensTransferFee() public view returns (uint256) {
+    return _defaultXTokensTransferFee;
+  }
+
+  function assertXTokensTransferFee(uint256 xTokensTransferFee) public pure {
+    require(xTokensTransferFee >= MIN_X_TOKENS_TRANSFER_FEE, "X tokens transfer fee too low");
+    require(xTokensTransferFee <= MAX_X_TOKENS_TRANSFER_FEE, "X tokens transfer fee too high");
+  }
+
   /* ============ MUTATIVE FUNCTIONS =========== */
+
+  function setTreasury(address newTreasury) public nonReentrant onlyProtocol {
+    require(newTreasury != address(0), "Zero address detected");
+    require(newTreasury != _treasury, "Same _treasury");
+    _treasury = newTreasury;
+    emit UpdateTreasury(_treasury, newTreasury);
+  }
 
   function setDefaultC1(uint256 newC1) external nonReentrant onlyProtocol {
     require(newC1 != _defaultC1, "Same redemption fee");
@@ -193,6 +222,14 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     emit UpdateDefaultCircuitBreakPeriod(_defaultCiruitBreakPeriod, newDefaultCircuitBreakPeriod);
   }
 
+  function setDefaultXTokensTransferFee(uint256 newDefaultXTokensTransferFee) external nonReentrant onlyProtocol {
+    require(newDefaultXTokensTransferFee != _defaultXTokensTransferFee, "Same default X tokens transfer fee");
+    assertXTokensTransferFee(newDefaultXTokensTransferFee);
+    
+    _defaultXTokensTransferFee = newDefaultXTokensTransferFee;
+    emit UpdateDefaultXTokensTransferFee(_defaultXTokensTransferFee, newDefaultXTokensTransferFee);
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyProtocol() {
@@ -202,10 +239,12 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
   /* =============== EVENTS ============= */
 
+  event UpdateTreasury(address prevTreasury, address newTreasury);
   event UpdateDefaultC1(uint256 prevDefaultC1, uint256 defaultC1);
   event UpdateDefaultC2(uint256 prevDeaultC2, uint256 defaultC2);
   event UpdateDefaultBasisR(uint256 prevDefaultBasisR, uint256 defaultBasisR);
   event UpdateDefaultRateR(uint256 prevDefaultRateR, uint256 defaultRateR);
   event UpdateDefaultBasisR2(uint256 prevDefaultBasisR2, uint256 defaultBasisR2);
   event UpdateDefaultCircuitBreakPeriod(uint256 prevDefaultCircuitBreakPeriod, uint256 circuitDefaultBreakPeriod);
+  event UpdateDefaultXTokensTransferFee(uint256 prevDefaultXTokensTransferFee, uint256 defaultXTokensTransferFee);
 }

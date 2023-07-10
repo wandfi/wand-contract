@@ -20,7 +20,7 @@ contract WandProtocol is Ownable, ReentrancyGuard {
   address public immutable interestPoolFactory;
 
   constructor() Ownable() {
-    settings = address(new ProtocolSettings(address(this)));
+    settings = address(new ProtocolSettings(address(this), _msgSender()));
     usbToken = address(new USB(address(this), "USB Token", "USB"));
     assetPoolFactory = address(new AssetPoolFactory(address(this), usbToken));
     interestPoolFactory = address(new InterestPoolFactory(address(this)));
@@ -84,6 +84,10 @@ contract WandProtocol is Ownable, ReentrancyGuard {
   }
 
   /* ========== Update Protocol Settings ========== */
+
+  function setTreasury(address newTreasury) external nonReentrant onlyOwner {
+    IProtocolSettings(settings).setTreasury(newTreasury);
+  }
 
   function setDefaultC1(uint256 newDefaultC1) external nonReentrant onlyOwner {
     IProtocolSettings(settings).setDefaultC1(newDefaultC1);

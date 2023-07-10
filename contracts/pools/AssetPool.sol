@@ -72,7 +72,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     assetToken = _assetToken;
     assetTokenPriceFeed = _assetTokenPriceFeed;
     usbToken = _usbToken;
-    xToken = address(new AssetX(address(this), _xTokenName, _xTokenSymbol));
+    xToken = address(new AssetX(_wandProtocol, address(this), _xTokenName, _xTokenSymbol));
 
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
     _settingsDecimals = settings.decimals();
@@ -213,11 +213,11 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
 
     // if AAR >= 100%,  Δeth = (Δusb / Peth) * (1 -C1)
+    uint256 fee = 0;
     if (aar >= 10 ** AARDecimals()) {
-      // TODO: set aside admin fees
-      assetAmount = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice).mul(
-        (10 ** _settingsDecimals).sub(C1)
-      ).div(10 ** _settingsDecimals);
+      uint256 total = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice);
+      fee = total.mul(C1).div(10 ** _settingsDecimals);
+      assetAmount = total.sub(fee);
     }
     // else if AAR < 100%, Δeth = (Δusb * Meth) / Musb-eth
     else {
@@ -227,9 +227,15 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     USB(usbToken).burn(_msgSender(), usbAmount);
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
-    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
 
+    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
     emit AssetRedeemedWithUSB(_msgSender(), usbAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
+
+    if (fee > 0) {
+      address treasury = IProtocolSettings(WandProtocol(wandProtocol).settings()).treasury();
+      TokensTransfer.transferTokens(assetToken, address(this), treasury, fee);
+      emit AssetRedeemedWithUSBFeeCollected(_msgSender(), treasury, usbAmount, fee, assetTokenPrice, assetTokenPriceDecimals);
+    }
   }
 
   /**
@@ -240,17 +246,22 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 pairedUSBAmount = pairedUSBAmountToDedeemByXTokens(xTokenAmount);
 
     // Δeth = Δethx * Meth / Methx * (1 -C2)
-    // TODO: set aside admin fees
-    uint256 assetAmount = xTokenAmount.mul(_getAssetTotalAmount()).div(AssetX(xToken).totalSupply()).mul(
-      (10 ** _settingsDecimals).sub(C2)
-    ).div(10 ** _settingsDecimals);
+    uint256 total = xTokenAmount.mul(_getAssetTotalAmount()).div(AssetX(xToken).totalSupply());
+    uint256 fee = total.mul(C2).div(10 ** _settingsDecimals);
+    uint256 assetAmount = total.sub(fee);
 
     USB(usbToken).burn(_msgSender(), pairedUSBAmount);
     _usbTotalSupply = _usbTotalSupply.sub(pairedUSBAmount);
     AssetX(xToken).burn(_msgSender(), xTokenAmount);
-    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
 
+    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
     emit AssetRedeemedWithXTokens(_msgSender(), xTokenAmount, pairedUSBAmount, assetAmount);
+
+    if (fee > 0) {
+      address treasury = IProtocolSettings(WandProtocol(wandProtocol).settings()).treasury();
+      TokensTransfer.transferTokens(assetToken, address(this), treasury, fee);
+      emit AssetRedeemedWithXTokensFeeCollected(_msgSender(), treasury, xTokenAmount, fee, pairedUSBAmount, assetAmount);
+    }
   }
 
   function usbToXTokens(uint256 usbAmount) external override nonReentrant doInterestSettlement {
@@ -488,7 +499,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 usbTokenAmount);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithUSBFeeCollected(address indexed user, address indexed feeTo, uint256 usbTokenAmount, uint256 feeAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithXTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount);
+  event AssetRedeemedWithXTokensFeeCollected(address indexed user, address indexed feeTo, uint256 xTokenAmount, uint256 fee, uint256 pairedUSBAmount, uint256 assetAmount);
   event UsbToXTokens(address indexed user, uint256 usbAmount, uint256 xTokenAmount, uint256 aar, uint256 r, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
 
   event InterestSettlement(uint256 interestAmount);
