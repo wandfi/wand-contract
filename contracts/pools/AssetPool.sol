@@ -143,6 +143,26 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return xTokenAmount.mul(_usbTotalSupply).div(AssetX(xToken).totalSupply());
   }
 
+ /**
+  * This is to workaround the following complier error:
+  *  CompilerError: Stack too deep, try removing local variables.
+  */
+  struct CalculateXTokensOutVars {
+    uint256 assetTotalAmount;
+    uint256 assetTokenPrice;
+    uint256 assetTokenPriceDecimals;
+    uint256 usbSwapableAmountBelowAARS;
+    uint256 usbSwapableAmountAboveAARS;
+    uint256 usbSwapableAmountAboveAART;
+    uint256 xTokenOutBelowAARS;
+    uint256 xTokenOutAboveAARS;
+    uint256 xTokenOutAboveAART;
+    uint256 remainingUSBAmount;
+    uint256 aarForRemainingUSB;
+    uint256 usbTotalSupplyForRemainingUSB;
+    uint256 xTokenTotalSupplyForRemainingUSB;
+  }
+
   function calculateXTokensOut(address account, uint256 usbAmount) public returns (uint256) {
     require(usbAmount > 0, "Amount must be greater than 0");
     require(usbAmount <= USB(usbToken).balanceOf(account), "Not enough $USB balance");
@@ -150,14 +170,15 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 aar = AAR();
     require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerThresholdTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
     
-    uint256 assetTotalAmount = _getAssetTotalAmount();
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    uint256 usbSwapableAmountBelowAARS = 0;
-    uint256 usbSwapableAmountAboveAARS = 0;
-    uint256 usbSwapableAmountAboveAART = 0;
-    uint256 xTokenOutBelowAARS = 0;
-    uint256 xTokenOutAboveAARS = 0;
-    uint256 xTokenOutAboveAART = 0;
+    CalculateXTokensOutVars memory vars;
+    vars.assetTotalAmount = _getAssetTotalAmount();
+    (vars.assetTokenPrice, vars.assetTokenPriceDecimals) = _getAssetTokenPrice();
+    vars.usbSwapableAmountBelowAARS = 0;
+    vars.usbSwapableAmountAboveAARS = 0;
+    vars.usbSwapableAmountAboveAART = 0;
+    vars.xTokenOutBelowAARS = 0;
+    vars.xTokenOutAboveAARS = 0;
+    vars.xTokenOutAboveAART = 0;
 
     // 𝑟 = 0 𝑖𝑓 𝐴𝐴𝑅 ≥ 2
     // 𝑟 = BasisR × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2;
@@ -167,65 +188,80 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     // AAReth = (Meth * Peth / Musb-eth) * 100%
 
-    uint256 remainingUSBAmount = usbAmount;
-    uint256 aarForRemainingUSB = aar;
-    uint256 usbTotalSupplyForRemainingUSB = _usbTotalSupply;
-    uint256 xTokenTotalSupplyForRemainingUSB = AssetX(xToken).totalSupply();
-    if (aarForRemainingUSB < AARS) {
+    vars.remainingUSBAmount = usbAmount;
+    vars.aarForRemainingUSB = aar;
+    vars.usbTotalSupplyForRemainingUSB = _usbTotalSupply;
+    vars.xTokenTotalSupplyForRemainingUSB = AssetX(xToken).totalSupply();
+    if (vars.aarForRemainingUSB < AARS) {
       require(_aarBelowSafeThresholdTime > 0, "AAR dropping below safe threshold time should be recorded");
-      uint256 base = AART.sub(aarForRemainingUSB).mul(BasisR).div(10 ** _settingsDecimals);
+      uint256 base = AART.sub(vars.aarForRemainingUSB).mul(BasisR).div(10 ** _settingsDecimals);
       uint256 timeElapsed = block.timestamp.sub(_aarBelowSafeThresholdTime);
       uint256 r = base.add(RateR.mul(timeElapsed).div(1 hours));
 
       // Well, how many $USB need be burned to make AAR = AARS?
-      uint256 targetUSBAmount = assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(AARS);
-      uint256 maxSwapableUSBAmount = usbTotalSupplyForRemainingUSB.sub(targetUSBAmount);
-      if (remainingUSBAmount <= maxSwapableUSBAmount) {
-        usbSwapableAmountBelowAARS = remainingUSBAmount;
-        remainingUSBAmount = 0;
+      uint256 targetUSBAmount = vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(AARS);
+      uint256 maxSwapableUSBAmount = vars.usbTotalSupplyForRemainingUSB.sub(targetUSBAmount);
+      if (vars.remainingUSBAmount <= maxSwapableUSBAmount) {
+        vars.usbSwapableAmountBelowAARS = vars.remainingUSBAmount;
+        vars.remainingUSBAmount = 0;
       } else {
-        usbSwapableAmountBelowAARS = maxSwapableUSBAmount;
-        remainingUSBAmount = remainingUSBAmount.sub(usbSwapableAmountBelowAARS);
+        vars.usbSwapableAmountBelowAARS = maxSwapableUSBAmount;
+        vars.remainingUSBAmount = vars.remainingUSBAmount.sub(vars.usbSwapableAmountBelowAARS);
       }
-      aarForRemainingUSB = AARS;
-      xTokenOutBelowAARS = usbSwapableAmountBelowAARS.mul(xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
-        assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(usbTotalSupplyForRemainingUSB)
+      vars.aarForRemainingUSB = AARS;
+      vars.xTokenOutBelowAARS = vars.usbSwapableAmountBelowAARS.mul(vars.xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
+        vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).sub(vars.usbTotalSupplyForRemainingUSB)
       );
-      xTokenTotalSupplyForRemainingUSB = xTokenTotalSupplyForRemainingUSB.add(xTokenOutBelowAARS);
-      usbTotalSupplyForRemainingUSB = usbTotalSupplyForRemainingUSB.sub(usbSwapableAmountBelowAARS);
+      vars.xTokenTotalSupplyForRemainingUSB = vars.xTokenTotalSupplyForRemainingUSB.add(vars.xTokenOutBelowAARS);
+      vars.usbTotalSupplyForRemainingUSB = vars.usbTotalSupplyForRemainingUSB.sub(vars.usbSwapableAmountBelowAARS);
     }
 
-    if (remainingUSBAmount > 0 && aarForRemainingUSB < AART) {
-      uint256 r = AART.sub(aarForRemainingUSB).mul(BasisR).div(10 ** _settingsDecimals);
+    if (vars.remainingUSBAmount > 0 && vars.aarForRemainingUSB < AART) {
+      uint256 r = AART.sub(vars.aarForRemainingUSB).mul(BasisR).div(10 ** _settingsDecimals);
 
       // Well, how many $USB need be burned to make AAR = AART?
-      uint256 targetUSBAmount = assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(AART);
-      uint256 maxSwapableUSBAmount = usbTotalSupplyForRemainingUSB.sub(targetUSBAmount);
-      if (remainingUSBAmount <= maxSwapableUSBAmount) {
-        usbSwapableAmountAboveAARS = remainingUSBAmount;
-        remainingUSBAmount = 0;
+      uint256 targetUSBAmount = vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(AART);
+      uint256 maxSwapableUSBAmount = vars.usbTotalSupplyForRemainingUSB.sub(targetUSBAmount);
+      if (vars.remainingUSBAmount <= maxSwapableUSBAmount) {
+        vars.usbSwapableAmountAboveAARS = vars.remainingUSBAmount;
+        vars.remainingUSBAmount = 0;
       } else {
-        usbSwapableAmountAboveAARS = maxSwapableUSBAmount;
-        remainingUSBAmount = remainingUSBAmount.sub(usbSwapableAmountAboveAARS);
+        vars.usbSwapableAmountAboveAARS = maxSwapableUSBAmount;
+        vars.remainingUSBAmount = vars.remainingUSBAmount.sub(vars.usbSwapableAmountAboveAARS);
       }
-      aarForRemainingUSB = AART;
-      xTokenOutAboveAARS = usbSwapableAmountAboveAARS.mul(xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
-        assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(usbTotalSupplyForRemainingUSB)
+      vars.aarForRemainingUSB = AART;
+      vars.xTokenOutAboveAARS = vars.usbSwapableAmountAboveAARS.mul(vars.xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
+        vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).sub(vars.usbTotalSupplyForRemainingUSB)
       );
-      xTokenTotalSupplyForRemainingUSB = xTokenTotalSupplyForRemainingUSB.add(xTokenOutAboveAARS);
-      usbTotalSupplyForRemainingUSB = usbTotalSupplyForRemainingUSB.sub(usbSwapableAmountAboveAARS);
+      vars.xTokenTotalSupplyForRemainingUSB = vars.xTokenTotalSupplyForRemainingUSB.add(vars.xTokenOutAboveAARS);
+      vars.usbTotalSupplyForRemainingUSB = vars.usbTotalSupplyForRemainingUSB.sub(vars.usbSwapableAmountAboveAARS);
     }
 
-    if (remainingUSBAmount > 0 && aarForRemainingUSB >= AART) {
+    if (vars.remainingUSBAmount > 0 && vars.aarForRemainingUSB >= AART) {
       uint256 r = 0;
 
-      usbSwapableAmountAboveAART = remainingUSBAmount;
-      xTokenOutAboveAART = usbSwapableAmountAboveAART.mul(xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
-        assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(usbTotalSupplyForRemainingUSB)
+      vars.usbSwapableAmountAboveAART = vars.remainingUSBAmount;
+      vars.xTokenOutAboveAART = vars.usbSwapableAmountAboveAART.mul(vars.xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
+        vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).sub(vars.usbTotalSupplyForRemainingUSB)
       );
     }
 
-    return xTokenOutBelowAARS.add(xTokenOutAboveAARS).add(xTokenOutAboveAART);
+    return vars.xTokenOutBelowAARS.add(vars.xTokenOutAboveAARS).add(vars.xTokenOutAboveAART);
+  }
+
+  /**
+   * This is to workaround the following complier error:
+   *  CompilerError: Stack too deep, try removing local variables.
+   */
+  struct CalculateUSBMintOutLocalVars {
+    uint256 assetTokenPrice;
+    uint256 assetTokenPriceDecimals;
+    uint256 remainingAssetAmount;
+    uint256 assetDepositableAmountBelowAART;
+    uint256 assetDepositableAmountAboveAART;
+    uint256 usbMintOutBelowAART;
+    uint256 usbMintOutAboveAART;
+    uint256 aarForRemainingAsset;
   }
 
   function calculateUSBMintOut(uint256 assetAmount) public returns (uint256) {
@@ -236,15 +272,16 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // Δusb = Δeth * Peth * (1 - R2)
     // AAReth = (Meth * Peth / Musb-eth) * 100%
 
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    uint256 remainingAssetAmount = assetAmount;
-    uint256 assetDepositableAmountBelowAART = 0;
-    uint256 assetDepositableAmountAboveAART = 0;
-    uint256 usbMintOutBelowAART = 0;
-    uint256 usbMintOutAboveAART = 0;
-    uint256 aarForRemainingAsset = aar;
+    CalculateUSBMintOutLocalVars memory vars;
+    (vars.assetTokenPrice, vars.assetTokenPriceDecimals) = _getAssetTokenPrice();
+    vars.remainingAssetAmount = assetAmount;
+    vars.assetDepositableAmountBelowAART = 0;
+    vars.assetDepositableAmountAboveAART = 0;
+    vars.usbMintOutBelowAART = 0;
+    vars.usbMintOutAboveAART = 0;
+    vars.aarForRemainingAsset = aar;
 
-    if (aarForRemainingAsset < AART) {
+    if (vars.aarForRemainingAsset < AART) {
       uint256 R2 = AART.sub(aar).mul(BasisR2).div(10 ** _settingsDecimals);
 
       /**
@@ -269,28 +306,28 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
        * Δusb = Δeth * Peth * (1 - R2)
        */
       uint256 assetTotalAmount = _getAssetTotalAmount();
-      uint256 maxDepositableAssetAmount = AART.mul(_usbTotalSupply).div(10 ** _settingsDecimals).sub(assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals))
-        .mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice)
+      uint256 maxDepositableAssetAmount = AART.mul(_usbTotalSupply).div(10 ** _settingsDecimals).sub(assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals))
+        .mul(10 ** vars.assetTokenPriceDecimals).div(vars.assetTokenPrice)
         .mul(10 ** _settingsDecimals).div(AART.sub(AART.mul(R2).div(10 ** _settingsDecimals)).sub(10 ** _settingsDecimals));
-      if (remainingAssetAmount <= maxDepositableAssetAmount) {
-        assetDepositableAmountBelowAART = remainingAssetAmount;
-        remainingAssetAmount = 0;
+      if (vars.remainingAssetAmount <= maxDepositableAssetAmount) {
+        vars.assetDepositableAmountBelowAART = vars.remainingAssetAmount;
+        vars.remainingAssetAmount = 0;
       }
       else {
-        assetDepositableAmountBelowAART = maxDepositableAssetAmount;
-        remainingAssetAmount = remainingAssetAmount.sub(assetDepositableAmountBelowAART);
+        vars.assetDepositableAmountBelowAART = maxDepositableAssetAmount;
+        vars.remainingAssetAmount = vars.remainingAssetAmount.sub(vars.assetDepositableAmountBelowAART);
       }
-      usbMintOutBelowAART = assetDepositableAmountBelowAART.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul((10 ** _settingsDecimals).sub(R2)).div(10 ** _settingsDecimals);
-      aarForRemainingAsset = AART;
+      vars.usbMintOutBelowAART = vars.assetDepositableAmountBelowAART.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).mul((10 ** _settingsDecimals).sub(R2)).div(10 ** _settingsDecimals);
+      vars.aarForRemainingAsset = AART;
     }
 
-    if (remainingAssetAmount > 0 && aarForRemainingAsset >= AART) {
+    if (vars.remainingAssetAmount > 0 && vars.aarForRemainingAsset >= AART) {
       uint256 R2 = 0;
-      assetDepositableAmountAboveAART = remainingAssetAmount;
-      usbMintOutAboveAART = assetDepositableAmountAboveAART.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul((10 ** _settingsDecimals).sub(R2)).div(10 ** _settingsDecimals);
+      vars.assetDepositableAmountAboveAART = vars.remainingAssetAmount;
+      vars.usbMintOutAboveAART = vars.assetDepositableAmountAboveAART.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).mul((10 ** _settingsDecimals).sub(R2)).div(10 ** _settingsDecimals);
     }
 
-    return usbMintOutBelowAART.add(usbMintOutAboveAART);
+    return vars.usbMintOutBelowAART.add(vars.usbMintOutAboveAART);
   }
 
 
