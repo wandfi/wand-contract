@@ -27,7 +27,9 @@ interface IAssetPool {
 
   function setBasisR2(uint256 newBasisR2) external;
 
-  function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external; 
+  function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external;
+
+  function calculateUSBMintOut(uint256 assetAmount) external returns (uint256);
   
   function mintUSB(uint256 assetAmount) external payable;
 
@@ -36,6 +38,8 @@ interface IAssetPool {
   function redeemByUSB(uint256 usbAmount) external;
 
   function redeemByXTokens(uint256 xTokenAmount) external;
+
+  function calculateXTokensOut(address account, uint256 usbAmount) external returns (uint256);
 
   function usbToXTokens(uint256 usbAmount) external;
 

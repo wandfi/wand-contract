@@ -45,10 +45,10 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MIN_BASIS_R = 0;
   uint256 public constant MAX_BASIS_R = 10 ** 10;
 
-  // Rate of r change per hour. Default to 0.001, [0.01, 0.1]
+  // Rate of r change per hour. Default to 0.001, [0, 1]
   uint256 internal _defaultRateR = 10 ** 7;
-  uint256 public constant MIN_RATE_R = 10 ** 8;
-  uint256 public constant MAX_RATE_R = 10 ** 9;
+  uint256 public constant MIN_RATE_R = 0;
+  uint256 public constant MAX_RATE_R = 10 ** 10;
 
   // Basis of R2. Default to 0.06, [0, 1]
   uint256 internal _defaultBasisR2 = 6 * 10 ** 8;
@@ -60,11 +60,10 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   uint256 public constant MIN_CIRCUIT_BREAK_PERIOD = 1 minutes;
   uint256 public constant MAX_CIRCUIT_BREAK_PERIOD = 1 days;
 
-  // X Tokens transfer fee. Default to 0.05%, [0, 10%]
-  uint256 internal _defaultXTokensTransferFee = 5 * 10 ** 6;
+  // X Tokens transfer fee. Default to 0.08%, [0, 100%]
+  uint256 internal _defaultXTokensTransferFee = 8 * 10 ** 6;
   uint256 public constant MIN_X_TOKENS_TRANSFER_FEE = 0;
-  uint256 public constant MAX_X_TOKENS_TRANSFER_FEE = 10 ** 9;
-
+  uint256 public constant MAX_X_TOKENS_TRANSFER_FEE = 10 ** 10;
 
   constructor(address _wandProtocol, address _treasury_) {
     require(_wandProtocol != address(0), "Zero address detected");

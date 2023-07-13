@@ -93,7 +93,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
     }
   }
 
-  function distributeInterestRewards(address rewardToken, uint256 totalAmount) external nonReentrant onlyAssetPool {
+  function distributeInterestRewards(address rewardToken, uint256 totalAmount) public  nonReentrant onlyAssetPool returns (bool) {
     require(rewardToken != address(0), "Zero address detected");
     require(totalAmount > 0, "Reward amount should be greater than 0");
 
@@ -106,7 +106,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
     }
 
     if (totalStakingAmountInUSB == 0) {
-      return;
+      return false;
     }
     for (uint256 i = 0; i < _stakingTokens.length(); i++) {
       IInterestPool pool = IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]);
@@ -117,6 +117,8 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
         }
       }
     }
+
+    return true;
   }
 
   /* ============== MODIFIERS =============== */
