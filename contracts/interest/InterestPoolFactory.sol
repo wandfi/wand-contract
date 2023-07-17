@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -73,6 +76,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
       revert("Invalid staking token type");
     }
     
+    _stakingTokens.add(stakingToken);
     _interestPoolsByStakingToken[stakingToken] = pool;
 
     emit InterestPoolAdded(stakingToken, stakingTokenType, rewardTokens, pool);
@@ -85,6 +89,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
 
   function addRewardTokenToAllPools(address rewardToken) public nonReentrant onlyProtocol {
     require(rewardToken != address(0), "Zero address detected");
+    // console.log('InterestPoolFactory, addRewardTokenToAllPools for x token : %s', ERC20(rewardToken).symbol());
 
     for (uint256 i = 0; i < _stakingTokens.length(); i++) {
       if (!IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]).rewardTokenAdded(rewardToken)) {

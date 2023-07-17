@@ -10,7 +10,7 @@ interface IPriceFeed {
   /**
    * @notice The symbol of the underlying asset, like 'ETH', 'BTC', 'WBTC', etc.
    */
-  function assetSymbol() external view returns (bytes32);
+  function assetSymbol() external view returns (string memory);
 
   /**
    * @notice Returns the latest price of the asset in USD

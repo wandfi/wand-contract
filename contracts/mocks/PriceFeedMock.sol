@@ -5,12 +5,12 @@ import "../interfaces/IPriceFeed.sol";
 
 contract PriceFeedMock is IPriceFeed {
 
-  bytes32 internal asset;
+  string internal asset;
   uint8 internal priceDecimals;
 
   uint256 internal mockedPrice;
 
-  constructor(bytes32 _asset, uint8 _priceDecimals) {
+  constructor(string memory _asset, uint8 _priceDecimals) {
     asset = _asset;
     priceDecimals = _priceDecimals;
   }
@@ -19,7 +19,7 @@ contract PriceFeedMock is IPriceFeed {
     return priceDecimals;
   }
 
-  function assetSymbol() external view override returns (bytes32) {
+  function assetSymbol() external view override returns (string memory) {
     return asset;
   }
 

@@ -6,10 +6,10 @@ import "../interfaces/IPriceFeed.sol";
 
 contract CommonPriceFeed is IPriceFeed {
 
-  bytes32 internal asset;
+  string internal asset;
   AggregatorV3Interface internal assetToUSD;
 
-  constructor(bytes32 _asset, address _assetToUSD) {
+  constructor(string memory _asset, address _assetToUSD) {
     asset = _asset;
     assetToUSD = AggregatorV3Interface(_assetToUSD);
   }
@@ -18,7 +18,7 @@ contract CommonPriceFeed is IPriceFeed {
     return assetToUSD.decimals();
   }
 
-  function assetSymbol() external view override returns (bytes32) {
+  function assetSymbol() external view override returns (string memory) {
     return asset;
   }
 

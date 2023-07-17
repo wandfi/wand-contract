@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -136,6 +139,8 @@ abstract contract InterestPool is IInterestPool, Context, ReentrancyGuard {
   /* ========== RESTRICTED FUNCTIONS ========== */
 
   function addRewardToken(address rewardToken) public nonReentrant onlyInterestPoolFactory {
+    // console.log('InterestPool, addRewardToken for x token : %s', ERC20(rewardToken).symbol());
+
     require(rewardToken != address(0), "Zero address detected");
     require(!_rewardTokensSet.contains(rewardToken), "Reward token already added");
     _rewardTokensSet.add(rewardToken);

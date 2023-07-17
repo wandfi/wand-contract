@@ -25,7 +25,7 @@ contract WBTCPriceFeed is IPriceFeed {
     return _decimals;
   }
 
-  function assetSymbol() external pure override returns (bytes32) {
+  function assetSymbol() external pure override returns (string memory) {
     return "WBTC";
   }
 

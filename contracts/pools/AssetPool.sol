@@ -148,105 +148,123 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   *  CompilerError: Stack too deep, try removing local variables.
   */
   struct CalculateXTokensOutVars {
-    uint256 assetTotalAmount;
-    uint256 assetTokenPrice;
-    uint256 assetTokenPriceDecimals;
-    uint256 usbSwapableAmountBelowAARS;
-    uint256 usbSwapableAmountAboveAARS;
-    uint256 usbSwapableAmountAboveAART;
-    uint256 xTokenOutBelowAARS;
-    uint256 xTokenOutAboveAARS;
-    uint256 xTokenOutAboveAART;
-    uint256 remainingUSBAmount;
-    uint256 aarForRemainingUSB;
-    uint256 usbTotalSupplyForRemainingUSB;
-    uint256 xTokenTotalSupplyForRemainingUSB;
+    uint256 aar;
+    uint256 Dusb; // Δusb
+    uint256 Musb_eth;
+    uint256 Methx;
+    uint256 Meth;
+    uint256 Peth;
+    uint256 PethDecimals;
+    uint256 aar_;
+    uint256 r;
   }
 
   function calculateXTokensOut(address account, uint256 usbAmount) public returns (uint256) {
     require(usbAmount > 0, "Amount must be greater than 0");
     require(usbAmount <= USB(usbToken).balanceOf(account), "Not enough $USB balance");
+    require(usbAmount < _usbTotalSupply, "Too much $USB amount");
 
-    uint256 aar = AAR();
-    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerThresholdTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
-    
     CalculateXTokensOutVars memory vars;
-    vars.assetTotalAmount = _getAssetTotalAmount();
-    (vars.assetTokenPrice, vars.assetTokenPriceDecimals) = _getAssetTokenPrice();
-    vars.usbSwapableAmountBelowAARS = 0;
-    vars.usbSwapableAmountAboveAARS = 0;
-    vars.usbSwapableAmountAboveAART = 0;
-    vars.xTokenOutBelowAARS = 0;
-    vars.xTokenOutAboveAARS = 0;
-    vars.xTokenOutAboveAART = 0;
+    vars.aar = AAR();
+    require(vars.aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerThresholdTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
+    
+    vars.Dusb = usbAmount;
+    vars.Musb_eth = _usbTotalSupply;
+    vars.Methx = AssetX(xToken).totalSupply();
+    vars.Meth = _getAssetTotalAmount();
+    (vars.Peth, vars.PethDecimals) = _getAssetTokenPrice();
+
+    // AAR'eth = (Meth * Peth / (Musb-eth - Δusb)) * 100%
+    vars.aar_ = vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(vars.Musb_eth.sub(vars.Dusb));
 
     // 𝑟 = 0 𝑖𝑓 𝐴𝐴𝑅 ≥ 2
     // 𝑟 = BasisR × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2;
-    // 𝑟 = BasisR × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) + RateR × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
-
-    // Δethx = Δusb * Methx * (1 + r) / (Meth * Peth - Musb-eth)
-
-    // AAReth = (Meth * Peth / Musb-eth) * 100%
-
-    vars.remainingUSBAmount = usbAmount;
-    vars.aarForRemainingUSB = aar;
-    vars.usbTotalSupplyForRemainingUSB = _usbTotalSupply;
-    vars.xTokenTotalSupplyForRemainingUSB = AssetX(xToken).totalSupply();
-    if (vars.aarForRemainingUSB < AARS) {
+    // 𝑟 = BasisR × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅S) + RateR × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
+    vars.r = 0;
+    if (vars.aar < AARS) {
       require(_aarBelowSafeThresholdTime > 0, "AAR dropping below safe threshold time should be recorded");
-      uint256 base = AART.sub(vars.aarForRemainingUSB).mul(BasisR).div(10 ** _settingsDecimals);
+      uint256 base = AART.sub(AARS).mul(BasisR).div(10 ** _settingsDecimals);
       uint256 timeElapsed = block.timestamp.sub(_aarBelowSafeThresholdTime);
-      uint256 r = base.add(RateR.mul(timeElapsed).div(1 hours));
-
-      // Well, how many $USB need be burned to make AAR = AARS?
-      uint256 targetUSBAmount = vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(AARS);
-      uint256 maxSwapableUSBAmount = vars.usbTotalSupplyForRemainingUSB.sub(targetUSBAmount);
-      if (vars.remainingUSBAmount <= maxSwapableUSBAmount) {
-        vars.usbSwapableAmountBelowAARS = vars.remainingUSBAmount;
-        vars.remainingUSBAmount = 0;
-      } else {
-        vars.usbSwapableAmountBelowAARS = maxSwapableUSBAmount;
-        vars.remainingUSBAmount = vars.remainingUSBAmount.sub(vars.usbSwapableAmountBelowAARS);
-      }
-      vars.aarForRemainingUSB = AARS;
-      vars.xTokenOutBelowAARS = vars.usbSwapableAmountBelowAARS.mul(vars.xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
-        vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).sub(vars.usbTotalSupplyForRemainingUSB)
-      );
-      vars.xTokenTotalSupplyForRemainingUSB = vars.xTokenTotalSupplyForRemainingUSB.add(vars.xTokenOutBelowAARS);
-      vars.usbTotalSupplyForRemainingUSB = vars.usbTotalSupplyForRemainingUSB.sub(vars.usbSwapableAmountBelowAARS);
+      vars.r = base.add(RateR.mul(timeElapsed).div(1 hours));
+    } else if (vars.aar < AART) {
+      vars.r = AART.sub(vars.aar).mul(BasisR).div(10 ** _settingsDecimals);
     }
 
-    if (vars.remainingUSBAmount > 0 && vars.aarForRemainingUSB < AART) {
-      uint256 r = AART.sub(vars.aarForRemainingUSB).mul(BasisR).div(10 ** _settingsDecimals);
-
-      // Well, how many $USB need be burned to make AAR = AART?
-      uint256 targetUSBAmount = vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(AART);
-      uint256 maxSwapableUSBAmount = vars.usbTotalSupplyForRemainingUSB.sub(targetUSBAmount);
-      if (vars.remainingUSBAmount <= maxSwapableUSBAmount) {
-        vars.usbSwapableAmountAboveAARS = vars.remainingUSBAmount;
-        vars.remainingUSBAmount = 0;
-      } else {
-        vars.usbSwapableAmountAboveAARS = maxSwapableUSBAmount;
-        vars.remainingUSBAmount = vars.remainingUSBAmount.sub(vars.usbSwapableAmountAboveAARS);
-      }
-      vars.aarForRemainingUSB = AART;
-      vars.xTokenOutAboveAARS = vars.usbSwapableAmountAboveAARS.mul(vars.xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
-        vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).sub(vars.usbTotalSupplyForRemainingUSB)
-      );
-      vars.xTokenTotalSupplyForRemainingUSB = vars.xTokenTotalSupplyForRemainingUSB.add(vars.xTokenOutAboveAARS);
-      vars.usbTotalSupplyForRemainingUSB = vars.usbTotalSupplyForRemainingUSB.sub(vars.usbSwapableAmountAboveAARS);
-    }
-
-    if (vars.remainingUSBAmount > 0 && vars.aarForRemainingUSB >= AART) {
-      uint256 r = 0;
-
-      vars.usbSwapableAmountAboveAART = vars.remainingUSBAmount;
-      vars.xTokenOutAboveAART = vars.usbSwapableAmountAboveAART.mul(vars.xTokenTotalSupplyForRemainingUSB).mul((10 ** AARDecimals()).add(r)).div(10 ** AARDecimals()).div(
-        vars.assetTotalAmount.mul(vars.assetTokenPrice).div(10 ** vars.assetTokenPriceDecimals).sub(vars.usbTotalSupplyForRemainingUSB)
+    // If AAR'eth <= AAARS or AAReth >= AART
+    //  Δethx = Δusb * Methx * (1 + r) / (Meth * Peth - Musb-eth)
+    if (vars.aar_ <= AARS || vars.aar >= AART) {
+      return vars.Dusb.mul(vars.Methx).mul((10 ** AARDecimals()).add(vars.r)).div(10 ** AARDecimals()).div(
+        vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth)
       );
     }
 
-    return vars.xTokenOutBelowAARS.add(vars.xTokenOutAboveAARS).add(vars.xTokenOutAboveAART);
+    // If AARS <= AAR'eth <= AART, and AAReth <= AARS
+    //  Δethx = (Musb-eth - Meth * Peth / AARS) * Methx / (Meth * Peth - Musb-eth) * (1 + r) 
+    //    + (Δusb - Musb-eth + Meth * Peth / AARS) * Methx / (Methx * Peth - Musb-eth)
+    //    * (1 + (2 * AART - AARS - AAR'eth) * 0.1 / 2)
+    if (vars.aar_ >= AARS && vars.aar_ <= AART && vars.aar <= AARS) {
+      return vars.Musb_eth.sub(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AARS)) // (Musb-eth - Meth * Peth / AARS)
+        .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth)) // * Methx / (Meth * Peth - Musb-eth)
+        .mul((10 ** AARDecimals()).add(vars.r)).div(10 ** AARDecimals()) // * (1 + r)
+        .add(  // +
+          vars.Dusb.sub(vars.Musb_eth).add(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AARS)) // (Δusb - Musb-eth + Meth * Peth / AARS)
+            .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth))  // * Methx / (Methx * Peth - Musb-eth)
+            .mul(10 ** AARDecimals().add(  // * (1 + (2 * AART - AARS - AAR'eth) * 0.1 / 2)
+              uint256(2).mul(AART).sub(AARS).sub(vars.aar_)
+            ).mul(BasisR).div(2).div(10 ** _settingsDecimals)).div(10 ** AARDecimals())
+        );
+    }
+
+    // If AARS <= AAReth <= AART, and AARS <= AAR'eth <= AART
+    //  Δethx = Δusb * Methx / (Meth * Peth - Musb-eth) * (1 + (AAR'eth - AAReth) * 0.1 / 2)
+    if (vars.aar >= AARS && vars.aar <= AART && vars.aar_ >= AARS && vars.aar_ <= AART) {
+      return vars.Dusb.mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth)) // Δusb * Methx / (Meth * Peth - Musb-eth)
+        .mul(10 ** AARDecimals().add(  // * (1 + (AAR'eth - AAReth) * 0.1 / 2)
+          (vars.aar_).sub(vars.aar)).mul(BasisR).div(2).div(10 ** _settingsDecimals)
+        ).div(10 ** AARDecimals());
+    }
+
+    // If AAR'eth >= AART, and AAReth <= AARS
+    //  Δethx = (Musb-eth - Meth * Peth / AARS) * Methx / (Meth * Peth - Musb-eth) * (1 + r)
+    //    + (Meth * Peth / AARS - Meth * Peth / AART)
+    //    * Methx / (Meth * Peth - Musb-eth) * (1 + (AART - AARS) * 0.1 / 2)
+    //    + (Δusb - Musb-eth + Meth * Peth / AART) * Methx / (Meth * Peth - Musb-eth)
+    if (vars.aar_ >= AART && vars.aar <= AARS) {
+      return vars.Musb_eth.sub(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AARS)) // (Musb-eth - Meth * Peth / AARS)
+        .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth)) // * Methx / (Meth * Peth - Musb-eth)
+        .mul((10 ** AARDecimals()).add(vars.r)).div(10 ** AARDecimals()) // * (1 + r)
+        .add( // + (Meth * Peth / AARS - Meth * Peth / AART)
+          vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AARS)
+          .sub(
+            vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AART)
+          )
+          .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth)) // * Methx / (Meth * Peth - Musb-eth)
+          .mul(10 ** AARDecimals().add(  // * (1 + (AART - AARS) * 0.1 / 2)
+            AART.sub(AARS).mul(BasisR).div(2).div(10 ** _settingsDecimals)
+          ).div(10 ** AARDecimals()))
+        )
+        .add( // +
+          vars.Dusb.sub(vars.Musb_eth).add(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AART)) // (Δusb - Musb-eth + Meth * Peth / AART)
+            .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth))  // * Methx / (Methx * Peth - Musb-eth)
+        );
+    }
+
+    // If AAR'eth >= AART, and AARS <= AAReth <= AART
+    //  Δethx = (Musb-eth - Meth * Peth / AART) 
+    //      * Methx / (Meth * Peth - Musb-eth)
+    //      * (1 + (AART - AAReth) * 0.1 / 2)
+    //    + (Δusb - Musb-eth + Meth * Peth / AART) * Methx / (Meth * Peth - Musb-eth)
+    if (vars.aar_ >= AART && vars.aar >= AARS && vars.aar <= AART) {
+      return vars.Musb_eth.sub(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AART))  // (Musb-eth - Meth * Peth / AART)
+        .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth))  // * Methx / (Meth * Peth - Musb-eth)
+        .mul(10 ** AARDecimals().add(AART.sub(vars.aar).mul(BasisR).div(2).div(10 ** _settingsDecimals)).div(10 ** AARDecimals()))  // * (1 + (AART - AAReth) * 0.1 / 2)
+        .add( // +
+          vars.Dusb.sub(vars.Musb_eth).add(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(AART)) // (Δusb - Musb-eth + Meth * Peth / AART)
+            .mul(vars.Methx).div(vars.Meth.mul(vars.Peth).div(10 ** vars.PethDecimals).sub(vars.Musb_eth))  // * Methx / (Methx * Peth - Musb-eth)
+        );
+    }
+
+    return 0;
   }
 
   /**
@@ -593,7 +611,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     }
 
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** Constants.PROTOCOL_DECIMALS).div(_usbTotalSupply);
+    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** AARDecimals()).div(_usbTotalSupply);
   }
 
   function _interestSettlement() internal {
