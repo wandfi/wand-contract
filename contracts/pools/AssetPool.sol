@@ -359,6 +359,23 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return xTokenAmount;
   }
 
+  function calculateInterest() public view returns (uint256, uint256) {
+    uint256 newInterestAmount = 0;
+    uint256 totalInterestAmount = newInterestAmount.add(_undistributedInterest);
+
+    if (_lastInterestSettlementTime == 0) {
+      return (newInterestAmount, totalInterestAmount);
+    }
+
+    // ∆ethx = (t / 365 days) * Y * Methx
+    uint256 timeElapsed = block.timestamp.sub(_lastInterestSettlementTime);
+    uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
+    newInterestAmount = timeElapsed.mul(Y).mul(xTokenTotalAmount).div(365 days).div(10 ** _settingsDecimals);
+    totalInterestAmount = newInterestAmount.add(_undistributedInterest);
+
+    return (newInterestAmount, totalInterestAmount);
+  }
+
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   /**
@@ -381,6 +398,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    */
   function mintXTokens(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
     uint256 xTokenAmount = calculateMintXTokensOut(assetAmount);
+    console.log('mintXTokens, x token out: %s', xTokenAmount);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     AssetX(xToken).mint(_msgSender(), xTokenAmount);
@@ -464,7 +482,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     emit UsbToXTokens(_msgSender(), usbAmount, xTokenOut);
   }
 
-  function interestSettlement() external nonReentrant doInterestSettlement {
+  function settleInterest() external nonReentrant doInterestSettlement {
     // Nothing to do here
   }
 
@@ -615,19 +633,14 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return (price, priceDecimals);
   }
 
-  function _interestSettlement() internal {
-    if (_lastInterestSettlementTime == 0) {
-      return;
-    }
+  function _settleInterest() internal {
+    _AAR(); // BTW, update _aarBelowSafeThresholdTime and _aarBelowCircuitBreakerThresholdTime
 
-    // ∆ethx = (t / 365 days) * AAR * Methx
-    uint256 timeElapsed = block.timestamp.sub(_lastInterestSettlementTime);
-    uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
-    uint256 newInterestAmount = timeElapsed.mul(_AAR()).mul(xTokenTotalAmount).div(365 days).div(10 ** AARDecimals());
+    (uint256 newInterestAmount, uint256 totalInterestAmount) = calculateInterest();
     if (newInterestAmount > 0) {
       AssetX(xToken).mint(address(this), newInterestAmount);
     }
-    uint256 totalInterestAmount = newInterestAmount.add(_undistributedInterest);
+    console.log('_settleInterest, new interest: %s, total: %s', newInterestAmount, totalInterestAmount);
 
     if (totalInterestAmount > 0) {
       IInterestPoolFactory interestPoolFactory = IInterestPoolFactory(WandProtocol(wandProtocol).interestPoolFactory());
@@ -664,7 +677,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   modifier doInterestSettlement() {
-    _interestSettlement();
+    _settleInterest();
     _;
     _startOrPauseInterestGeneration();
   }

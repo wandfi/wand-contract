@@ -29,6 +29,6 @@ interface IInterestPool {
 
   function addRewardToken(address rewardToken) external;
 
-  function addRewards(address rewardToken, uint256 amount) external;
+  function notifyRewardsAdded(address rewardToken, uint256 amount) external;
 
 }

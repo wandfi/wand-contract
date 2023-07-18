@@ -147,11 +147,9 @@ abstract contract InterestPool is IInterestPool, Context, ReentrancyGuard {
     emit RewardTokenAdded(rewardToken);
   }
 
-  function addRewards(address rewardToken, uint256 amount) external nonReentrant updateStakingRewards(rewardToken, address(0)) onlyValidRewardToken(rewardToken) onlyInterestPoolFactory {
+  function notifyRewardsAdded(address rewardToken, uint256 amount) external nonReentrant updateStakingRewards(rewardToken, address(0)) onlyValidRewardToken(rewardToken) onlyInterestPoolFactory {
     require(amount > 0, "Reward amount should be greater than 0");
     require(_totalStakingAmount > 0, "No staking yet");
-
-    IERC20(rewardToken).safeTransferFrom(_msgSender(), address(this), amount);
 
     stakingRewardsPerToken[rewardToken] = stakingRewardsPerToken[rewardToken].add(amount.mul(1e18).div(_totalStakingAmount));
 

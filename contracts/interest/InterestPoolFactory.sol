@@ -98,7 +98,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
     }
   }
 
-  function distributeInterestRewards(address rewardToken, uint256 totalAmount) public  nonReentrant onlyAssetPool returns (bool) {
+  function distributeInterestRewards(address rewardToken, uint256 totalAmount) public nonReentrant onlyAssetPool returns (bool) {
     require(rewardToken != address(0), "Zero address detected");
     require(totalAmount > 0, "Reward amount should be greater than 0");
 
@@ -118,7 +118,11 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
       if (pool.rewardTokenAdded(rewardToken)) {
         uint256 amount = totalAmount.mul(pool.totalStakingAmountInUSB()).div(totalStakingAmountInUSB);
         if (amount > 0) {
-          pool.addRewards(rewardToken, amount);
+          require(
+            IERC20(rewardToken).transferFrom(_msgSender(), address(pool), amount),
+            'InterestPoolFactory::distributeInterestRewards: transfer reward token failed'
+          );
+          pool.notifyRewardsAdded(rewardToken, amount);
         }
       }
     }

@@ -29,7 +29,7 @@ describe('Wand Protocol', () => {
     
     // Create ETH asset pool
     const ethAddress = nativeTokenAddress;
-    const ethY = BigNumber.from(10).pow(await settings.decimals()).mul(35).div(1000);  // 3.5%
+    const ethY = BigNumber.from(10).pow(await settings.decimals()).mul(365).div(10000);  // 3.65%
     const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
     const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
     const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
@@ -100,16 +100,48 @@ describe('Wand Protocol', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Caro.address, expectedETHxAmount)
       .to.emit(ethPool, 'XTokenMinted').withArgs(Caro.address, caroDepositETH, expectedETHxAmount);
 
-    // Bob deposit 1 ETH to mint $ETH
-    // Expected amount: (1 * $3500 * 4) / (7 * $3500 - 7000) = 0.8
+    // Day 4. Bob deposit 1 ETH to mint $ETH
+    // Current state: Meth = 4; Musb-eth = 7000;  APY = 3.65%; Peth = 3500; Methx = 4 + interest
+    //  Interest generated: (1 day / 365) * 3.65% * 4 = ~0.0004 $ETHx
+    //  Expected amount: (1 * $3500 * 4) / (7 * $3500 - 7000) = ~0.8
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 4);
+    const expectedInterest = ethers.utils.parseUnits('0.0004', await ethxToken.decimals());
+    expectBigNumberEquals((await ethPool.calculateInterest())[0], expectedInterest);
     const bobDepositETH2 = ethers.utils.parseEther('1');
     const expectedETHxAmount2 = ethers.utils.parseUnits('0.8', await ethxToken.decimals());
     expect(await ethPool.calculateMintXTokensOut(bobDepositETH2)).to.equal(expectedETHxAmount2);
-    // await expect(ethPool.connect(Bob).mintXTokens(bobDepositETH2, {value: bobDepositETH2}))
-    //   .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH2])
-    //   .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Bob.address, expectedETHxAmount2)
-    //   .to.emit(ethPool, 'XTokenMinted').withArgs(Bob.address, bobDepositETH2, expectedETHxAmount2);
+    await expect(ethPool.connect(Bob).mintXTokens(bobDepositETH2, {value: bobDepositETH2}))
+      .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH2])
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Bob.address, anyValue)
+      .to.emit(ethPool, 'XTokenMinted').withArgs(Bob.address, bobDepositETH2, anyValue);
+    // Interest is generated but not distributed, since no staking in the interest pool yet
+    expectBigNumberEquals(await ethxToken.balanceOf(ethPool.address), expectedInterest);
+    expectBigNumberEquals(await ethxToken.balanceOf(Bob.address), expectedETHxAmount2);
 
+    // Day 5. Alice stakes 1000 $USB to earn interest; Bob stakes 2000 $USB to earn interest
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 5);
+    const aliceStakeAmount = ethers.utils.parseUnits('1000', await usbToken.decimals());
+    const bobStakeAmount = ethers.utils.parseUnits('2000', await usbToken.decimals());
+    await expect(usbToken.connect(Alice).approve(usbInterestPool.address, aliceStakeAmount)).not.to.be.reverted;
+    await expect(usbToken.connect(Bob).approve(usbInterestPool.address, bobStakeAmount)).not.to.be.reverted;
+    await expect(usbInterestPool.connect(Alice).stake(aliceStakeAmount)).not.to.be.reverted;
+    await expect(usbInterestPool.connect(Bob).stake(bobStakeAmount)).not.to.be.reverted;
+
+    // Day 6. Two more days interest generated
+    //  Additional interest generated: (2 day / 365) * 3.65% * (4 + 0.8) = ~0.00096 $ETHx
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 6);
+    const expectedInterest2 = ethers.utils.parseUnits('0.00096', await ethxToken.decimals());
+    const totalInterest = expectedInterest.add(expectedInterest2);
+    expectBigNumberEquals((await ethPool.calculateInterest())[1], totalInterest);
+
+    // Settle interest. Alice should get 1000 / (1000 + 2000) * (0.0004 + 0.00096) = ~0.00045333333 $ETHx, and Bob should get 0.00090666666 $ETHx
+    await expect(ethPool.connect(Bob).settleInterest())
+      .to.emit(usbInterestPool, 'StakingRewardsAdded').withArgs(ethxToken.address, anyValue)
+      .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
+    
+    expectBigNumberEquals(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address), ethers.utils.parseUnits('0.00045333333', await ethxToken.decimals()));
+    expectBigNumberEquals(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address), ethers.utils.parseUnits('0.00090666666', await ethxToken.decimals()));
 
   });
 

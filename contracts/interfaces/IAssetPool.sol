@@ -47,6 +47,8 @@ interface IAssetPool {
 
   function usbToXTokens(uint256 usbAmount) external;
 
-  function interestSettlement() external;
+  function calculateInterest() external view returns (uint256, uint256);
+
+  function settleInterest() external;
 
 }
