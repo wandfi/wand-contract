@@ -63,12 +63,53 @@ describe('Wand Protocol', () => {
     const wbtcxToken = AssetX__factory.connect(await wbtcPool.xToken(), provider);
     expect(await usbInterestPool.rewardTokenAdded(wbtcxToken.address)).to.be.true;
 
-    // Day 1. Suppose ETH price is $2000. Alice deposit 1 ETH to mint 2000 $USB
+    // Day 1. Suppose ETH price is $2000. Alice deposit 2 ETH to mint 4000 $USB
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS);
-    // await expect(ethPool.connect(Alice).mintUSB(bobStakeAmount))
-    //   .to.changeEtherBalances([Bob.address, weth.address], [ethers.utils.parseEther('-0.0089'), ethers.utils.parseEther('0.0089')])
-    //   .to.emit(, 'Transfer').withArgs(Bob.address, rewardBooster.address, bobStakeAmount)
-    //   .to.emit(rewardBooster, 'Stake').withArgs(Bob.address, nextStakeId, bobStakeAmount);
+    const ethPrice1 = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
+    const aliceDepositETH = ethers.utils.parseEther('2');
+    const expectedUsbAmount = ethers.utils.parseUnits('4000', await usbToken.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice1)).not.to.be.reverted;
+    expect(await ethPool.calculateMintUSBOut(aliceDepositETH)).to.equal(expectedUsbAmount);
+    await expect(ethPool.connect(Alice).mintUSB(aliceDepositETH, {value: aliceDepositETH}))
+      .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-2'), aliceDepositETH])
+      .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedUsbAmount)
+      .to.emit(ethPool, 'USBMinted').withArgs(Alice.address, aliceDepositETH, expectedUsbAmount);
+    expect(await usbToken.balanceOf(Alice.address)).to.equal(expectedUsbAmount);
+
+    //  Day 2. ETH price is $3000. Bob deposit 1 ETH to mint 3000 $USB
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 2);
+    const ethPrice2 = ethers.utils.parseUnits('3000', await ethPriceFeed.decimals());
+    const bobDepositETH = ethers.utils.parseEther('1');
+    const expectedUsbAmount2 = ethers.utils.parseUnits('3000', await usbToken.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice2)).not.to.be.reverted;
+    expect(await ethPool.calculateMintUSBOut(bobDepositETH)).to.equal(expectedUsbAmount2);
+    await expect(ethPool.connect(Bob).mintUSB(bobDepositETH, {value: bobDepositETH}))
+      .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH])
+      .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Bob.address, expectedUsbAmount2)
+      .to.emit(ethPool, 'USBMinted').withArgs(Bob.address, bobDepositETH, expectedUsbAmount2);
+    
+    // Day 3. ETH price is $3500. Caro deposit 4 ETH to mint 4 $ETHx
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 3);
+    const ethPrice3 = ethers.utils.parseUnits('3500', await ethPriceFeed.decimals());
+    const caroDepositETH = ethers.utils.parseEther('4');
+    const expectedETHxAmount = ethers.utils.parseUnits('4', await ethxToken.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice3)).not.to.be.reverted;
+    expect(await ethPool.calculateMintXTokensOut(caroDepositETH)).to.equal(expectedETHxAmount);
+    await expect(ethPool.connect(Caro).mintXTokens(caroDepositETH, {value: caroDepositETH}))
+      .to.changeEtherBalances([Caro.address, ethPool.address], [ethers.utils.parseEther('-4'), caroDepositETH])
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Caro.address, expectedETHxAmount)
+      .to.emit(ethPool, 'XTokenMinted').withArgs(Caro.address, caroDepositETH, expectedETHxAmount);
+
+    // Bob deposit 1 ETH to mint $ETH
+    // Expected amount: (1 * $3500 * 4) / (7 * $3500 - 7000) = 0.8
+    const bobDepositETH2 = ethers.utils.parseEther('1');
+    const expectedETHxAmount2 = ethers.utils.parseUnits('0.8', await ethxToken.decimals());
+    expect(await ethPool.calculateMintXTokensOut(bobDepositETH2)).to.equal(expectedETHxAmount2);
+    // await expect(ethPool.connect(Bob).mintXTokens(bobDepositETH2, {value: bobDepositETH2}))
+    //   .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH2])
+    //   .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Bob.address, expectedETHxAmount2)
+    //   .to.emit(ethPool, 'XTokenMinted').withArgs(Bob.address, bobDepositETH2, expectedETHxAmount2);
+
 
   });
 

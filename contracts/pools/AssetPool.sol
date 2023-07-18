@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -109,33 +111,25 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @notice Current adequency ratio of the pool
    * @dev AAReth = (Meth * Peth / Musb-eth) * 100%
    */
-  function AAR() public returns (uint256) {
-    uint256 aar = _AAR();
-
-    if (_aarBelowSafeThresholdTime == 0) {
-      if (aar < AARS) {
-        _aarBelowSafeThresholdTime = block.timestamp;
-      }
-    } else if (aar >= AARS) {
-      _aarBelowSafeThresholdTime = 0;
+  function AAR() public view returns (uint256) {
+    if (_usbTotalSupply == 0) {
+      return type(uint256).max;
     }
 
-    if (_aarBelowCircuitBreakerThresholdTime == 0) {
-      if (aar < AARC) {
-        _aarBelowCircuitBreakerThresholdTime = block.timestamp;
-      }
-    } else if (aar >= AARC) {
-      _aarBelowCircuitBreakerThresholdTime = 0;
+    uint256 assetTotalAmount = _getAssetTotalAmount();
+    if (assetTotalAmount == 0) {
+      return 0;
     }
 
-    return aar;
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
+    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** AARDecimals()).div(_usbTotalSupply);
   }
 
   function AARDecimals() public pure returns (uint256) {
     return Constants.PROTOCOL_DECIMALS;
   }
 
-  function pairedUSBAmountToDedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
+  function pairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
     require(xTokenAmount > 0, "Amount must be greater than 0");
     require(AssetX(xToken).totalSupply() > 0, "No x tokens minted yet");
 
@@ -170,7 +164,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 T8;
   }
 
-  function calculateXTokensOut(address account, uint256 usbAmount) public returns (uint256) {
+  function calculateUSBToXTokensOut(address account, uint256 usbAmount) public view returns (uint256) {
     require(usbAmount > 0, "Amount must be greater than 0");
     require(usbAmount <= USB(usbToken).balanceOf(account), "Not enough $USB balance");
     require(usbAmount < _usbTotalSupply, "Too much $USB amount");
@@ -290,7 +284,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 aar_;
   }
 
-  function calculateUSBMintOut(uint256 assetAmount) public returns (uint256) {
+  function calculateMintUSBOut(uint256 assetAmount) public view returns (uint256) {
     require(assetAmount > 0, "Amount must be greater than 0");
 
     CalculateUSBMintOutLocalVars memory vars;
@@ -307,10 +301,11 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     vars.aar_ = vars.Deth.add(vars.Meth).mul(vars.Peth).div(10 ** vars.PethDecimals).mul(10 ** AARDecimals()).div(
       vars.Musb_eth.add(vars.Deth.mul(vars.Peth).div(10 ** vars.PethDecimals))
     );
+    console.log('calculateMintUSBOut, aar: %s, aar`: %s', vars.aar, vars.aar_);
 
-    // If AAR'eth >= AART and AAReth >= AART
+    // If AAR'eth <= AARS, or AAReth >= AART
     //  Δusb = Δeth * Peth
-    if (vars.aar_ >= AART && vars.aar >= AART) {
+    if (vars.aar_ <= AARS || vars.aar >= AART) {
       return vars.Deth.mul(vars.Peth).div(10 ** vars.PethDecimals);
     }
 
@@ -343,28 +338,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     revert("Should not reach here");
   }
 
-
-  /* ========== MUTATIVE FUNCTIONS ========== */
-
-  /**
-   * @notice Mint $USB tokens using asset token
-   * @param assetAmount: Amount of asset token used to mint
-   */
-  function mintUSB(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
-    uint256 usbOutAmount = calculateUSBMintOut(assetAmount);
-
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-    USB(usbToken).mint(_msgSender(), usbOutAmount);
-    _usbTotalSupply = _usbTotalSupply.add(usbOutAmount);
-
-    emit USBMinted(_msgSender(), assetAmount, usbOutAmount);
-  }
-
-  /**
-   * @notice Mint X tokens using asset token
-   * @param assetAmount: Amount of asset token used to mint
-   */
-  function mintXTokens(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
+  function calculateMintXTokensOut(uint256 assetAmount) public view returns (uint256) {
     uint256 aar = AAR();
     require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerThresholdTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
 
@@ -382,9 +356,35 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
       );
     }
 
+    return xTokenAmount;
+  }
+
+  /* ========== MUTATIVE FUNCTIONS ========== */
+
+  /**
+   * @notice Mint $USB tokens using asset token
+   * @param assetAmount: Amount of asset token used to mint
+   */
+  function mintUSB(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
+    uint256 usbOutAmount = calculateMintUSBOut(assetAmount);
+
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
+    USB(usbToken).mint(_msgSender(), usbOutAmount);
+    _usbTotalSupply = _usbTotalSupply.add(usbOutAmount);
+
+    emit USBMinted(_msgSender(), assetAmount, usbOutAmount);
+  }
+
+  /**
+   * @notice Mint X tokens using asset token
+   * @param assetAmount: Amount of asset token used to mint
+   */
+  function mintXTokens(uint256 assetAmount) external payable override nonReentrant doInterestSettlement {
+    uint256 xTokenAmount = calculateMintXTokensOut(assetAmount);
+
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     AssetX(xToken).mint(_msgSender(), xTokenAmount);
-    emit XTokenMinted(_msgSender(), assetAmount, assetTokenPrice, assetTokenPriceDecimals, xTokenAmount);
+    emit XTokenMinted(_msgSender(), assetAmount, xTokenAmount);
   }
 
   /**
@@ -396,7 +396,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     uint256 assetAmount = 0;
 
-    uint256 aar = AAR();
+    uint256 aar = _AAR();
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
 
     // if AAR >= 100%,  Δeth = (Δusb / Peth) * (1 -C1)
@@ -433,7 +433,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param xTokenAmount: Amount of X tokens used to redeem for asset tokens
    */
   function redeemByXTokens(uint256 xTokenAmount) external override nonReentrant doInterestSettlement {
-    uint256 pairedUSBAmount = pairedUSBAmountToDedeemByXTokens(xTokenAmount);
+    uint256 pairedUSBAmount = pairedUSBAmountToRedeemByXTokens(xTokenAmount);
 
     // Δeth = Δethx * Meth / Methx * (1 -C2)
     uint256 total = xTokenAmount.mul(_getAssetTotalAmount()).div(AssetX(xToken).totalSupply());
@@ -454,8 +454,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     }
   }
 
-  function usbToXTokens(uint256 usbAmount) external override nonReentrant doInterestSettlement {
-    uint256 xTokenOut = calculateXTokensOut(_msgSender(), usbAmount);
+  function usbToXTokens(uint256 usbAmount) external override nonReentrant doInterestSettlement {  
+    uint256 xTokenOut = calculateUSBToXTokensOut(_msgSender(), usbAmount);
 
     USB(usbToken).burn(_msgSender(), usbAmount);
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
@@ -576,9 +576,32 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
+  function _AAR() internal returns (uint256) {
+    uint256 aar = AAR();
+
+    if (_aarBelowSafeThresholdTime == 0) {
+      if (aar < AARS) {
+        _aarBelowSafeThresholdTime = block.timestamp;
+      }
+    } else if (aar >= AARS) {
+      _aarBelowSafeThresholdTime = 0;
+    }
+
+    if (_aarBelowCircuitBreakerThresholdTime == 0) {
+      if (aar < AARC) {
+        _aarBelowCircuitBreakerThresholdTime = block.timestamp;
+      }
+    } else if (aar >= AARC) {
+      _aarBelowCircuitBreakerThresholdTime = 0;
+    }
+
+    return aar;
+  }
+
+
   function _getAssetTotalAmount() internal view returns (uint256) {
     if (assetToken == Constants.NATIVE_TOKEN) {
-      return address(this).balance;
+      return address(this).balance.sub(msg.value);
     }
     else {
       return IERC20(assetToken).balanceOf(address(this));
@@ -592,23 +615,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return (price, priceDecimals);
   }
 
-  /**
-   * AAReth = (Meth * Peth / Musb-eth) * 100%
-   */
-  function _AAR() internal view returns (uint256) {
-    uint256 assetTotalAmount = _getAssetTotalAmount();
-    if (assetTotalAmount == 0) {
-      return 0;
-    }
-
-    if (_usbTotalSupply == 0) {
-      return type(uint256).max;
-    }
-
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = _getAssetTokenPrice();
-    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** AARDecimals()).div(_usbTotalSupply);
-  }
-
   function _interestSettlement() internal {
     if (_lastInterestSettlementTime == 0) {
       return;
@@ -617,7 +623,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // ∆ethx = (t / 365 days) * AAR * Methx
     uint256 timeElapsed = block.timestamp.sub(_lastInterestSettlementTime);
     uint256 xTokenTotalAmount = AssetX(xToken).totalSupply();
-    uint256 newInterestAmount = timeElapsed.mul(AAR()).mul(xTokenTotalAmount).div(365 days).div(10 ** AARDecimals());
+    uint256 newInterestAmount = timeElapsed.mul(_AAR()).mul(xTokenTotalAmount).div(365 days).div(10 ** AARDecimals());
     if (newInterestAmount > 0) {
       AssetX(xToken).mint(address(this), newInterestAmount);
     }
@@ -677,7 +683,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   event UpdateCiruitBreakPeriod(uint256 prevCiruitBreakPeriod, uint256 newCiruitBreakPeriod);
 
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount);
-  event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals, uint256 xTokenAmount);
+  event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithUSBFeeCollected(address indexed user, address indexed feeTo, uint256 usbTokenAmount, uint256 feeAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithXTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount);

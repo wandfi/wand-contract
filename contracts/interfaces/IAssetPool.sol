@@ -9,9 +9,9 @@ interface IAssetPool {
   function usbTotalSupply() external view returns (uint256);
 
   /**
-   * @notice Current adequency ratio of the pool, with 18 decimals
+   * @notice Current adequency ratio of the pool, with decimals specified via AARDecimals()
    */
-  function AAR() external returns (uint256);
+  function AAR() external view returns (uint256);
 
   function AARDecimals() external view returns (uint256);
 
@@ -29,9 +29,11 @@ interface IAssetPool {
 
   function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external;
 
-  function calculateUSBMintOut(uint256 assetAmount) external returns (uint256);
+  function calculateMintUSBOut(uint256 assetAmount) external view returns (uint256);
   
   function mintUSB(uint256 assetAmount) external payable;
+
+  function calculateMintXTokensOut(uint256 assetAmount) external view returns (uint256);
 
   function mintXTokens(uint256 assetAmount) external payable;
 
@@ -39,7 +41,9 @@ interface IAssetPool {
 
   function redeemByXTokens(uint256 xTokenAmount) external;
 
-  function calculateXTokensOut(address account, uint256 usbAmount) external returns (uint256);
+  function pairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) external view returns (uint256);
+
+  function calculateUSBToXTokensOut(address account, uint256 usbAmount) external returns (uint256);
 
   function usbToXTokens(uint256 usbAmount) external;
 
