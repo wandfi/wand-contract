@@ -4,11 +4,10 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { ONE_DAY_IN_SECS, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
+import { nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
 import { 
   AssetPool__factory,
   AssetX__factory,
-  InterestPool__factory,
 } from '../typechain';
 
 const { provider, BigNumber } = ethers;

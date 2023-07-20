@@ -15,6 +15,12 @@ $ hh compile
 With same keys to `.env-example`
 
 ```sh
+$ hh run scripts/deployMockContracts.ts --network <goerli>
+
+$ hh run scripts/deployContracts.ts --network <mainnet/goerli>
+
+# Etherscan verify
+$ hh verify --network <mainnet/goerli> <address>
 
 ```
 

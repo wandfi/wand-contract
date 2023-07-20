@@ -39,6 +39,8 @@ export async function deployContractsFixture() {
   const WandProtocolFactory = await ethers.getContractFactory('WandProtocol');
   const WandProtocol = await WandProtocolFactory.deploy();
   const wandProtocol = WandProtocol__factory.connect(WandProtocol.address, provider);
+  let trans = await wandProtocol.connect(Alice).initialize();
+  await trans.wait();
 
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
   const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
