@@ -8,6 +8,8 @@ interface IAssetPool {
    */
   function usbTotalSupply() external view returns (uint256);
 
+  function getAssetTotalAmount() external view returns (uint256);
+
   /**
    * @notice Current adequency ratio of the pool, with decimals specified via AARDecimals()
    */
@@ -48,6 +50,8 @@ interface IAssetPool {
   function usbToXTokens(uint256 usbAmount) external;
 
   function calculateInterest() external view returns (uint256, uint256);
+
+  function checkAAR() external; 
 
   function settleInterest() external;
 

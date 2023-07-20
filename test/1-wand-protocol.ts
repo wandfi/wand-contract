@@ -4,13 +4,11 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { ONE_DAY_IN_SECS, nativeTokenAddress, deployContractsFixture, expandTo18Decimals, expectBigNumberEquals } from './utils';
+import { ONE_DAY_IN_SECS, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
 import { 
   AssetPool__factory,
   AssetX__factory,
-  ERC20Mock__factory,
   InterestPool__factory,
-  WandProtocol__factory
 } from '../typechain';
 
 const { provider, BigNumber } = ethers;
@@ -172,9 +170,7 @@ describe('Wand Protocol', () => {
     //  Expected paired $USB: 0.1 * 6900 / 4.80192 = ~143.692522991
     //  Δeth: 0.1 * 7.975 * (1 - 0.5%) / 4.80192 = ~0.16524900456
     //  Fee: 0.1 * 7.975 * 0.5% / 4.80192 = ~0.000830397
-    // console.log(await ethPool.usbTotalSupply());
-    // console.log(await ethxToken.totalSupply());
-    // console.log(await provider.getBalance(ethPool.address));
+    await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 8);
     const bobRedeemETHxAmount = ethers.utils.parseUnits('0.1', await ethxToken.decimals());
     const expectedPairedUSBAmount = ethers.utils.parseUnits('143.692522991', await usbToken.decimals());

@@ -89,8 +89,9 @@ contract AssetX is ERC20, ReentrancyGuard {
     IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
     settings.assertXTokensTransferFee(newFee);
     
+    uint256 prevFee = fee;
     fee = newFee;
-    emit UpdatedFee(fee, newFee);
+    emit UpdatedFee(prevFee, fee);
   }
 
   /**

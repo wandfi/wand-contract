@@ -8,7 +8,9 @@ import {
   ProtocolSettings__factory,
   USB__factory,
   AssetPoolFactory__factory,
-  InterestPoolFactory__factory
+  InterestPoolFactory__factory,
+  AssetPool,
+  ERC20__factory,
 } from '../typechain';
 
 const { provider } = ethers;
@@ -44,6 +46,26 @@ export async function deployContractsFixture() {
   const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
 
   return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
+}
+
+export async function dumpAssetPoolState(assetPool: AssetPool) {
+  const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
+  const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
+
+  const assetTokenERC20 = ERC20__factory.connect(await assetPool.assetToken(), provider);
+  const assetSymbol = (await assetPool.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
+  const assetPriceFeed = PriceFeedMock__factory.connect(await assetPool.assetTokenPriceFeed(), provider);
+  const usbToken = USB__factory.connect(await assetPool.usbToken(), provider);
+  const ethxToken = USB__factory.connect(await assetPool.xToken(), provider);
+
+  console.log(`${assetSymbol} Pool:`);
+  console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.getAssetTotalAmount(), 18)}`);
+  console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits(await assetPriceFeed.latestPrice(), await assetPriceFeed.decimals())}`);
+  console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
+  console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
+  console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
+  console.log(`  AAR: ${ethers.utils.formatUnits(await assetPool.AAR(), await assetPool.AARDecimals())}`);
+  console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.Y(), await settings.decimals())}`);
 }
 
 export function expandTo18Decimals(n: number) {

@@ -169,64 +169,73 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   function setTreasury(address newTreasury) public nonReentrant onlyProtocol {
     require(newTreasury != address(0), "Zero address detected");
     require(newTreasury != _treasury, "Same _treasury");
+
+    address prevTreasury = _treasury;
     _treasury = newTreasury;
-    emit UpdateTreasury(_treasury, newTreasury);
+    emit UpdateTreasury(prevTreasury, _treasury);
   }
 
   function setDefaultC1(uint256 newC1) external nonReentrant onlyProtocol {
     require(newC1 != _defaultC1, "Same redemption fee");
     assertC1(newC1);
     
+    uint256 prevDefaultC1 = _defaultC1;
     _defaultC1 = newC1;
-    emit UpdateDefaultC1(_defaultC1, newC1);
+    emit UpdateDefaultC1(prevDefaultC1, _defaultC1);
   }
 
   function setDefaultC2(uint256 newC2) external nonReentrant onlyProtocol {
     require(newC2 != _defaultC2, "Same redemption fee");
     assertC2(newC2);
     
+    uint256 prevDefaultC2 = _defaultC2;
     _defaultC2 = newC2;
-    emit UpdateDefaultC2(_defaultC2, newC2);
+    emit UpdateDefaultC2(prevDefaultC2, _defaultC2);
   }
 
   function setDefaultBasisR(uint256 newBasisR) external nonReentrant onlyProtocol {
     require(newBasisR != _defaultBasisR, "Same basis r");
     assertBasisR(newBasisR);
     
+    uint256 prevDefaultBasisR = _defaultBasisR;
     _defaultBasisR = newBasisR;
-    emit UpdateDefaultBasisR(_defaultBasisR, newBasisR);
+    emit UpdateDefaultBasisR(prevDefaultBasisR, _defaultBasisR);
   }
 
   function setDefaultRateR(uint256 newRateR) external nonReentrant onlyProtocol {
     require(newRateR != _defaultRateR, "Same rate r");
     assertRateR(newRateR);
     
+    uint256 prevDefaultRateR = _defaultRateR;
     _defaultRateR = newRateR;
-    emit UpdateDefaultRateR(_defaultRateR, newRateR);
+    emit UpdateDefaultRateR(prevDefaultRateR, _defaultRateR);
   }
 
   function setDefaultBasisR2(uint256 newBasisR2) external nonReentrant onlyProtocol {
     require(newBasisR2 != _defaultBasisR2, "Same basis R2");
     assertBasisR2(newBasisR2);
     
+    uint256 prevDefaultBasisR2 = _defaultBasisR2;
     _defaultBasisR2 = newBasisR2;
-    emit UpdateDefaultBasisR2(_defaultBasisR2, newBasisR2);
+    emit UpdateDefaultBasisR2(prevDefaultBasisR2, _defaultBasisR2);
   }
 
   function setDefaultCiruitBreakPeriod(uint256 newDefaultCircuitBreakPeriod) external nonReentrant onlyProtocol {
     require(newDefaultCircuitBreakPeriod != _defaultCiruitBreakPeriod, "Same default circuit break period");
     assertCiruitBreakPeriod(newDefaultCircuitBreakPeriod);
     
+    uint256 prevDefaultCiruitBreakPeriod = _defaultCiruitBreakPeriod;
     _defaultCiruitBreakPeriod = newDefaultCircuitBreakPeriod;
-    emit UpdateDefaultCircuitBreakPeriod(_defaultCiruitBreakPeriod, newDefaultCircuitBreakPeriod);
+    emit UpdateDefaultCircuitBreakPeriod(prevDefaultCiruitBreakPeriod, _defaultCiruitBreakPeriod);
   }
 
   function setDefaultXTokensTransferFee(uint256 newDefaultXTokensTransferFee) external nonReentrant onlyProtocol {
     require(newDefaultXTokensTransferFee != _defaultXTokensTransferFee, "Same default X tokens transfer fee");
     assertXTokensTransferFee(newDefaultXTokensTransferFee);
     
+    uint256 prevDefaultXTokensTransferFee = _defaultXTokensTransferFee;
     _defaultXTokensTransferFee = newDefaultXTokensTransferFee;
-    emit UpdateDefaultXTokensTransferFee(_defaultXTokensTransferFee, newDefaultXTokensTransferFee);
+    emit UpdateDefaultXTokensTransferFee(prevDefaultXTokensTransferFee, _defaultXTokensTransferFee);
   }
 
   /* ============== MODIFIERS =============== */
