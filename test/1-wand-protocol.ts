@@ -190,6 +190,23 @@ describe('Wand Protocol', () => {
       .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Bob.address, bobRedeemETHxAmount, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals())
       .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Bob.address, Alice.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
 
+    // Day 9. Alice 100 $USB -> $ETHx
+    //  
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 9);
+    const aliceUSBSwapAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
+    const calculatedETHxAmount = await ethPool.calculateUSBToXTokensOut(Alice.address, aliceUSBSwapAmount);
+    await expect(usbToken.connect(Alice).approve(ethPool.address, aliceUSBSwapAmount)).not.to.be.reverted;
+    // console.log(calculatedETHxAmount);
+    // console.log(await ethPool.AAR());
+    // console.log(await ethPool.usbTotalSupply());
+    // console.log(await ethxToken.totalSupply());
+    // console.log(await provider.getBalance(ethPool.address));
+    await expect(ethPool.connect(Alice).usbToXTokens(aliceUSBSwapAmount))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceUSBSwapAmount)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, aliceUSBSwapAmount, anyValue, ethPrice4, await ethPriceFeed.decimals());
+
+
 
   });
 
