@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./UsbInterestPool.sol";
 import "./UniLpInterestPool.sol";
 import "./CurveLpInterestPool.sol";
+import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IAssetPoolFactory.sol";
 import "../interfaces/IInterestPool.sol";
 import "../interfaces/IInterestPoolFactory.sol";
@@ -138,7 +139,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
   }
 
   modifier onlyAssetPool() {
-    require(IAssetPoolFactory(WandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an AssetPool contract");
+    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an AssetPool contract");
     _;
   }
 

@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
 import "./InterestPool.sol";
+import "../interfaces/IWandProtocol.sol";
 
 contract UniLpInterestPool is InterestPool {
   using SafeMath for uint256;
@@ -21,7 +22,7 @@ contract UniLpInterestPool is InterestPool {
   ) InterestPool(_wandProtocol, _interestPoolFactory, _stakingToken, _rewardTokens) {
 
     // Check `_stakingToken` is `IUniswapV2Pair`, and one of the tokens is $USB
-    address usb = WandProtocol(_wandProtocol).usbToken();
+    address usb = IWandProtocol(_wandProtocol).usbToken();
     IUniswapV2Pair pair = IUniswapV2Pair(_stakingToken);
     require(pair.token0() == usb || pair.token1() == usb, "Invalid Uniswap Lp staking token");
     _uniPoolCoinsUSBIndex = pair.token0() == usb ? 0 : 1;

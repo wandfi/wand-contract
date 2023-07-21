@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./AssetPool.sol";
 import "../interfaces/IAssetPool.sol";
 import "../interfaces/IAssetPoolFactory.sol";
-import "../WandProtocol.sol";
 
 contract AssetPoolFactory is IAssetPoolFactory, Context, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;

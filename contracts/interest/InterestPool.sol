@@ -11,7 +11,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "../WandProtocol.sol";
 import "../interfaces/IInterestPool.sol";
 import "../libs/Constants.sol";
 

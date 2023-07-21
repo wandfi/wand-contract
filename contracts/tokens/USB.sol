@@ -3,7 +3,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "../WandProtocol.sol";
+import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IAssetPoolFactory.sol";
 
 contract USB is ERC20 {
@@ -23,7 +23,7 @@ contract USB is ERC20 {
   }
 
   modifier onlyAssetPool() {
-    require(IAssetPoolFactory(WandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an AssetPool contract");
+    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an AssetPool contract");
     _;
   }
 }

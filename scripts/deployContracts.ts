@@ -22,27 +22,53 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // Goerli
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
+const deployer = new ethers.Wallet(privateKey, provider);
 const wbtcAddress = '0x183c07F248e137E964E213925d0cfd0d3DCd8f1C';
 const ethPriceFeedAddress = '0x05acAAe839d572D45109ef9EbbBB200AA7b0bB05';
 const wbtcPriceFeedAddress = '0xCD1d9898453d49F947e518d1F2776CEd580095F2';
+const treasuryAddress = deployer.address;
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
 
 async function main() {
-  const deployer = new ethers.Wallet(privateKey, provider);
+  // const deployer = new ethers.Wallet(privateKey, provider);
 
   const WandProtocolFactory = await ethers.getContractFactory('WandProtocol');
   const WandProtocol = await WandProtocolFactory.deploy();
-  console.log(`Deployed WandProtocol`);
-
   const wandProtocol = WandProtocol__factory.connect(WandProtocol.address, provider);
-  let trans = await wandProtocol.connect(deployer).initialize();
+  console.log(`Deployed WandProtocol to ${wandProtocol.address}`);
+  // const wandProtocol = WandProtocol__factory.connect('0x6B4cB7784Ffa7b940fC4EB917bbf1B69bD1628DD', provider);
+
+  const ProtocolSettingsFactory = await ethers.getContractFactory('ProtocolSettings');
+  const ProtocolSettings = await ProtocolSettingsFactory.deploy(wandProtocol.address, treasuryAddress);
+  const settings = ProtocolSettings__factory.connect(ProtocolSettings.address, provider);
+  console.log(`ProtocolSettings address: ${settings.address}`);
+  let trans = await wandProtocol.connect(deployer).setSettings(settings.address);
   await trans.wait();
-  const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
-  const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
-  const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
+
+  const USBFactory = await ethers.getContractFactory('USB');
+  const USB = await USBFactory.deploy(wandProtocol.address, "USB Token", "USB");
+  const usbToken = USB__factory.connect(USB.address, provider);
+  console.log(`$USB token address: ${usbToken.address}`);
+  trans = await wandProtocol.connect(deployer).setUsbToken(usbToken.address);
+  await trans.wait();
+
+  const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
+  const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address, usbToken.address);
+  const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
+  console.log(`Deployed AssetPoolFactory to ${assetPoolFactory.address}`);
+  trans = await wandProtocol.connect(deployer).setAssetPoolFactory(assetPoolFactory.address);
+  await trans.wait();
+  console.log(`Set WandProtocol.AssetPoolFactory to ${assetPoolFactory.address}`);
+
+  const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
+  const InterestPoolFactory = await InterestPoolFactoryFactory.deploy(wandProtocol.address);
+  const interestPoolFactory = InterestPoolFactory__factory.connect(InterestPoolFactory.address, provider);
+  console.log(`Deployed InterestPoolFactory to ${interestPoolFactory.address}`);
+  trans = await wandProtocol.connect(deployer).setInterestPoolFactory(interestPoolFactory.address);
+  await trans.wait();
+  console.log(`Set WandProtocol.InterestPoolFactory to ${interestPoolFactory.address}`);
 
   // Create ETH asset pool
   const ethAddress = nativeTokenAddress;
@@ -71,6 +97,7 @@ async function main() {
 
   console.log(`Contract addresses:`);
   console.log(`\tWandProtocol address: ${WandProtocol.address}`);
+  console.log(`\tProtocolSettings address: ${settings.address}`);
   console.log(`\t$USB token address: ${usbToken.address}`);
   console.log(`\tAssetPoolFactory address: ${assetPoolFactory.address}`);
   console.log(`\t\tETH Asset Pool address: ${ethPool.address}`);

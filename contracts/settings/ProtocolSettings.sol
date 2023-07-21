@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 import "../interfaces/IProtocolSettings.sol";
 import "../libs/Constants.sol";
-import "../WandProtocol.sol";
 
 contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
 
@@ -68,7 +67,7 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
   constructor(address _wandProtocol, address _treasury_) {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
-    setTreasury(_treasury_);
+    _treasury = _treasury_;
   }
 
   /* ============== VIEWS =============== */

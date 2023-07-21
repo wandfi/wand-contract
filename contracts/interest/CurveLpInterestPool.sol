@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./InterestPool.sol";
+import "../interfaces/IWandProtocol.sol";
 import "../interfaces/ICurvePool.sol";
 
 contract CurveLpInterestPool is InterestPool {
@@ -24,7 +25,7 @@ contract CurveLpInterestPool is InterestPool {
 
     // Check one of the curve pool token is $USB
     require(_curvePoolCoinsCount > 0, "Invalid curve pool coins count");
-    address usb = WandProtocol(_wandProtocol).usbToken();
+    address usb = IWandProtocol(_wandProtocol).usbToken();
     ICurvePool curvePool = ICurvePool(_curvePool);
     for (uint256 i = 0; i < _curvePoolCoinsCount; i++) {
       if (curvePool.coins(i) == usb) {

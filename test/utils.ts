@@ -39,13 +39,30 @@ export async function deployContractsFixture() {
   const WandProtocolFactory = await ethers.getContractFactory('WandProtocol');
   const WandProtocol = await WandProtocolFactory.deploy();
   const wandProtocol = WandProtocol__factory.connect(WandProtocol.address, provider);
-  let trans = await wandProtocol.connect(Alice).initialize();
+
+  const ProtocolSettingsFactory = await ethers.getContractFactory('ProtocolSettings');
+  const ProtocolSettings = await ProtocolSettingsFactory.deploy(wandProtocol.address, Alice.address);
+  const settings = ProtocolSettings__factory.connect(ProtocolSettings.address, provider);
+  let trans = await wandProtocol.connect(Alice).setSettings(settings.address);
   await trans.wait();
 
-  const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
-  const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
-  const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
+  const USBFactory = await ethers.getContractFactory('USB');
+  const USB = await USBFactory.deploy(wandProtocol.address, "USB Token", "USB");
+  const usbToken = USB__factory.connect(USB.address, provider);
+  trans = await wandProtocol.connect(Alice).setUsbToken(usbToken.address);
+  await trans.wait();
+
+  const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
+  const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address, usbToken.address);
+  const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
+  trans = await wandProtocol.connect(Alice).setAssetPoolFactory(assetPoolFactory.address);
+  await trans.wait();
+
+  const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
+  const InterestPoolFactory = await InterestPoolFactoryFactory.deploy(wandProtocol.address);
+  const interestPoolFactory = InterestPoolFactory__factory.connect(InterestPoolFactory.address, provider);
+  trans = await wandProtocol.connect(Alice).setInterestPoolFactory(interestPoolFactory.address);
+  await trans.wait();
 
   return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
 }
