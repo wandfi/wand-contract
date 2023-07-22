@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -21,7 +23,6 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
 
   EnumerableSet.Bytes32Set internal _paramsSet;
   mapping(bytes32 => ParamConfig) internal _paramConfigs;
-  mapping(address => mapping(bytes32 => uint256)) internal _assetPoolParams;
 
   constructor(address _treasury_) Ownable() {
     _treasury = _treasury_;
@@ -64,21 +65,33 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     return _paramsSet.values();
   }
 
+  function isValidParam(bytes32 param, uint256 value) public view returns (bool) {
+    if (param.length == 0 || !_paramsSet.contains(param)) {
+      return false;
+    }
+
+    ParamConfig memory config = _paramConfigs[param];
+    return config.min <= value && value <= config.max;
+  }
+
   function paramConfig(bytes32 param) public view returns(ParamConfig memory) {
+    if (!_paramsSet.contains(param)) {
+      console.log('paramConfig, invalid param: %s', string(abi.encodePacked(param)));
+    }
+
     require(param.length > 0, "Empty param name");
     require(_paramsSet.contains(param), "Invalid param name");
     return _paramConfigs[param];
   }
 
   function paramDefaultValue(bytes32 param) public view returns (uint256) {
-    return paramConfig(param).defaultValue;
-  }
+    if (!_paramsSet.contains(param)) {
+      console.log('paramDefaultValue, invalid param: %s', string(abi.encodePacked(param)));
+    }
 
-  function assetPoolParamValue(address assetPool, bytes32 param) public view returns (uint256) {
-    require(assetPool != address(0), "Zero address detected");
     require(param.length > 0, "Empty param name");
     require(_paramsSet.contains(param), "Invalid param name");
-    return _assetPoolParams[assetPool][param];
+    return paramConfig(param).defaultValue;
   }
 
   /* ============ MUTATIVE FUNCTIONS =========== */
@@ -102,20 +115,9 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     emit UpsertParamConfig(param, defaultValue, min, max);
   }
 
-  function updateAssetPoolParam(address assetPool, bytes32 param, uint256 value) public nonReentrant onlyOwner {
-    require(assetPool != address(0), "Zero address detected");
-    require(param.length > 0, "Empty param name");
-    require(_paramsSet.contains(param), "Invalid param name");
-    require(_paramConfigs[param].min <= value && value <= _paramConfigs[param].max, "Invalid value");
-
-    _assetPoolParams[assetPool][param] = value;
-    emit UpdateAssetPoolParamValue(assetPool, param, value);
-  }
-
   /* =============== EVENTS ============= */
 
   event UpsertParamConfig(bytes32 indexed name, uint256 defaultValue, uint256 min, uint256 max);
-  event UpdateAssetPoolParamValue(address indexed assetPool, bytes32 indexed param, uint256 value);
 
   event UpdateTreasury(address prevTreasury, address newTreasury);
 }

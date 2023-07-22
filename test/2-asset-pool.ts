@@ -138,7 +138,7 @@ describe('Asset Pool', () => {
     // Expected $ETHx output is: 1 * 350 * 16.5 / (9 * 350 - 3000) = 38.5
     await expect(ethPool.connect(Alice).checkAAR()).not.to.be.reverted;
     const ONE_HOUR_IN_SECS = 60 * 60;
-    expect(await ethPool.CiruitBreakPeriod()).to.equal(ONE_HOUR_IN_SECS);
+    expect(await ethPool.CircuitBreakPeriod()).to.equal(ONE_HOUR_IN_SECS);
     await dumpAssetPoolState(ethPool);
     await time.increase(ONE_HOUR_IN_SECS);
     expectedETHxAmount = ethers.utils.parseUnits('38.5', await ethxToken.decimals());

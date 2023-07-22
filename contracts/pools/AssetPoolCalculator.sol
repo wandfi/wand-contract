@@ -60,7 +60,7 @@ contract AssetPoolCalculaor {
     require(Delta_USB <= IUSB(usbToken).balanceOf(account), "Not enough $USB balance");
     require(Delta_USB < S.M_USB_ETH, "Too much $USB amount");
 
-    // require(S.aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CiruitBreakPeriod()), "Circuit breaker AAR reached");
+    // require(S.aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "Circuit breaker AAR reached");
     
     // AAR'eth = (M_ETH * P_ETH / (Musb-eth - Δusb)) * 100%
     S.aar_ = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.M_USB_ETH.sub(Delta_USB));
@@ -206,7 +206,7 @@ contract AssetPoolCalculaor {
     uint256 aar = AAR(assetPool);
     require(aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
-    // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CiruitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
+    // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
 
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = assetPool.getAssetTokenPrice();
 

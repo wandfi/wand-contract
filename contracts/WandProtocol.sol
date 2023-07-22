@@ -56,6 +56,7 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   }
 
   /* ========== Initialization Operations ========= */
+
   function initialize(address _usbToken_, address _assetPoolCalculator_, address _assetPoolFactory_, address _interestPoolFactory_) external nonReentrant onlyOwner {
     require(!initialized, "Already initialized");
     require(_usbToken_ != address(0), "Zero address detected");

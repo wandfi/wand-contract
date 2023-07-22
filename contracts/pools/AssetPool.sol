@@ -3,10 +3,11 @@ pragma solidity ^0.8.9;
 
 import "hardhat/console.sol";
 
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IAssetPool.sol";
@@ -22,6 +23,7 @@ import "../libs/TokensTransfer.sol";
 contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.Bytes32Set;
 
   IWandProtocol public immutable wandProtocol;
   IProtocolSettings public immutable settings;
@@ -32,6 +34,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   address public immutable xToken;
 
   uint256 internal immutable settingsDecimals;
+  EnumerableSet.Bytes32Set internal _assetPoolParamsSet;
+  mapping(bytes32 => uint256) internal _assetPoolParams;
 
   uint256 internal _usbTotalSupply;
 
@@ -65,7 +69,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     settingsDecimals = settings.decimals();
 
     for (uint256 i = 0; i < assetPoolParams.length; i++) {
-      settings.updateAssetPoolParam(address(this), assetPoolParams[i], assetPoolParamsValues[i]);
+      _updateParam(assetPoolParams[i], assetPoolParamsValues[i]);
     }
   }
 
@@ -89,10 +93,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return (price, priceDecimals);
   }
 
-  // function xToken() public view returns (address) {
-  //   return xToken;
-  // }
-
   /**
    * @notice Current adequency ratio of the pool
    * @dev AAReth = (M_ETH * P_ETH / Musb-eth) * 100%
@@ -111,9 +111,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   function calculateUSBToXTokensOut(address account, uint256 usbAmount) public view returns (uint256) {
     uint256 aar = AAR();
-    uint256 AARC = settings.assetPoolParamValue(address(this), "AARC");
-    uint256 CiruitBreakPeriod = settings.assetPoolParamValue(address(this), "CiruitBreakPeriod");
-    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CiruitBreakPeriod), "Circuit breaker AAR reached");
+    uint256 AARC = _assetPoolParamValue("AARC");
+    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "Circuit breaker AAR reached");
 
     Constants.AssetPoolState memory S = _getAssetPoolState();
 
@@ -133,22 +133,23 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     S.M_USB_ETH = _usbTotalSupply;
     S.M_ETHx = IERC20(xToken).totalSupply();
     S.aar = AAR();
-    S.AART = settings.assetPoolParamValue(address(this), "AART");
-    S.AARS = settings.assetPoolParamValue(address(this), "AARS");
-    S.AARC = settings.assetPoolParamValue(address(this), "AARC");
+    S.AART = _assetPoolParamValue("AART");
+    S.AARS = _assetPoolParamValue("AARS");
+    S.AARC = _assetPoolParamValue("AARC");
     S.AARDecimals = AARDecimals();
-    S.RateR = settings.assetPoolParamValue(address(this), "RateR");
-    S.BasisR = settings.assetPoolParamValue(address(this), "BasisR");
-    S.BasisR2 = settings.assetPoolParamValue(address(this), "BasisR2");
+    S.RateR = _assetPoolParamValue("RateR");
+    S.BasisR = _assetPoolParamValue("BasisR");
+    S.BasisR2 = _assetPoolParamValue("BasisR2");
 
     return S;
   }
 
   function calculateMintXTokensOut(uint256 assetAmount) public view returns (uint256) {
     uint256 aar = AAR();
-    uint256 AARC = settings.assetPoolParamValue(address(this), "AARC");
-    uint256 CiruitBreakPeriod = settings.assetPoolParamValue(address(this), "CiruitBreakPeriod");
-    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CiruitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
+    // console.log('calculateMintXTokensOut, msg.value: %s', msg.value);
+    uint256 AARC = _assetPoolParamValue("AARC");
+    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
 
     return IAssetPoolCalculaor(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount);
   }
@@ -164,7 +165,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // ∆ethx = (t / 365 days) * Y * M_ETHx
     uint256 timeElapsed = block.timestamp.sub(_lastInterestSettlementTime);
     uint256 xTokenTotalAmount = IAssetX(xToken).totalSupply();
-    uint256 Y = settings.assetPoolParamValue(address(this), "Y");
+    uint256 Y = _assetPoolParamValue("Y");
     newInterestAmount = timeElapsed.mul(Y).mul(xTokenTotalAmount).div(365 days).div(10 ** settingsDecimals);
     totalInterestAmount = newInterestAmount.add(_undistributedInterest);
 
@@ -219,8 +220,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     if (aar >= 10 ** AARDecimals()) {
       uint256 total = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice);
       // C1 only takes effect when AAR >= [2 * (AART - 100%) + 100%]
-      uint256 AART = settings.assetPoolParamValue(address(this), "AART");
-      uint256 C1 = settings.assetPoolParamValue(address(this), "C1");
+      uint256 AART = _assetPoolParamValue("AART");
+      uint256 C1 = _assetPoolParamValue("C1");
       if (aar >= AART.sub(10 ** AARDecimals()).mul(2).add(10 ** AARDecimals())) {
         fee = total.mul(C1).div(10 ** settingsDecimals);
       }
@@ -253,7 +254,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 pairedUSBAmount = pairedUSBAmountToRedeemByXTokens(xTokenAmount);
 
     // Δeth = Δethx * M_ETH / M_ETHx * (1 -C2)
-    uint256 C2 = settings.assetPoolParamValue(address(this), "C2");
+    uint256 C2 = _assetPoolParamValue("C2");
     uint256 total = xTokenAmount.mul(_getAssetTotalAmount()).div(IAssetX(xToken).totalSupply());
     uint256 fee = total.mul(C2).div(10 ** settingsDecimals);
     uint256 assetAmount = total.sub(fee);
@@ -292,13 +293,36 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // Nothing to do here
   }
 
+  /* ========== RESTRICTED FUNCTIONS ========== */
+
+  function updateParam(bytes32 param, uint256 value) external nonReentrant onlyOwner {
+    _updateParam(param, value);
+  }
+
   /* ========== INTERNAL FUNCTIONS ========== */
+
+  function _updateParam(bytes32 param, uint256 value) internal {
+    require(settings.isValidParam(param, value), "Invalid param or value");
+
+    _assetPoolParamsSet.add(param);
+    _assetPoolParams[param] = value;
+    emit UpdateParamValue(param, value);
+  }
+
+  function _assetPoolParamValue(bytes32 param) internal view returns (uint256) {
+    require(param.length > 0, "Empty param name");
+
+    if (_assetPoolParamsSet.contains(param)) {
+      return _assetPoolParams[param];
+    }
+    return settings.paramDefaultValue(param);
+  }
 
   function _AAR() internal returns (uint256) {
     uint256 aar = AAR();
 
-    uint256 AARS = settings.assetPoolParamValue(address(this), "AARS");
-    uint256 AARC = settings.assetPoolParamValue(address(this), "AARC");
+    uint256 AARS = _assetPoolParamValue("AARS");
+    uint256 AARC = _assetPoolParamValue("AARC");
     if (_aarBelowSafeLineTime == 0) {
       if (aar < AARS) {
         _aarBelowSafeLineTime = block.timestamp;
@@ -321,6 +345,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   function _getAssetTotalAmount() internal view returns (uint256) {
+    // console.log('_getAssetTotalAmount, msg.value: %s', msg.value);
+
     if (assetToken == Constants.NATIVE_TOKEN) {
       return address(this).balance.sub(msg.value);
     }
@@ -382,6 +408,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   /* =============== EVENTS ============= */
+
+  event UpdateParamValue(bytes32 indexed param, uint256 value);
   
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);

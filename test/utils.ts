@@ -12,6 +12,7 @@ import {
   InterestPoolFactory__factory,
   AssetPool,
   ERC20__factory,
+  AssetX__factory
 } from '../typechain';
 
 const { provider } = ethers;
@@ -20,7 +21,7 @@ export const ONE_DAY_IN_SECS = 24 * 60 * 60;
 
 export const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
-const maxContractSize = 24576;
+export const maxContractSize = 24576;
 
 export async function deployContractsFixture() {
   const  [Alice, Bob, Caro, Dave, Ivy]  = await ethers.getSigners();
@@ -48,13 +49,14 @@ export async function deployContractsFixture() {
    *  - Deploy AssetPoolFactory
    *  - Deploy InterestPoolFactory
    *  - Register USB/AssetPoolCalculaor/AssetPoolFactory/InterestPoolFactory to WandProtocol
+   * 
+   *  - Create AssetPools
+   *    - Deploy AssetX (WandProtocol.addAssetPool)
+   *    - Create AssetPool
+   *    - Set AssetPool to AssetX
    *  - Create InterestPools
    *   - Deploy $USB InterestPool
    *   - Notifiy InterestPoolFactory
-   *  - Create AssetPools
-   *    - Deploy AssetX
-   *    - Create AssetPool
-   *    - Set AssetPool to AssetX
    */
   const ProtocolSettingsFactory = await ethers.getContractFactory('ProtocolSettings');
   expect(ProtocolSettingsFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -73,8 +75,13 @@ export async function deployContractsFixture() {
 
   const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
   expect(AssetPoolFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
+  console.log(`AssetPoolFactory code size: ${AssetPoolFactoryFactory.bytecode.length / 2} bytes`);
   const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
   const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
+
+  const AssetPool = await ethers.getContractFactory('AssetPool');
+  expect(AssetPool.bytecode.length / 2).lessThan(maxContractSize);
+  console.log(`AssetPool code size: ${AssetPool.bytecode.length / 2} bytes`);
 
   const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculaor');
   expect(AssetPoolCalculaorFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -83,11 +90,25 @@ export async function deployContractsFixture() {
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   expect(InterestPoolFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
+  console.log(`InterestPoolFactory code size: ${InterestPoolFactoryFactory.bytecode.length / 2} bytes`)
   const InterestPoolFactory = await InterestPoolFactoryFactory.deploy(wandProtocol.address);
   const interestPoolFactory = InterestPoolFactory__factory.connect(InterestPoolFactory.address, provider);
 
   let trans = await wandProtocol.connect(Alice).initialize(usbToken.address, assetPoolCalculaor.address, assetPoolFactory.address, interestPoolFactory.address);
   await trans.wait();
+
+  // const AssetXFactory = await ethers.getContractFactory('AssetX');
+  // expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
+  // const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
+  // const ethx = AssetX__factory.connect(ETHx.address, provider);
+
+  // const AssetPool = await ethers.getContractFactory('AssetPool');
+  // expect(AssetPool.bytecode.length / 2).lessThan(maxContractSize);
+  // const ETHAssetPool = await AssetPool.deploy(
+  //   wandProtocol.address, ethx.address, ethPriceFeed.address, usbToken.address,
+  //   [],
+  //   []
+  // );
 
   return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
 }

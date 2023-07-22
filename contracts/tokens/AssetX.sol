@@ -82,9 +82,6 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
   function setFee(uint256 newFee) external nonReentrant onlyOwner {
     require(newFee != fee, "Same transfer fee");
-
-    IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-    settings.updateAssetPoolParam(address(this), "XTokensTransferFee", newFee);
     
     uint256 prevFee = fee;
     fee = newFee;
@@ -94,7 +91,19 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
   /**
    * @dev Adds or removes addresses from the whitelist
    */
-  function setWhitelistAddress(address account, bool whitelisted) public nonReentrant onlyAssetPool {
+  function setWhitelistAddress(address account, bool whitelisted) external nonReentrant onlyOwner {
+    _setWhitelistAddress(account, whitelisted);
+  }
+
+  function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
+    require(_assetPool != address(0), "Zero address detected");
+    assetPool = _assetPool;
+    _setWhitelistAddress(_assetPool, true);
+  }
+
+  /* ========== INTERNAL FUNCTIONS ========== */
+
+  function _setWhitelistAddress(address account, bool whitelisted) internal {
     require(account != address(0), "Zero address detected");
 
     if (whitelisted) {
@@ -108,14 +117,6 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
     emit UpdateWhitelistAddress(account, whitelisted);
   }
-
-  function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
-    require(_assetPool != address(0), "Zero address detected");
-    assetPool = _assetPool;
-    setWhitelistAddress(_assetPool, true);
-  }
-
-  /* ========== INTERNAL FUNCTIONS ========== */
 
   function _transferWithFees(address from, address to, uint256 amount) internal returns (bool) {
     uint256 feeAmount = amount.mul(fee).div(10 ** feeDecimals);
