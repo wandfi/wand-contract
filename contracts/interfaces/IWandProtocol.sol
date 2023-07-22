@@ -5,16 +5,20 @@ interface IWandProtocol {
 
   /* ============ VIEWS =========== */
 
+  function protocolOwner() external view returns (address);
+
   function settings() external view returns (address);
 
   function usbToken() external view returns (address);
+
+  function assetPoolCalculator() external view returns (address);
 
   function assetPoolFactory() external view returns (address);
 
   function interestPoolFactory() external view returns (address);
 
-  /* ============ MUTATIVE FUNCTIONS =========== */
+  function setUsbToken(address newUsbToken) external;
 
-
+  function setAssetPoolFactory(address newAssetPoolFactory) external;
 
 }

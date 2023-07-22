@@ -3,23 +3,23 @@ pragma solidity ^0.8.9;
 
 import "hardhat/console.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "./UsbInterestPool.sol";
-import "./UniLpInterestPool.sol";
-import "./CurveLpInterestPool.sol";
+// import "./UsbInterestPool.sol";
+// import "./UniLpInterestPool.sol";
+// import "./CurveLpInterestPool.sol";
 import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IAssetPoolFactory.sol";
 import "../interfaces/IInterestPool.sol";
 import "../interfaces/IInterestPoolFactory.sol";
 
-contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
+contract InterestPoolFactory is IInterestPoolFactory, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -56,32 +56,43 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function addInterestPool(
-    address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType,
-    address swapPool, uint256 swapPoolCoinsCount, address[] memory rewardTokens
-  ) external nonReentrant onlyProtocol {
+  function notifyInterestPoolAdded(address stakingToken, address interestPool) external onlyOwner {
     require(stakingToken != address(0), "Zero address detected");
+    require(interestPool != address(0), "Zero address detected");
     require(_interestPoolsByStakingToken[stakingToken] == address(0), "InterestPool already exists");
 
-    address pool;
-    if (stakingTokenType == Constants.InterestPoolStakingTokenType.Usb) {
-      pool = address(new UsbInterestPool(wandProtocol, address(this), stakingToken, rewardTokens));
-    }
-    else if (stakingTokenType == Constants.InterestPoolStakingTokenType.UniswapV2PairLp) {
-      pool = address(new UniLpInterestPool(wandProtocol, address(this), stakingToken, rewardTokens));
-    }
-    else if (stakingTokenType == Constants.InterestPoolStakingTokenType.CurvePlainPoolLp) {
-      pool = address(new CurveLpInterestPool(wandProtocol, address(this), stakingToken, swapPool, swapPoolCoinsCount, rewardTokens));
-    }
-    else {
-      revert("Invalid staking token type");
-    }
-    
     _stakingTokens.add(stakingToken);
-    _interestPoolsByStakingToken[stakingToken] = pool;
+    _interestPoolsByStakingToken[stakingToken] = interestPool;
 
-    emit InterestPoolAdded(stakingToken, stakingTokenType, rewardTokens, pool);
+    emit InterestPoolAdded(stakingToken, interestPool);
   }
+
+  // function addInterestPool(
+  //   address stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType,
+  //   address swapPool, uint256 swapPoolCoinsCount, address[] memory rewardTokens
+  // ) external nonReentrant onlyProtocol {
+  //   require(stakingToken != address(0), "Zero address detected");
+  //   require(_interestPoolsByStakingToken[stakingToken] == address(0), "InterestPool already exists");
+
+  //   address pool;
+  //   if (stakingTokenType == Constants.InterestPoolStakingTokenType.Usb) {
+  //     pool = address(new UsbInterestPool(wandProtocol, address(this), stakingToken, rewardTokens));
+  //   }
+  //   else if (stakingTokenType == Constants.InterestPoolStakingTokenType.UniswapV2PairLp) {
+  //     pool = address(new UniLpInterestPool(wandProtocol, address(this), stakingToken, rewardTokens));
+  //   }
+  //   else if (stakingTokenType == Constants.InterestPoolStakingTokenType.CurvePlainPoolLp) {
+  //     pool = address(new CurveLpInterestPool(wandProtocol, address(this), stakingToken, swapPool, swapPoolCoinsCount, rewardTokens));
+  //   }
+  //   else {
+  //     revert("Invalid staking token type");
+  //   }
+    
+  //   _stakingTokens.add(stakingToken);
+  //   _interestPoolsByStakingToken[stakingToken] = pool;
+
+  //   emit InterestPoolAdded(stakingToken, stakingTokenType, rewardTokens, pool);
+  // }
 
   function addRewardToken(address stakingToken, address rewardToken) public nonReentrant onlyProtocol {
     require(_stakingTokens.contains(stakingToken), "Invalid staking token");
@@ -90,7 +101,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
 
   function addRewardTokenToAllPools(address rewardToken) public nonReentrant onlyProtocol {
     require(rewardToken != address(0), "Zero address detected");
-    // console.log('InterestPoolFactory, addRewardTokenToAllPools for x token : %s', ERC20(rewardToken).symbol());
+    // console.log('InterestPoolFactory, addRewardTokenToAllPools for x token : %s', IERC20(rewardToken).symbol());
 
     for (uint256 i = 0; i < _stakingTokens.length(); i++) {
       if (!IInterestPool(_interestPoolsByStakingToken[_stakingTokens.at(i)]).rewardTokenAdded(rewardToken)) {
@@ -145,6 +156,5 @@ contract InterestPoolFactory is IInterestPoolFactory, Context, ReentrancyGuard {
 
   /* =============== EVENTS ============= */
 
-  event InterestPoolAdded(address indexed stakingToken, Constants.InterestPoolStakingTokenType stakingTokenType, address[] rewardTokens, address interestPool);
-
+  event InterestPoolAdded(address indexed stakingToken, address interestPool);
 }

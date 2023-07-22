@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IProtocolSettings.sol";
-import "../WandProtocol.sol";
 
-contract AssetX is ERC20, ReentrancyGuard {
+contract AssetX is Ownable, ERC20, ReentrancyGuard {
   using SafeMath for uint256;
   using EnumerableSet for EnumerableSet.AddressSet;
 
   address public immutable wandProtocol;
-  address public immutable assetPool;
+  address public assetPool;
 
   uint256 public fee;
   uint256 public feeDecimals;
@@ -22,17 +23,17 @@ contract AssetX is ERC20, ReentrancyGuard {
   // addresses free of transfer fee
   EnumerableSet.AddressSet internal _whitelistAddresses;
 
-  constructor(address _wandProtocol, address _assetPool, string memory _name, string memory _symbol) ERC20(_name, _symbol) {
+  constructor(address _wandProtocol, string memory _name, string memory _symbol) ERC20(_name, _symbol) {
     require(_wandProtocol != address(0), "Zero address detected");
-    require(_assetPool != address(0), "Zero address detected");
+    // require(_assetPool != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
-    assetPool = _assetPool;
+    // assetPool = _assetPool;
 
-    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
+    IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
     feeDecimals = settings.decimals();
-    fee = settings.defaultXTokensTransferFee();
+    fee = settings.paramDefaultValue("XTokensTransferFee");
 
-    setWhitelistAddress(_assetPool, true);
+    // setWhitelistAddress(_assetPool, true);
   }
 
   /* ================= VIEWS ================ */
@@ -83,11 +84,12 @@ contract AssetX is ERC20, ReentrancyGuard {
     _burn(account, amount);
   }
 
-  function setFee(uint256 newFee) external nonReentrant onlyAssetPool {
+  function setFee(uint256 newFee) external nonReentrant onlyOwner {
     require(newFee != fee, "Same transfer fee");
 
-    IProtocolSettings settings = IProtocolSettings(WandProtocol(wandProtocol).settings());
-    settings.assertXTokensTransferFee(newFee);
+    IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
+    // settings.assertXTokensTransferFee(newFee);
+    settings.updateAssetPoolParam(address(this), "XTokensTransferFee", newFee);
     
     uint256 prevFee = fee;
     fee = newFee;
@@ -112,12 +114,17 @@ contract AssetX is ERC20, ReentrancyGuard {
     emit UpdateWhitelistAddress(account, whitelisted);
   }
 
+  function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
+    require(_assetPool != address(0), "Zero address detected");
+    assetPool = _assetPool;
+  }
+
   /* ========== INTERNAL FUNCTIONS ========== */
 
   function _transferWithFees(address from, address to, uint256 amount) internal returns (bool) {
     uint256 feeAmount = amount.mul(fee).div(10 ** feeDecimals);
     uint256 remainingAmount = amount.sub(feeAmount);
-    address treasury = IProtocolSettings(WandProtocol(wandProtocol).settings()).treasury();
+    address treasury = IProtocolSettings(IWandProtocol(wandProtocol).settings()).treasury();
 
     _transfer(from, to, remainingAmount);
     _transfer(from, treasury, feeAmount);
@@ -128,7 +135,7 @@ contract AssetX is ERC20, ReentrancyGuard {
   /* ============== MODIFIERS =============== */
 
   modifier onlyAssetPool() {
-    require(assetPool == _msgSender(), "Caller is not the AssetPool contract");
+    require(assetPool != address(0) && assetPool == _msgSender(), "Caller is not the AssetPool contract");
     _;
   }
 

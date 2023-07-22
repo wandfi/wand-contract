@@ -1,73 +1,59 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.9;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
+// import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+// import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../libs/Constants.sol";
 
-contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
+contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
+  using EnumerableSet for EnumerableSet.Bytes32Set;
 
-  address public immutable wandProtocol;
+  // address public immutable wandProtocol;
 
   address internal _treasury;
 
-  // Redemption fee rate with $USB. Default to 0.1%. [0, 10%]
-  uint256 internal _defaultC1 = 1 * 10 ** 7;
-  uint256 public constant MIN_C1 = 0;
-  uint256 public constant MAX_C1 = 10 ** 9;
+  struct ParamConfig {
+    uint256 defaultValue;
+    uint256 min;
+    uint256 max;
+  }
 
-  // Redemption fee rate with X tokens paired with $USB. Default to 0.5%. [0, 10%]
-  uint256 internal _defaultC2 = 5 * 10 ** 7;
-  uint256 public constant MIN_C2 = 0;
-  uint256 public constant MAX_C2 = 10 ** 9;
+  EnumerableSet.Bytes32Set internal _paramsSet;
+  mapping(bytes32 => ParamConfig) internal _paramConfigs;
+  mapping(address => mapping(bytes32 => uint256)) internal _assetPoolParams;
 
-  // Yield rate. [0, 50%]
-  uint256 public constant MIN_Y = 0;
-  uint256 public constant MAX_Y = 5 * 10 ** 9;
-
-  // Target AAR. Default 200%, [100%, 1000%]
-  uint256 public constant MIN_AART = 10 ** 10;
-  uint256 public constant MAX_AART = 10 ** 11;
-
-  // Safe AAR. Default 150%, [100%, 1000%]
-  uint256 public constant MIN_AARS = 10 ** 10;
-  uint256 public constant MAX_AARS = 10 ** 11;
-
-  // Circuit Breaker AAR. Default 110%, [100%, 1000%]
-  uint256 public constant MIN_AARC = 10 ** 10;
-  uint256 public constant MAX_AARC = 10 ** 11;
-
-  // Basis of r. Default to 0.1, [0, 1]
-  uint256 internal _defaultBasisR = 10 ** 9;
-  uint256 public constant MIN_BASIS_R = 0;
-  uint256 public constant MAX_BASIS_R = 10 ** 10;
-
-  // Rate of r change per hour. Default to 0.001, [0, 1]
-  uint256 internal _defaultRateR = 10 ** 7;
-  uint256 public constant MIN_RATE_R = 0;
-  uint256 public constant MAX_RATE_R = 10 ** 10;
-
-  // Basis of R2. Default to 0.06, [0, 1]
-  uint256 internal _defaultBasisR2 = 6 * 10 ** 8;
-  uint256 public constant MIN_BASIS_R2 = 0;
-  uint256 public constant MAX_BASIS_R2 = 10 ** 10;
-
-  // Circuit breaker period. Default to 1 hour
-  uint256 internal _defaultCiruitBreakPeriod = 1 hours;
-  uint256 public constant MIN_CIRCUIT_BREAK_PERIOD = 1 minutes;
-  uint256 public constant MAX_CIRCUIT_BREAK_PERIOD = 1 days;
-
-  // X Tokens transfer fee. Default to 0.08%, [0, 100%]
-  uint256 internal _defaultXTokensTransferFee = 8 * 10 ** 6;
-  uint256 public constant MIN_X_TOKENS_TRANSFER_FEE = 0;
-  uint256 public constant MAX_X_TOKENS_TRANSFER_FEE = 10 ** 10;
-
-  constructor(address _wandProtocol, address _treasury_) {
-    require(_wandProtocol != address(0), "Zero address detected");
-    wandProtocol = _wandProtocol;
+  constructor(address _treasury_) Ownable() {
+    // require(_wandProtocol != address(0), "Zero address detected");
+    // wandProtocol = _wandProtocol;
     _treasury = _treasury_;
+
+    // Redemption fee rate with $USB. Default to 0.1%. [0, 10%]
+    _upsertParamConfig("C1", 1 * 10 ** 7, 0, 10 ** 9);
+    // Redemption fee rate with X tokens paired with $USB. Default to 0.5%. [0, 10%]
+    _upsertParamConfig("C2", 5 * 10 ** 7, 0, 10 ** 9);
+    // Yield rate. Default to 3.5%, [0, 50%]
+    _upsertParamConfig("Y", 35 * 10 ** 7, 0, 5 * 10 ** 9);
+    // Basis of r. Default to 0.1, [0, 1]
+    _upsertParamConfig("BasisR", 10 ** 9, 0, 10 ** 10);
+    // Rate of r change per hour. Default to 0.001, [0, 1]
+    _upsertParamConfig("RateR", 10 ** 7, 0, 10 ** 10);
+    // Basis of R2. Default to 0.06, [0, 1]
+    _upsertParamConfig("BasisR2", 6 * 10 ** 8, 0, 10 ** 10);
+    // Circuit breaker period. Default to 1 hour, [1 minute, 1 day]
+    _upsertParamConfig("CircuitBreakPeriod", 1 hours, 1 minutes, 1 days);
+    // X Tokens transfer fee. Default to 0.08%, [0, 100%]
+    _upsertParamConfig("XTokensTransferFee", 8 * 10 ** 6, 0, 10 ** 10);
+    // Target AAR. Default 200%, [100%, 1000%]
+    _upsertParamConfig("AART", 2 * 10 ** 10, 10 ** 10, 10 ** 11);
+    // Safe AAR. Default 150%, [100%, 1000%]
+    _upsertParamConfig("AARS", 15 * 10 ** 9, 10 ** 10, 10 ** 11);
+    // Circuit Breaker AAR. Default 110%, [100%, 1000%]
+    _upsertParamConfig("AARC", 11 * 10 ** 9, 10 ** 10, 10 ** 11);
   }
 
   /* ============== VIEWS =============== */
@@ -80,92 +66,30 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     return Constants.PROTOCOL_DECIMALS;
   }
 
-  function defaultC1() public view returns (uint256) {
-    return _defaultC1;
+  function params() public view returns (bytes32[] memory) {
+    return _paramsSet.values();
   }
 
-  function defaultC2() public view returns (uint256) {
-    return _defaultC2;
+  function paramConfig(bytes32 param) public view returns(ParamConfig memory) {
+    require(param.length > 0, "Empty param name");
+    require(_paramsSet.contains(param), "Invalid param name");
+    return _paramConfigs[param];
   }
 
-  function assertC1(uint256 c1) public pure override {
-    require(c1 >= MIN_C1, "C1 too low");
-    require(c1 <= MAX_C1, "C1 too high");
+  function paramDefaultValue(bytes32 param) public view returns (uint256) {
+    return paramConfig(param).defaultValue;
   }
 
-  function assertC2(uint256 c2) public pure override {
-    require(c2 >= MIN_C2, "C2 too low");
-    require(c2 <= MAX_C2, "C2 too high");
-  }
-
-  function assertY(uint256 y) public pure {
-    require(y >= MIN_Y, "Y too low");
-    require(y <= MAX_Y, "Y too high");
-  }
-
-  function assertAART(uint256 aart) public pure {
-    require(aart >= MIN_AART, "AART too low");
-    require(aart <= MAX_AART, "AART too high");
-  }
-
-  function assertAARS(uint256 aars) public pure {
-    require(aars >= MIN_AARS, "AARS too low");
-    require(aars <= MAX_AARS, "AARS too high");
-  }
-
-  function assertAARC(uint256 aarc) public pure {
-    require(aarc >= MIN_AARC, "AARC too low");
-    require(aarc <= MAX_AARC, "AARC too high");
-  }
-
-  function defaultBasisR() public view returns (uint256) {
-    return _defaultBasisR;
-  }
-
-  function assertBasisR(uint256 basisR) public pure {
-    require(basisR >= MIN_BASIS_R, "Basis r too low");
-    require(basisR <= MAX_BASIS_R, "Basis r too high");
-  }
-
-  function defaultRateR() public view returns (uint256) {
-    return _defaultRateR;
-  }
-
-  function assertRateR(uint256 rateR) public pure {
-    require(rateR >= MIN_RATE_R, "Rate r too low");
-    require(rateR <= MAX_RATE_R, "Rate r too high");
-  }
-
-  function defaultBasisR2() public view returns (uint256) {
-    return _defaultBasisR2;
-  }
-
-  function assertBasisR2(uint256 basisR2) public pure {
-    require(basisR2 >= MIN_BASIS_R2, "Basis R2 too low");
-    require(basisR2 <= MAX_BASIS_R2, "Basis R2 too high");
-  }
-
-  function defaultCiruitBreakPeriod() public view returns (uint256) {
-    return _defaultCiruitBreakPeriod;
-  }
-
-  function assertCiruitBreakPeriod(uint256 circuitBreakPeriod) public pure {
-    require(circuitBreakPeriod >= MIN_CIRCUIT_BREAK_PERIOD, "Circuit break period too short");
-    require(circuitBreakPeriod <= MAX_CIRCUIT_BREAK_PERIOD, "Circuit break period too long");
-  }
-
-  function defaultXTokensTransferFee() public view returns (uint256) {
-    return _defaultXTokensTransferFee;
-  }
-
-  function assertXTokensTransferFee(uint256 xTokensTransferFee) public pure {
-    require(xTokensTransferFee >= MIN_X_TOKENS_TRANSFER_FEE, "X tokens transfer fee too low");
-    require(xTokensTransferFee <= MAX_X_TOKENS_TRANSFER_FEE, "X tokens transfer fee too high");
+  function assetPoolParamValue(address assetPool, bytes32 param) public view returns (uint256) {
+    require(assetPool != address(0), "Zero address detected");
+    require(param.length > 0, "Empty param name");
+    require(_paramsSet.contains(param), "Invalid param name");
+    return _assetPoolParams[assetPool][param];
   }
 
   /* ============ MUTATIVE FUNCTIONS =========== */
 
-  function setTreasury(address newTreasury) public nonReentrant onlyProtocol {
+  function setTreasury(address newTreasury) public nonReentrant onlyOwner {
     require(newTreasury != address(0), "Zero address detected");
     require(newTreasury != _treasury, "Same _treasury");
 
@@ -174,84 +98,37 @@ contract ProtocolSettings is IProtocolSettings, Context, ReentrancyGuard {
     emit UpdateTreasury(prevTreasury, _treasury);
   }
 
-  function setDefaultC1(uint256 newC1) external nonReentrant onlyProtocol {
-    require(newC1 != _defaultC1, "Same redemption fee");
-    assertC1(newC1);
-    
-    uint256 prevDefaultC1 = _defaultC1;
-    _defaultC1 = newC1;
-    emit UpdateDefaultC1(prevDefaultC1, _defaultC1);
+  function _upsertParamConfig(bytes32 param, uint256 defaultValue, uint256 min, uint256 max) internal onlyOwner {
+    require(param.length > 0, "Empty param name");
+    require(min <= defaultValue && defaultValue <= max, "Invalid default value");
+    require(min <= max, "Invalid min and max");
+
+    _paramsSet.add(param);
+    _paramConfigs[param] = ParamConfig(defaultValue, min, max);
+    emit UpsertParamConfig(param, defaultValue, min, max);
   }
 
-  function setDefaultC2(uint256 newC2) external nonReentrant onlyProtocol {
-    require(newC2 != _defaultC2, "Same redemption fee");
-    assertC2(newC2);
-    
-    uint256 prevDefaultC2 = _defaultC2;
-    _defaultC2 = newC2;
-    emit UpdateDefaultC2(prevDefaultC2, _defaultC2);
-  }
+  function updateAssetPoolParam(address assetPool, bytes32 param, uint256 value) public nonReentrant onlyOwner {
+    require(assetPool != address(0), "Zero address detected");
+    require(param.length > 0, "Empty param name");
+    require(_paramsSet.contains(param), "Invalid param name");
+    require(_paramConfigs[param].min <= value && value <= _paramConfigs[param].max, "Invalid value");
 
-  function setDefaultBasisR(uint256 newBasisR) external nonReentrant onlyProtocol {
-    require(newBasisR != _defaultBasisR, "Same basis r");
-    assertBasisR(newBasisR);
-    
-    uint256 prevDefaultBasisR = _defaultBasisR;
-    _defaultBasisR = newBasisR;
-    emit UpdateDefaultBasisR(prevDefaultBasisR, _defaultBasisR);
-  }
-
-  function setDefaultRateR(uint256 newRateR) external nonReentrant onlyProtocol {
-    require(newRateR != _defaultRateR, "Same rate r");
-    assertRateR(newRateR);
-    
-    uint256 prevDefaultRateR = _defaultRateR;
-    _defaultRateR = newRateR;
-    emit UpdateDefaultRateR(prevDefaultRateR, _defaultRateR);
-  }
-
-  function setDefaultBasisR2(uint256 newBasisR2) external nonReentrant onlyProtocol {
-    require(newBasisR2 != _defaultBasisR2, "Same basis R2");
-    assertBasisR2(newBasisR2);
-    
-    uint256 prevDefaultBasisR2 = _defaultBasisR2;
-    _defaultBasisR2 = newBasisR2;
-    emit UpdateDefaultBasisR2(prevDefaultBasisR2, _defaultBasisR2);
-  }
-
-  function setDefaultCiruitBreakPeriod(uint256 newDefaultCircuitBreakPeriod) external nonReentrant onlyProtocol {
-    require(newDefaultCircuitBreakPeriod != _defaultCiruitBreakPeriod, "Same default circuit break period");
-    assertCiruitBreakPeriod(newDefaultCircuitBreakPeriod);
-    
-    uint256 prevDefaultCiruitBreakPeriod = _defaultCiruitBreakPeriod;
-    _defaultCiruitBreakPeriod = newDefaultCircuitBreakPeriod;
-    emit UpdateDefaultCircuitBreakPeriod(prevDefaultCiruitBreakPeriod, _defaultCiruitBreakPeriod);
-  }
-
-  function setDefaultXTokensTransferFee(uint256 newDefaultXTokensTransferFee) external nonReentrant onlyProtocol {
-    require(newDefaultXTokensTransferFee != _defaultXTokensTransferFee, "Same default X tokens transfer fee");
-    assertXTokensTransferFee(newDefaultXTokensTransferFee);
-    
-    uint256 prevDefaultXTokensTransferFee = _defaultXTokensTransferFee;
-    _defaultXTokensTransferFee = newDefaultXTokensTransferFee;
-    emit UpdateDefaultXTokensTransferFee(prevDefaultXTokensTransferFee, _defaultXTokensTransferFee);
+    _assetPoolParams[assetPool][param] = value;
+    emit UpdateAssetPoolParamValue(assetPool, param, value);
   }
 
   /* ============== MODIFIERS =============== */
 
-  modifier onlyProtocol() {
-    require(_msgSender() == wandProtocol, "Caller is not protocol");
-    _;
-  }
+  // modifier onlyOwner() {
+  //   require(_msgSender() == IWandProtocol(wandProtocol).protocolOwner(), "Caller is not owner");
+  //   _;
+  // }
 
   /* =============== EVENTS ============= */
 
+  event UpsertParamConfig(bytes32 indexed name, uint256 defaultValue, uint256 min, uint256 max);
+  event UpdateAssetPoolParamValue(address indexed assetPool, bytes32 indexed param, uint256 value);
+
   event UpdateTreasury(address prevTreasury, address newTreasury);
-  event UpdateDefaultC1(uint256 prevDefaultC1, uint256 defaultC1);
-  event UpdateDefaultC2(uint256 prevDeaultC2, uint256 defaultC2);
-  event UpdateDefaultBasisR(uint256 prevDefaultBasisR, uint256 defaultBasisR);
-  event UpdateDefaultRateR(uint256 prevDefaultRateR, uint256 defaultRateR);
-  event UpdateDefaultBasisR2(uint256 prevDefaultBasisR2, uint256 defaultBasisR2);
-  event UpdateDefaultCircuitBreakPeriod(uint256 prevDefaultCircuitBreakPeriod, uint256 circuitDefaultBreakPeriod);
-  event UpdateDefaultXTokensTransferFee(uint256 prevDefaultXTokensTransferFee, uint256 defaultXTokensTransferFee);
 }

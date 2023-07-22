@@ -9,58 +9,66 @@ interface IProtocolSettings {
 
   function decimals() external view returns (uint256);
 
-  function defaultC1() external view returns (uint256);
+  function paramDefaultValue(bytes32 param) external view returns (uint256);
 
-  function defaultC2() external view returns (uint256);
+  function assetPoolParamValue(address assetPool, bytes32 param) external view returns (uint256);
 
-  function assertC1(uint256 C1) external view;
+  
 
-  function assertC2(uint256 C2) external view;
+  // function defaultC1() external view returns (uint256);
 
-  function assertY(uint256 Y) external view;
+  // function defaultC2() external view returns (uint256);
 
-  function assertAART(uint256 targetAAR) external view;
+  // function assertC1(uint256 C1) external view;
 
-  function assertAARS(uint256 safeAAR) external view;
+  // function assertC2(uint256 C2) external view;
 
-  function assertAARC(uint256 safeAAR) external view;
+  // function assertY(uint256 Y) external view;
 
-  function defaultBasisR() external view returns (uint256);
+  // function assertAART(uint256 targetAAR) external view;
 
-  function assertBasisR(uint256 basisR) external view;
+  // function assertAARS(uint256 safeAAR) external view;
 
-  function defaultRateR() external view returns (uint256);
+  // function assertAARC(uint256 safeAAR) external view;
 
-  function assertRateR(uint256 rateR) external view;
+  // function defaultBasisR() external view returns (uint256);
 
-  function defaultBasisR2() external view returns (uint256);
+  // function assertBasisR(uint256 basisR) external view;
 
-  function assertBasisR2(uint256 basisR2) external view;
+  // function defaultRateR() external view returns (uint256);
 
-  function defaultCiruitBreakPeriod() external view returns (uint256);
+  // function assertRateR(uint256 rateR) external view;
 
-  function assertCiruitBreakPeriod(uint256 circuitBreakPeriod) external view;
+  // function defaultBasisR2() external view returns (uint256);
 
-  function defaultXTokensTransferFee() external view returns (uint256);
+  // function assertBasisR2(uint256 basisR2) external view;
 
-  function assertXTokensTransferFee(uint256 xTokensTransferFee) external pure;
+  // function defaultCiruitBreakPeriod() external view returns (uint256);
+
+  // function assertCiruitBreakPeriod(uint256 circuitBreakPeriod) external view;
+
+  // function defaultXTokensTransferFee() external view returns (uint256);
+
+  // function assertXTokensTransferFee(uint256 xTokensTransferFee) external pure;
 
   /* ============ MUTATIVE FUNCTIONS =========== */
 
-  function setTreasury(address newTreasury) external;
+  function updateAssetPoolParam(address assetPool, bytes32 param, uint256 value) external;
 
-  function setDefaultC1(uint256 defaultC1) external;
+  // function setTreasury(address newTreasury) external;
 
-  function setDefaultC2(uint256 defaultC2) external;
+  // function setDefaultC1(uint256 defaultC1) external;
 
-  function setDefaultBasisR(uint256 newBasisR) external;
+  // function setDefaultC2(uint256 defaultC2) external;
 
-  function setDefaultRateR(uint256 newRateR) external;
+  // function setDefaultBasisR(uint256 newBasisR) external;
 
-  function setDefaultBasisR2(uint256 newBasisR2) external;
+  // function setDefaultRateR(uint256 newRateR) external;
 
-  function setDefaultCiruitBreakPeriod(uint256 newCircuitBreakPeriod) external;
+  // function setDefaultBasisR2(uint256 newBasisR2) external;
 
-  function setDefaultXTokensTransferFee(uint256 newDefaultXTokensTransferFee) external;
+  // function setDefaultCiruitBreakPeriod(uint256 newCircuitBreakPeriod) external;
+
+  // function setDefaultXTokensTransferFee(uint256 newDefaultXTokensTransferFee) external;
 
 }
