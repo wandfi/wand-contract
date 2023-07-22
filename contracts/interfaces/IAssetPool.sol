@@ -21,44 +21,6 @@ interface IAssetPool {
 
   function AARDecimals() external view returns (uint256);
 
-  // function C1() external view returns (uint256);
-
-  // function C2() external view returns (uint256);
-
-  // function Y() external view returns (uint256);
-
-  // function AART() external view returns (uint256);
-
-  // function AARS() external view returns (uint256);
-
-  // function AARC() external view returns (uint256);
-
-  // function BasisR() external view returns (uint256);
-
-  // function RateR() external view returns (uint256);
-
-  // function BasisR2() external view returns (uint256);
-
-  // function CiruitBreakPeriod() external view returns (uint256);
-
-  // function settingsDecimals() external view returns (uint256);
-
-  // function aarBelowSafeLineTime() external view returns (uint256);
-
-  // function setC1(uint256 newC1) external;
-
-  // function setC2(uint256 newC2) external;
-
-  // function setY(uint256 newY) external;
-
-  // function setBasisR(uint256 newBasisR) external;
-
-  // function setRateR(uint256 newRateR) external;
-
-  // function setBasisR2(uint256 newBasisR2) external;
-
-  // function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external;
-
   function calculateMintUSBOut(uint256 assetAmount) external view returns (uint256);
   
   function mintUSB(uint256 assetAmount) external payable;

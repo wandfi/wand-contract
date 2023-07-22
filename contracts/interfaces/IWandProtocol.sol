@@ -17,8 +17,8 @@ interface IWandProtocol {
 
   function interestPoolFactory() external view returns (address);
 
-  function setUsbToken(address newUsbToken) external;
+  // function setUsbToken(address newUsbToken) external;
 
-  function setAssetPoolFactory(address newAssetPoolFactory) external;
+  // function setAssetPoolFactory(address newAssetPoolFactory) external;
 
 }

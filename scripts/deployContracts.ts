@@ -39,8 +39,9 @@ const treasuryAddress = deployer.address;
  *  - Deploy AssetPoolCalculaor
  *  - Deploy AssetPoolFactory
  *  - Deploy InterestPoolFactory
+ *  - Register USB/AssetPoolCalculaor/AssetPoolFactory/InterestPoolFactory to WandProtocol
  *  - Create InterestPools
- *   - Deploy InterestPool
+ *   - Deploy $USB InterestPool
  *   - Notifiy InterestPoolFactory
  *  - Create AssetPools
  *    - Deploy AssetX
@@ -48,8 +49,6 @@ const treasuryAddress = deployer.address;
  *    - Set AssetPool to AssetX
  */
 async function main() {
-  // const deployer = new ethers.Wallet(privateKey, provider);
-
   const ProtocolSettingsFactory = await ethers.getContractFactory('ProtocolSettings');
   console.log(`ProtocolSettings Contract size: ${ProtocolSettingsFactory.bytecode.length / 2} (Max 24576) bytes`);
 

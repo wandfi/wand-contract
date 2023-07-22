@@ -18,7 +18,6 @@ import "../interfaces/IUSB.sol";
 import "../interfaces/IAssetX.sol";
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
-// import "../tokens/AssetX.sol";
 
 contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   using SafeMath for uint256;
@@ -26,7 +25,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   IWandProtocol public immutable wandProtocol;
   IProtocolSettings public immutable settings;
-  // address public immutable assetPoolFactory;
   address public immutable assetPoolCalculator;
   address public immutable assetToken;
   address public immutable assetTokenPriceFeed;
@@ -43,18 +41,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   uint256 internal _aarBelowSafeLineTime;
   uint256 internal _aarBelowCircuitBreakerLineTime;
 
-  // uint256 public C1;
-  // uint256 public C2;
-  // uint256 public Y;
-  // uint256 public AART;
-  // uint256 public AARS;
-  // uint256 public AARC;
-  // uint256 public BasisR;
-  // uint256 public RateR;
-  // uint256 public BasisR2;
-  // uint256 public CiruitBreakPeriod;
-
-  // new AssetPool(wandProtocol, assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues));
   constructor(
     address _wandProtocol,
     address _assetToken,
@@ -81,24 +67,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     for (uint256 i = 0; i < assetPoolParams.length; i++) {
       settings.updateAssetPoolParam(address(this), assetPoolParams[i], assetPoolParamsValues[i]);
     }
-
-    // C1 = settings.defaultC1();
-    // C2 = settings.defaultC2();
-
-    // settings.assertY(_Y_);
-    // Y = _Y_;
-
-    // settings.assertAART(_AART_);
-    // AART = _AART_;
-    // settings.assertAARS(_AARS_);
-    // AARS = _AARS_;
-    // settings.assertAARC(_AARC_);
-    // AARC = _AARC_;
-
-    // BasisR = settings.defaultBasisR();
-    // BasisR2 = settings.defaultBasisR2();
-    // RateR = settings.defaultRateR();
-    // CiruitBreakPeriod = settings.defaultCiruitBreakPeriod();
   }
 
   /* ================= VIEWS ================ */
@@ -324,127 +292,6 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     // Nothing to do here
   }
 
-  /* ========== RESTRICTED FUNCTIONS ========== */
-
-  // function setXToken(address _xToken_) external nonReentrant onlyOwner {
-  //   require(_xToken_ != address(0), "Zero address detected");
-  //   xToken = _xToken_;
-  // }
-
-  // function setC1(uint256 newC1) external nonReentrant onlyOwner {
-  //   require(newC1 != C1, "Same redemption fee");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertC1(newC1);
-    
-  //   uint256 prevC1 = C1;
-  //   C1 = newC1;
-  //   emit UpdatedC1(prevC1, C1);
-  // }
-
-  // function setC2(uint256 newC2) external nonReentrant onlyOwner {
-  //   require(newC2 != C2, "Same redemption fee");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertC2(newC2);
-
-  //   uint256 prevC2 = C2;
-  //   C2 = newC2;
-  //   emit UpdatedC2(prevC2, C2);
-  // }
-
-  // function setY(uint256 newY) external nonReentrant onlyOwner {
-  //   require(newY != Y, "Same yield rate");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertY(newY);
-
-  //   uint256 prevY = Y;
-  //   Y = newY;
-  //   emit UpdatedY(prevY, Y);
-  // }
-
-  // function setBasisR(uint256 newBasisR) external nonReentrant onlyOwner {
-  //   require(newBasisR != BasisR, "Same basis of r");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertBasisR(newBasisR);
-
-  //   uint256 prevBasisR = BasisR;
-  //   BasisR = newBasisR;
-  //   emit UpdatedBasisR(prevBasisR, BasisR);
-  // }
-
-  // function setRateR(uint256 newRateR) external nonReentrant onlyOwner {
-  //   require(newRateR != RateR, "Same rate of r");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertRateR(newRateR);
-
-  //   uint256 prevRateR = RateR;
-  //   RateR = newRateR;
-  //   emit UpdatedRateR(prevRateR, RateR);
-  // }
-
-  // function setBasisR2(uint256 newBasisR2) external nonReentrant onlyOwner {
-  //   require(newBasisR2 != BasisR2, "Same basis of R2");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertBasisR2(newBasisR2);
-
-  //   uint256 prevBasisR2 = BasisR2;
-  //   BasisR2 = newBasisR2;
-  //   emit UpdatedBasisR2(prevBasisR2, BasisR2);
-  // }
-
-  // function setCiruitBreakPeriod(uint256 newCiruitBreakPeriod) external nonReentrant onlyOwner {
-  //   require(newCiruitBreakPeriod != CiruitBreakPeriod, "Same circuit breaker period");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertCiruitBreakPeriod(newCiruitBreakPeriod);
-
-  //   uint256 prevCiruitBreakPeriod = CiruitBreakPeriod;
-  //   CiruitBreakPeriod = newCiruitBreakPeriod;
-  //   emit UpdateCiruitBreakPeriod(prevCiruitBreakPeriod, CiruitBreakPeriod);
-  // }
-
-  // function setAART(uint256 newAART) external nonReentrant onlyOwner {
-  //   require(newAART != AART, "Same target AAR");
-  //   require(newAART >= AARS, "Target AAR must be greater than or equal to safe AAR");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertAART(newAART);
-
-  //   uint256 prevAART = AART;
-  //   AART = newAART;
-  //   emit UpdatedAART(prevAART, AART);
-  // }
-
-  // function setAARS(uint256 newAARS) external nonReentrant onlyOwner {
-  //   require(newAARS != AARS, "Same safe AAR");
-  //   require(newAARS <= AART, "Safe AAR must be less than or equal to target AAR");
-  //   require(newAARS >= AARC, "Safe AAR must be greater than or equal to circuit breaker AAR");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertAARS(newAARS);
-
-  //   uint256 prevAARS = AARS;
-  //   AARS = newAARS;
-  //   emit UpdatedAARS(prevAARS, AARS);
-  // }
-
-  // function setAARC(uint256 newAARC) external nonReentrant onlyOwner {
-  //   require(newAARC != AARC, "Same circuit breaker AAR");
-  //   require(newAARC <= AARS, "Circuit breaker AAR must be less than or equal to safe AAR");
-
-  //   IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-  //   settings.assertAARC(newAARC);
-
-  //   uint256 prevAARC = AARC;
-  //   AARC = newAARC;
-  //   emit UpdatedAARC(prevAARC, AARC);
-  // }
-
   /* ========== INTERNAL FUNCTIONS ========== */
 
   function _AAR() internal returns (uint256) {
@@ -535,18 +382,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   /* =============== EVENTS ============= */
-
-  // event UpdatedC1(uint256 prevC1, uint256 newC1);
-  // event UpdatedC2(uint256 prevC2, uint256 newC2);
-  // event UpdatedY(uint256 prevY, uint256 newY);
-  // event UpdatedAART(uint256 prevAART, uint256 newAART);
-  // event UpdatedAARS(uint256 prevAARS, uint256 newAARS);
-  // event UpdatedAARC(uint256 prevAARC, uint256 newAARC);
-  // event UpdatedBasisR(uint256 prevBasisR, uint256 newBasisR);
-  // event UpdatedRateR(uint256 prevRateR, uint256 newRateR);
-  // event UpdatedBasisR2(uint256 prevBasisR2, uint256 newBasisR2);
-  // event UpdateCiruitBreakPeriod(uint256 prevCiruitBreakPeriod, uint256 newCiruitBreakPeriod);
-
+  
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);

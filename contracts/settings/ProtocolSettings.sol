@@ -3,17 +3,13 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-// import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-// import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../libs/Constants.sol";
 
 contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.Bytes32Set;
-
-  // address public immutable wandProtocol;
 
   address internal _treasury;
 
@@ -28,8 +24,6 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
   mapping(address => mapping(bytes32 => uint256)) internal _assetPoolParams;
 
   constructor(address _treasury_) Ownable() {
-    // require(_wandProtocol != address(0), "Zero address detected");
-    // wandProtocol = _wandProtocol;
     _treasury = _treasury_;
 
     // Redemption fee rate with $USB. Default to 0.1%. [0, 10%]
@@ -117,13 +111,6 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     _assetPoolParams[assetPool][param] = value;
     emit UpdateAssetPoolParamValue(assetPool, param, value);
   }
-
-  /* ============== MODIFIERS =============== */
-
-  // modifier onlyOwner() {
-  //   require(_msgSender() == IWandProtocol(wandProtocol).protocolOwner(), "Caller is not owner");
-  //   _;
-  // }
 
   /* =============== EVENTS ============= */
 

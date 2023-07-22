@@ -14,7 +14,6 @@ contract USB is IUSB, Ownable, ERC20 {
   constructor(address _wandProtocol, string memory _name, string memory _symbol) Ownable() ERC20(_name, _symbol) {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
-    IWandProtocol(wandProtocol).setUsbToken(address(this));
   }
 
   function mint(address to, uint256 amount) public override onlyAssetPool {

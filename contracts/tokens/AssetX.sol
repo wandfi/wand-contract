@@ -25,15 +25,11 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
   constructor(address _wandProtocol, string memory _name, string memory _symbol) ERC20(_name, _symbol) {
     require(_wandProtocol != address(0), "Zero address detected");
-    // require(_assetPool != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
-    // assetPool = _assetPool;
 
     IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
     feeDecimals = settings.decimals();
     fee = settings.paramDefaultValue("XTokensTransferFee");
-
-    // setWhitelistAddress(_assetPool, true);
   }
 
   /* ================= VIEWS ================ */
@@ -88,7 +84,6 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
     require(newFee != fee, "Same transfer fee");
 
     IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-    // settings.assertXTokensTransferFee(newFee);
     settings.updateAssetPoolParam(address(this), "XTokensTransferFee", newFee);
     
     uint256 prevFee = fee;
@@ -117,6 +112,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
   function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
     require(_assetPool != address(0), "Zero address detected");
     assetPool = _assetPool;
+    setWhitelistAddress(_assetPool, true);
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
