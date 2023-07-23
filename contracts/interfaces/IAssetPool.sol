@@ -8,7 +8,7 @@ interface IAssetPool {
    */
   function usbTotalSupply() external view returns (uint256);
 
-  function getAssetTotalAmount() external view returns (uint256);
+  function getAssetToken() external view returns (address);
 
   function getAssetTokenPrice() external view returns (uint256, uint256);
 
@@ -23,21 +23,11 @@ interface IAssetPool {
 
   function calculateMintUSBOut(uint256 assetAmount) external view returns (uint256);
   
-  function mintUSB(uint256 assetAmount) external payable;
-
   function calculateMintXTokensOut(uint256 assetAmount) external view returns (uint256);
-
-  function mintXTokens(uint256 assetAmount) external payable;
-
-  function redeemByUSB(uint256 usbAmount) external;
-
-  function redeemByXTokens(uint256 xTokenAmount) external;
 
   function pairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) external view returns (uint256);
 
   function calculateUSBToXTokensOut(address account, uint256 usbAmount) external returns (uint256);
-
-  function usbToXTokens(uint256 usbAmount) external;
 
   function calculateInterest() external view returns (uint256, uint256);
 

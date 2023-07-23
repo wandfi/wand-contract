@@ -85,7 +85,7 @@ export async function deployContractsFixture() {
 
   const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculaor');
   expect(AssetPoolCalculaorFactory.bytecode.length / 2).lessThan(maxContractSize);
-  const AssetPoolCalculaor = await AssetPoolCalculaorFactory.deploy(wandProtocol.address);
+  const AssetPoolCalculaor = await AssetPoolCalculaorFactory.deploy(usbToken.address);
   const assetPoolCalculaor = AssetPoolCalculaor__factory.connect(AssetPoolCalculaor.address, provider);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
@@ -96,19 +96,6 @@ export async function deployContractsFixture() {
 
   let trans = await wandProtocol.connect(Alice).initialize(usbToken.address, assetPoolCalculaor.address, assetPoolFactory.address, interestPoolFactory.address);
   await trans.wait();
-
-  // const AssetXFactory = await ethers.getContractFactory('AssetX');
-  // expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
-  // const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
-  // const ethx = AssetX__factory.connect(ETHx.address, provider);
-
-  // const AssetPool = await ethers.getContractFactory('AssetPool');
-  // expect(AssetPool.bytecode.length / 2).lessThan(maxContractSize);
-  // const ETHAssetPool = await AssetPool.deploy(
-  //   wandProtocol.address, ethx.address, ethPriceFeed.address, usbToken.address,
-  //   [],
-  //   []
-  // );
 
   return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
 }
@@ -130,7 +117,7 @@ export async function dumpAssetPoolState(assetPool: AssetPool) {
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
   console.log(`  AAR: ${ethers.utils.formatUnits(await assetPool.AAR(), await assetPool.AARDecimals())}`);
-  console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.Y(), await settings.decimals())}`);
+  // console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.Y(), await settings.decimals())}`);
 }
 
 export function expandTo18Decimals(n: number) {

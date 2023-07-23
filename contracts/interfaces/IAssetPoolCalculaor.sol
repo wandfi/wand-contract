@@ -16,6 +16,6 @@ interface IAssetPoolCalculaor {
 
   function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) external pure returns (uint256);
 
-  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount) external pure returns (uint256);
+  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount, uint256 msgValue) external pure returns (uint256);
 
 }

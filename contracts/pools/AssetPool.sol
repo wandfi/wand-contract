@@ -86,11 +86,19 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return _getAssetTotalAmount();
   }
 
+  function getAssetToken() public view returns (address) {
+    return assetToken;
+  }
+
   function getAssetTokenPrice() public view returns (uint256, uint256) {
     uint256 price = IPriceFeed(assetTokenPriceFeed).latestPrice();
     uint256 priceDecimals = IPriceFeed(assetTokenPriceFeed).decimals();
 
     return (price, priceDecimals);
+  }
+
+  function getParamValue(bytes32 param) public view returns (uint256) {
+    return _assetPoolParamValue(param);
   }
 
   /**
@@ -151,7 +159,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
     require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
 
-    return IAssetPoolCalculaor(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount);
+    return IAssetPoolCalculaor(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, 0);
   }
 
   function calculateInterest() public view returns (uint256, uint256) {
@@ -178,7 +186,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @notice Mint $USB tokens using asset token
    * @param assetAmount: Amount of asset token used to mint
    */
-  function mintUSB(uint256 assetAmount) external payable override nonReentrant doCheckAAR doSettleInterest {
+  function mintUSB(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
     uint256 usbOutAmount = calculateMintUSBOut(assetAmount);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
@@ -193,9 +201,15 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @notice Mint X tokens using asset token
    * @param assetAmount: Amount of asset token used to mint
    */
-  function mintXTokens(uint256 assetAmount) external payable override nonReentrant doCheckAAR doSettleInterest {
-    uint256 xTokenAmount = calculateMintXTokensOut(assetAmount);
-    // console.log('mintXTokens, x token out: %s', xTokenAmount);
+  function mintXTokens(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
+    uint256 aar = AAR();
+    require(aar > 10 ** AARDecimals(), "AAR Below 100%");
+    // console.log('calculateMintXTokensOut, msg.value: %s', msg.value);
+    uint256 AARC = _assetPoolParamValue("AARC");
+    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
+
+    uint256 xTokenAmount = IAssetPoolCalculaor(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     IAssetX(xToken).mint(_msgSender(), xTokenAmount);
@@ -207,7 +221,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @notice Redeem asset tokens with $USB
    * @param usbAmount: Amount of $USB tokens used to redeem for asset tokens
    */
-  function redeemByUSB(uint256 usbAmount) external override nonReentrant doCheckAAR doSettleInterest {
+  function redeemByUSB(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {
     require(usbAmount > 0, "Amount must be greater than 0");
 
     uint256 assetAmount = 0;
@@ -250,7 +264,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @notice Redeem asset tokens with X tokens
    * @param xTokenAmount: Amount of X tokens used to redeem for asset tokens
    */
-  function redeemByXTokens(uint256 xTokenAmount) external override nonReentrant doCheckAAR doSettleInterest {
+  function redeemByXTokens(uint256 xTokenAmount) external nonReentrant doCheckAAR doSettleInterest {
     uint256 pairedUSBAmount = pairedUSBAmountToRedeemByXTokens(xTokenAmount);
 
     // Δeth = Δethx * M_ETH / M_ETHx * (1 -C2)
@@ -274,7 +288,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     }
   }
 
-  function usbToXTokens(uint256 usbAmount) external override nonReentrant doCheckAAR doSettleInterest {  
+  function usbToXTokens(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {  
     uint256 xTokenOut = calculateUSBToXTokensOut(_msgSender(), usbAmount);
 
     IUSB(usbToken).burn(_msgSender(), usbAmount);
@@ -295,7 +309,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function updateParam(bytes32 param, uint256 value) external nonReentrant onlyOwner {
+  function updateParamValue(bytes32 param, uint256 value) external nonReentrant onlyOwner {
     _updateParam(param, value);
   }
 

@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
+import { nativeTokenAddress, maxContractSize, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
 import { 
   AssetPool__factory,
   AssetX__factory,
@@ -20,6 +20,12 @@ describe('Asset Pool', () => {
       Alice, Bob, Caro, ethPriceFeed,
       wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
+
+    // Create $ETHx token
+    const AssetXFactory = await ethers.getContractFactory('AssetX');
+    expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
+    const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
+    const ethxToken = AssetX__factory.connect(ETHx.address, provider);
     
     // Create ETH asset pool
     const ethAddress = nativeTokenAddress;
@@ -27,21 +33,22 @@ describe('Asset Pool', () => {
     const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
     const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
     const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, "ETHx Token", "ETHx", ethY, ethAART, ethAARS, ethAARC))
-      .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue)
-      .to.emit(interestPoolFactory, 'InterestPoolAdded').withArgs(usbToken.address, 0 /* InterestPoolStakingTokenType.Usb */, anyValue, anyValue);
-    const ethPoolInfo = await assetPoolFactory.getAssetPoolInfo(ethAddress);
-    const ethPool = AssetPool__factory.connect(ethPoolInfo.pool, provider);
-    const ethxToken = AssetX__factory.connect(ethPoolInfo.xToken, provider);
+    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+      [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
+      [ethY, ethAART, ethAARS, ethAARC]))
+      .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
 
     // Initial AAR should be max uint256
     expect (await ethPool.AAR()).to.equal(ethers.constants.MaxUint256);
 
     // Set C1 & C2 to 0 to faciliate testing
-    await expect(wandProtocol.connect(Alice).setC1(ethAddress, 0))
-      .to.emit(ethPool, 'UpdatedC1').withArgs(await settings.defaultC1(), 0);
-    await expect(wandProtocol.connect(Alice).setC2(ethAddress, 0))
-      .to.emit(ethPool, 'UpdatedC2').withArgs(await settings.defaultC2(), 0);
+    await expect(ethPool.connect(Alice).updateParamValue(ethers.utils.formatBytes32String("C1"), 0))
+      .to.emit(ethPool, 'UpdateParamValue').withArgs(ethers.utils.formatBytes32String("C1"), 0);
+    await expect(ethPool.connect(Alice).updateParamValue(ethers.utils.formatBytes32String("C2"), 0))
+      .to.emit(ethPool, 'UpdateParamValue').withArgs(ethers.utils.formatBytes32String("C2"), 0);
 
     // Asset Pool State: M_ETH = 0, M_USB = 0, M_ETHx = 0, P_ETH = $2000
     // Alice deposit 2 ETH to mint 2 $ETHx
@@ -132,13 +139,13 @@ describe('Asset Pool', () => {
     ethPrice = ethers.utils.parseUnits('350', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('1.05', await ethPool.AARDecimals()));
-    await expect(ethPool.connect(Alice).mintXTokens(ethDepositAmount)).to.be.rejectedWith(/AAR Below Safe Threshold/);
+    await expect(ethPool.connect(Alice).mintXTokens(ethDepositAmount)).to.be.rejectedWith(/AAR Below Circuit Breaker AAR Threshold/);
 
     // 1 hour later, $ETHx mint should be resumed
     // Expected $ETHx output is: 1 * 350 * 16.5 / (9 * 350 - 3000) = 38.5
     await expect(ethPool.connect(Alice).checkAAR()).not.to.be.reverted;
     const ONE_HOUR_IN_SECS = 60 * 60;
-    expect(await ethPool.CircuitBreakPeriod()).to.equal(ONE_HOUR_IN_SECS);
+    expect(await ethPool.getParamValue(ethers.utils.formatBytes32String('CircuitBreakPeriod'))).to.equal(ONE_HOUR_IN_SECS);
     await dumpAssetPoolState(ethPool);
     await time.increase(ONE_HOUR_IN_SECS);
     expectedETHxAmount = ethers.utils.parseUnits('38.5', await ethxToken.decimals());
@@ -147,8 +154,6 @@ describe('Asset Pool', () => {
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-1'), ethDepositAmount])
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedETHxAmount)
       .to.emit(ethPool, 'XTokenMinted').withArgs(Alice.address, ethDepositAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
-    
-
 
   });
 

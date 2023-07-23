@@ -37,7 +37,7 @@ contract AssetPoolCalculaor {
       return type(uint256).max;
     }
 
-    uint256 assetTotalAmount = assetPool.getAssetTotalAmount();
+    uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, 0);
     if (assetTotalAmount == 0) {
       return 0;
     }
@@ -156,7 +156,6 @@ contract AssetPoolCalculaor {
   function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public pure returns (uint256) {
     require(assetAmount > 0, "Amount must be greater than 0");
 
-    // S.aar = AAR(assetPool);
     require(S.aar >= S.AARS, "AAR Below Safe Threshold");
     
     uint256 Delta_ETH = assetAmount;
@@ -202,7 +201,7 @@ contract AssetPoolCalculaor {
     revert("Should not reach here");
   }
 
-  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount) public view returns (uint256) {
+  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount, uint256 msgValue) public view returns (uint256) {
     uint256 aar = AAR(assetPool);
     require(aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
@@ -215,13 +214,30 @@ contract AssetPoolCalculaor {
 
     // Otherwise: Δethx = (Δeth * P_ETH * M_ETHx) / (M_ETH * P_ETH - Musb-eth)
     if (IERC20(assetPool.xToken()).totalSupply() > 0) {
-      uint256 assetTotalAmount = assetPool.getAssetTotalAmount();
+      // console.log('calculateMintXTokensOut 1, address(assetPool).balance: %s', address(assetPool).balance);
+      uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, msgValue);
+      // console.log('calculateMintXTokensOut 2, assetTotalAmount: %s', assetTotalAmount);
+
       uint256 xTokenTotalAmount = IERC20(assetPool.xToken()).totalSupply();
-      xTokenAmount = assetAmount.mul(xTokenTotalAmount).mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).div(
-        assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(assetPool.usbTotalSupply())
-      );
+
+      Terms memory T;
+      T.T1 = assetAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(xTokenTotalAmount); // (Δeth * P_ETH * M_ETHx)
+      T.T2 = assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(assetPool.usbTotalSupply()); // (M_ETH * P_ETH - Musb-eth)
+      xTokenAmount = T.T1.div(T.T2);
     }
 
     return xTokenAmount;
+  }
+
+  function _getAssetTotalAmount(IAssetPool assetPool, uint256 msgValue) internal view returns (uint256) {
+    // console.log('_getAssetTotalAmount, msg.value: %s', msg.value);
+    address assetToken = assetPool.getAssetToken();
+
+    if (assetToken == Constants.NATIVE_TOKEN) {
+      return address(assetPool).balance.sub(msgValue);
+    }
+    else {
+      return IERC20(assetToken).balanceOf(address(assetPool));
+    }
   }
 }
