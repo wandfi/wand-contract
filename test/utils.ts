@@ -7,7 +7,7 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   USB__factory,
-  AssetPoolCalculaor__factory,
+  AssetPoolCalculator__factory,
   AssetPoolFactory__factory,
   InterestPoolFactory__factory,
   AssetPool,
@@ -88,7 +88,7 @@ export async function deployContractsFixture() {
   const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculator');
   expect(AssetPoolCalculaorFactory.bytecode.length / 2).lessThan(maxContractSize);
   const AssetPoolCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
-  const assetPoolCalculaor = AssetPoolCalculaor__factory.connect(AssetPoolCalculator.address, provider);
+  const assetPoolCalculaor = AssetPoolCalculator__factory.connect(AssetPoolCalculator.address, provider);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   expect(InterestPoolFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);

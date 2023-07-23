@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../interfaces/IPriceFeed.sol";
 
@@ -35,5 +36,11 @@ contract WBTCPriceFeed is IPriceFeed {
     require(price1 >= 0 && price2 >= 0, "WBTCPriceFeed: negative price");
 
     return uint256(price1).mul(uint256(price2)).mul(10 ** _decimals).div(10 ** wbtcToBTC.decimals()).div(10 ** btcToUSD.decimals());
+  }
+
+  function latestTimestamp() external view returns (uint256) {
+    (, , , uint256 timestamp1, ) = wbtcToBTC.latestRoundData();
+    (, , , uint256 timestamp2, ) = btcToUSD.latestRoundData();
+    return Math.min(timestamp1, timestamp2);
   }
 }

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IAssetPool.sol";
 import "../libs/Constants.sol";
 
-interface IAssetPoolCalculaor {
+interface IAssetPoolCalculator {
 
   function AAR(IAssetPool assetPool) external pure returns (uint256);
 

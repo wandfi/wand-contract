@@ -67,7 +67,7 @@ describe('Asset Pool', () => {
     // Alice deposit 1 ETH to mint $USB, expected output is: 1 * 3000 = 3000
     // await dumpAssetPoolState(ethPool);
     ethPrice = ethers.utils.parseUnits('3000', await ethPriceFeed.decimals());
-    await expect(ethPriceFeed.connect(Bob).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     ethDepositAmount = ethers.utils.parseEther('1');
     const expectedUSBAmount = ethers.utils.parseUnits('3000', await usbToken.decimals());
     expect(await ethPool.calculateMintUSBOut(ethDepositAmount)).to.equal(expectedUSBAmount);
@@ -87,7 +87,7 @@ describe('Asset Pool', () => {
     // Asset Pool State: M_ETH = 3, M_USB = 3000, M_ETHx = 2, P_ETH = $2000
     // Bob deposite 3 ETH to mint $ETHx, expected output is: 3 * 2000 * 2 / (3 * 2000 - 3000) = 4
     ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
-    await expect(ethPriceFeed.connect(Bob).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     ethDepositAmount = ethers.utils.parseEther('3');
     expectedETHxAmount = ethers.utils.parseUnits('4', await ethxToken.decimals());
     expect(await ethPool.calculateMintXTokensOut(ethDepositAmount)).to.equal(expectedETHxAmount);
@@ -107,7 +107,7 @@ describe('Asset Pool', () => {
     // ETH price falls to $700, AAR = 6 * 700 / 3000 = 140%
     // Expected behavior: $USB mint is paused, $ETHx mint is un-paused
     ethPrice = ethers.utils.parseUnits('700', await ethPriceFeed.decimals());
-    await expect(ethPriceFeed.connect(Caro).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('1.4', await ethPool.AARDecimals()));
     ethDepositAmount = ethers.utils.parseEther('1');
     await expect(ethPool.calculateMintUSBOut(ethDepositAmount)).to.be.rejectedWith(/AAR Below Safe Threshold/);

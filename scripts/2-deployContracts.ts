@@ -7,7 +7,7 @@ import {
   USB__factory,
   AssetPoolFactory__factory,
   InterestPoolFactory__factory,
-  AssetPoolCalculaor__factory
+  AssetPoolCalculator__factory
 } from '../typechain';
 
 const { BigNumber } = ethers;
@@ -64,17 +64,17 @@ async function main() {
   const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
   const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
   const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
-  console.log(`Deployed AssetPoolFactory to ${assetPoolFactory.address}. Size: ${AssetPoolFactoryFactory.bytecode.length / 2} bytes`);
+  console.log(`Deployed AssetPoolFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
   const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculator');
   const AssetPoolCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
-  const assetPoolCalculaor = AssetPoolCalculaor__factory.connect(AssetPoolCalculator.address, provider);
-  console.log(`Deployed AssetPoolCalculator to ${assetPoolCalculaor.address}. Size: ${AssetPoolCalculaorFactory.bytecode.length / 2} bytes`);
+  const assetPoolCalculaor = AssetPoolCalculator__factory.connect(AssetPoolCalculator.address, provider);
+  console.log(`Deployed AssetPoolCalculator to ${assetPoolCalculaor.address}  (${AssetPoolCalculaorFactory.bytecode.length / 2} bytes)`);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   const InterestPoolFactory = await InterestPoolFactoryFactory.deploy(wandProtocol.address);
   const interestPoolFactory = InterestPoolFactory__factory.connect(InterestPoolFactory.address, provider);
-  console.log(`Deployed InterestPoolFactory to ${interestPoolFactory.address}. Size: ${InterestPoolFactoryFactory.bytecode.length / 2} bytes`);
+  console.log(`Deployed InterestPoolFactory to ${interestPoolFactory.address} (${InterestPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
   let trans = await wandProtocol.connect(deployer).initialize(usbToken.address, assetPoolCalculaor.address, assetPoolFactory.address, interestPoolFactory.address);
   await trans.wait();

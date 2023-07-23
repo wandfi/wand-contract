@@ -25,15 +25,15 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
 const deployer = new ethers.Wallet(privateKey, provider);
 
-const wbtcAddress = '0x183c07F248e137E964E213925d0cfd0d3DCd8f1C';
-const ethPriceFeedAddress = '0x05acAAe839d572D45109ef9EbbBB200AA7b0bB05';
-const wbtcPriceFeedAddress = '0xCD1d9898453d49F947e518d1F2776CEd580095F2';
+// Based on Chainlink price feed for ETH/USD on Goerli
+// https://goerli.etherscan.io/address/0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e
+const ethPriceFeedAddress = '0xf6E8f6233FbfBbA5d42547B7A94819c0afF91D8A';
 
-const protocolSettingsAddress = '0x32995491E0B6EcAebd51dfF140B0526041f83c57';
-const wandProtocolAddress = '0xcfb2d127b8CB9D8cEc75E02674B2D6B931A87038';
-const usbTokenAddress = '0x807D699594fD12D1dD8448B026EA1361b65D75c4';
-const assetPoolFactoryAddress = '0x325B450F3f9eBc231948A5Dc2b8e9D0cc6B70b36';
-const interestPoolFactoryAddress = '0x895eb3893068296c03915509B943d9Fe27D49b08';
+const wbtcAddress = '0xf8424b5359AAE2098eB9C8A51458b9D594B35096';
+// Mocked price feed for WBTC/USD on Goerli
+const wbtcPriceFeedAddress = '0x7286754f7523c2D84Ac9cdAb1F0f0e323f6745cc';
+
+const wandProtocolAddress = '0x99A966E3BB33080b6c8A752B932d51a1a0FEC30b';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
@@ -58,10 +58,10 @@ const interestPoolFactoryAddress = '0x895eb3893068296c03915509B943d9Fe27D49b08';
  */
 async function main() {
   const wandProtocol = WandProtocol__factory.connect(wandProtocolAddress, provider);
-  const settings = ProtocolSettings__factory.connect(protocolSettingsAddress, provider);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(assetPoolFactoryAddress, provider);
-  const interestPoolFactory = InterestPoolFactory__factory.connect(interestPoolFactoryAddress, provider);
-  const usbToken = USB__factory.connect(usbTokenAddress, provider);
+  const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
+  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
+  const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
+  const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
 
   // Create $ETHx token
   const AssetXFactory = await ethers.getContractFactory('AssetX');
@@ -114,8 +114,12 @@ async function main() {
     [wbtcY, wbtcAART, wbtcAARS, wbtcAARC]
   );
   await trans.wait();
-  const wbtcxPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtcAddress);
-  console.log(`Deployed $WBTC asset pool to ${wbtcxPoolAddress}`);
+  const wbtcPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtcAddress);
+  console.log(`Deployed $WBTC asset pool to ${wbtcPoolAddress}`);
+
+  trans = await wbtcxToken.connect(deployer).setAssetPool(wbtcPoolAddress);
+  await trans.wait();
+  console.log(`Connected $WBTCx asset pool to $WBTCx token`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

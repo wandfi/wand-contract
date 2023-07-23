@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IAssetPool.sol";
-import "../interfaces/IAssetPoolCalculaor.sol";
+import "../interfaces/IAssetPoolCalculator.sol";
 import "../interfaces/IInterestPoolFactory.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IProtocolSettings.sol";
@@ -106,7 +106,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @dev AAReth = (M_ETH * P_ETH / Musb-eth) * 100%
    */
   function AAR() public view returns (uint256) {
-    return IAssetPoolCalculaor(assetPoolCalculator).AAR(IAssetPool(this));
+    return IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this));
   }
 
   function AARDecimals() public pure returns (uint256) {
@@ -114,7 +114,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   function pairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
-    return IAssetPoolCalculaor(assetPoolCalculator).pairedUSBAmountToRedeemByXTokens(IAssetPool(this), xTokenAmount);
+    return IAssetPoolCalculator(assetPoolCalculator).pairedUSBAmountToRedeemByXTokens(IAssetPool(this), xTokenAmount);
   }
 
   function calculateUSBToXTokensOut(address account, uint256 usbAmount) public view returns (uint256) {
@@ -125,12 +125,12 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     Constants.AssetPoolState memory S = _getAssetPoolState();
 
-    return IAssetPoolCalculaor(assetPoolCalculator).calculateUSBToXTokensOut(S, account, usbAmount);
+    return IAssetPoolCalculator(assetPoolCalculator).calculateUSBToXTokensOut(S, account, usbAmount);
   }
 
   function calculateMintUSBOut(uint256 assetAmount) public view returns (uint256) {
     Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IAssetPoolCalculaor(assetPoolCalculator).calculateMintUSBOut(S, assetAmount);
+    return IAssetPoolCalculator(assetPoolCalculator).calculateMintUSBOut(S, assetAmount);
   }
 
   function _getAssetPoolState() internal view returns (Constants.AssetPoolState memory) {
@@ -159,7 +159,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
     require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
 
-    return IAssetPoolCalculaor(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, 0);
+    return IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, 0);
   }
 
   function calculateInterest() public view returns (uint256, uint256) {
@@ -209,7 +209,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
     require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
 
-    uint256 xTokenAmount = IAssetPoolCalculaor(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);
+    uint256 xTokenAmount = IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     IAssetX(xToken).mint(_msgSender(), xTokenAmount);

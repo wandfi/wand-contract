@@ -15,11 +15,11 @@ $ hh compile
 With same keys to `.env-example`
 
 ```sh
-$ hh run scripts/deployMockContracts.ts --network <goerli>
+$ hh run scripts/1-deployPriceFeeds.ts --network <goerli>
 
-$ hh run scripts/deployContracts.ts --network <mainnet/goerli>
+$ hh run scripts/2-deployContracts.ts --network <mainnet/goerli>
 
-$ hh run scripts/addPools.ts --network <mainnet/goerli>
+$ hh run scripts/3-addPools.ts --network <mainnet/goerli>
 
 # Etherscan verify
 $ hh verify --network <mainnet/goerli> <address>
@@ -39,29 +39,29 @@ $ hh test ./test/xxx.ts
 ### Goerli
 
 ```
-WandProtocol: 0xcfb2d127b8CB9D8cEc75E02674B2D6B931A87038
-  $USB Token: 0x807D699594fD12D1dD8448B026EA1361b65D75c4
-  ProtocolSettings: 0x32995491E0B6EcAebd51dfF140B0526041f83c57
-  AssetPoolCalculator: 0xee8522a92af9773A2e34BFF44650B08E20bb3A9B
-  AssetPoolFactory: 0x325B450F3f9eBc231948A5Dc2b8e9D0cc6B70b36
-  InterestPoolFactory: 0x895eb3893068296c03915509B943d9Fe27D49b08
+WandProtocol: 0x99A966E3BB33080b6c8A752B932d51a1a0FEC30b
+  $USB Token: 0x2f37F3D6a93AC7a0D5A5fF5924A0feF0F1E97096
+  ProtocolSettings: 0x94A87d3F73Bbb7a65713b02D4A19e85aa456bd2a
+  AssetPoolCalculator: 0x61688FAf46E0AF475e414271168fdACE571F8176
+  AssetPoolFactory: 0x997d20e942691D7eD8DF29650791F9280bC86eBA
+  InterestPoolFactory: 0x4262E7F6a202AadB242aB0889b7C503b02a498E5
 Asset Pools:
   $ETH Pool
     Asset Token: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-    Asset Pool: 0x9A46890924D1845aa6EFa724c63daa86DdDBdC1e
-    Asset Price Feed: 0x05acAAe839d572D45109ef9EbbBB200AA7b0bB05
-    $ETHx Token: 0xe562937ccD9D2088c20A4716C7376560CEDb3DD0
+    Asset Pool: 0x1e6537D3440372D5ff12bBE7C5e3B9191a5401EB
+    Asset Price Feed: 0xf6E8f6233FbfBbA5d42547B7A94819c0afF91D8A
+    $ETHx Token: 0x39D793f1B7BeDfE7a9834892CF1e6F438A741233
   $WBTC Pool
-    Asset Token: 0x183c07F248e137E964E213925d0cfd0d3DCd8f1C
-    Asset Pool: 0x48c097F86c30cA1029958ECbA238022eFce314e9
-    Asset Price Feed: 0xCD1d9898453d49F947e518d1F2776CEd580095F2
-    $WBTCx Token: 0x92a86AD8Da608c2D6f67D2C70A945dEAF5C1ea7A
+    Asset Token: 0xf8424b5359AAE2098eB9C8A51458b9D594B35096
+    Asset Pool: 0x6Cab6c94e2086Dec7c1265fAb6f2D08F57e9D9Bf
+    Asset Price Feed: 0x7286754f7523c2D84Ac9cdAb1F0f0e323f6745cc
+    $WBTCx Token: 0x34801dFC736aCfe784408E9aa1F3186cdE9aCe26
 Interest Pools:
   $USB Pool
-    Staking Token: 0x807D699594fD12D1dD8448B026EA1361b65D75c4
+    Staking Token: 0x2f37F3D6a93AC7a0D5A5fF5924A0feF0F1E97096
     Reward Tokens:
-      $ETHx: 0xe562937ccD9D2088c20A4716C7376560CEDb3DD0
-      $WBTCx: 0x92a86AD8Da608c2D6f67D2C70A945dEAF5C1ea7A
+      $ETHx: 0x39D793f1B7BeDfE7a9834892CF1e6F438A741233
+      $WBTCx: 0x34801dFC736aCfe784408E9aa1F3186cdE9aCe26
 ```
 
 ## License

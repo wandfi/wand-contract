@@ -29,4 +29,9 @@ contract CommonPriceFeed is IPriceFeed {
     require(price >= 0, "CommonPriceFeed: negative price");
     return uint256(price);
   }
+
+  function latestTimestamp() external view returns (uint256) {
+    (, , , uint256 timestamp, ) = assetToUSD.latestRoundData();
+    return timestamp;
+  }
 }
