@@ -12,7 +12,9 @@ import {
   InterestPoolFactory__factory,
   AssetPool,
   ERC20__factory,
-  AssetX__factory
+  WandProtocol,
+  AssetPool__factory,
+  InterestPool__factory
 } from '../typechain';
 
 const { provider } = ethers;
@@ -45,10 +47,10 @@ export async function deployContractsFixture() {
    *  - Deploy ProtocolSettings
    *  - Deploy WandProtocol
    *  - Deploy USB
-   *  - Deploy AssetPoolCalculaor
+   *  - Deploy AssetPoolCalculator
    *  - Deploy AssetPoolFactory
    *  - Deploy InterestPoolFactory
-   *  - Register USB/AssetPoolCalculaor/AssetPoolFactory/InterestPoolFactory to WandProtocol
+   *  - Register USB/AssetPoolCalculator/AssetPoolFactory/InterestPoolFactory to WandProtocol
    * 
    *  - Create AssetPools
    *    - Deploy AssetX (WandProtocol.addAssetPool)
@@ -83,10 +85,10 @@ export async function deployContractsFixture() {
   expect(AssetPool.bytecode.length / 2).lessThan(maxContractSize);
   console.log(`AssetPool code size: ${AssetPool.bytecode.length / 2} bytes`);
 
-  const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculaor');
+  const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculator');
   expect(AssetPoolCalculaorFactory.bytecode.length / 2).lessThan(maxContractSize);
-  const AssetPoolCalculaor = await AssetPoolCalculaorFactory.deploy(usbToken.address);
-  const assetPoolCalculaor = AssetPoolCalculaor__factory.connect(AssetPoolCalculaor.address, provider);
+  const AssetPoolCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
+  const assetPoolCalculaor = AssetPoolCalculaor__factory.connect(AssetPoolCalculator.address, provider);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   expect(InterestPoolFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -117,7 +119,54 @@ export async function dumpAssetPoolState(assetPool: AssetPool) {
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
   console.log(`  AAR: ${ethers.utils.formatUnits(await assetPool.AAR(), await assetPool.AARDecimals())}`);
-  // console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.Y(), await settings.decimals())}`);
+  console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
+}
+
+export async function dumpContracts(wandProtocolAddress: string) {
+  const wandProtocol = WandProtocol__factory.connect(wandProtocolAddress, provider);
+  console.log(`WandProtocol: ${wandProtocol.address}`);
+  console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
+  console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
+  console.log(`  AssetPoolCalculator: ${await wandProtocol.assetPoolCalculator()}`);
+  console.log(`  AssetPoolFactory: ${await wandProtocol.assetPoolFactory()}`);
+  console.log(`  InterestPoolFactory: ${await wandProtocol.interestPoolFactory()}`);
+
+  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
+  const assetTokens = await assetPoolFactory.assetTokens();
+  console.log(`Asset Pools:`);
+  for (let i = 0; i < assetTokens.length; i++) {
+    const assetToken = assetTokens[i];
+    const isETH = assetToken == nativeTokenAddress;
+    const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
+    const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
+    const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
+    const assetPool = AssetPool__factory.connect(assetPoolAddress, provider);
+    const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
+    console.log(`  $${assetSymbol} Pool`);
+    console.log(`    Asset Token: ${assetToken}`);
+    console.log(`    Asset Pool: ${assetPoolAddress}`);
+    console.log(`    Asset Price Feed: ${await assetPool.assetTokenPriceFeed()}`);
+    console.log(`    $${await xToken.symbol()} Token: ${xToken.address}`);
+  }
+
+  const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
+  const stakingTokens = await interestPoolFactory.stakingTokens();
+  console.log(`Interest Pools:`);
+  for (let i = 0; i < stakingTokens.length; i++) {
+    const stakingTokenAddress = stakingTokens[i];
+    const stakingToken = ERC20__factory.connect(stakingTokenAddress, provider);
+    const interestPoolAddress = await interestPoolFactory.getInterestPoolAddress(stakingTokenAddress);
+    const interestPool = InterestPool__factory.connect(interestPoolAddress, provider);
+    const rewardTokens = await interestPool.rewardTokens();
+    console.log(`  $${await stakingToken.symbol()} Pool`);
+    console.log(`    Staking Token: ${stakingTokenAddress}`);
+    console.log(`    Reward Tokens:`);
+    for (let j = 0; j < rewardTokens.length; j++) {
+      const rewardToken = rewardTokens[j];
+      const rewardTokenERC20 = ERC20__factory.connect(rewardToken, provider);
+      console.log(`      $${await rewardTokenERC20.symbol()}: ${rewardToken}`);
+    }
+  }
 }
 
 export function expandTo18Decimals(n: number) {

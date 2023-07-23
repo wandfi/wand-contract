@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
+import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, dumpContracts, expectBigNumberEquals } from './utils';
 import { 
   AssetPool__factory,
   AssetX__factory,
@@ -64,6 +64,8 @@ describe('Wand Protocol', () => {
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [wbtcY, wbtcAART, wbtcAARS, wbtcAARC])
     ).to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
+
+    await dumpContracts(wandProtocol.address);
     
     // Check $WBTCx is added as a reward token to $USB interest pool
     const wbtcxPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
@@ -182,7 +184,7 @@ describe('Wand Protocol', () => {
     //  Expected paired $USB: 0.1 * 6900 / 4.80192 = ~143.692522991
     //  Δeth: 0.1 * 7.975 * (1 - 0.5%) / 4.80192 = ~0.16524900456
     //  Fee: 0.1 * 7.975 * 0.5% / 4.80192 = ~0.000830397
-    await dumpAssetPoolState(ethPool);
+    // await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 8);
     const bobRedeemETHxAmount = ethers.utils.parseUnits('0.1', await ethxToken.decimals());
     const expectedPairedUSBAmount = ethers.utils.parseUnits('143.692522991', await usbToken.decimals());
@@ -199,12 +201,12 @@ describe('Wand Protocol', () => {
       .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Bob.address, Alice.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
 
     // Day 9. Alice 100 $USB -> $ETHx
-    await dumpAssetPoolState(ethPool);
+    // await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 9);
     const aliceUSBSwapAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
     const calculatedETHxAmount = await ethPool.calculateUSBToXTokensOut(Alice.address, aliceUSBSwapAmount);
     await expect(usbToken.connect(Alice).approve(ethPool.address, aliceUSBSwapAmount)).not.to.be.reverted;
-    console.log(calculatedETHxAmount);
+    // console.log(calculatedETHxAmount);
     await expect(ethPool.connect(Alice).usbToXTokens(aliceUSBSwapAmount))
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceUSBSwapAmount)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
