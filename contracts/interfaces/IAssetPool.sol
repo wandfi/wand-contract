@@ -25,13 +25,9 @@ interface IAssetPool {
   
   function calculateMintXTokensOut(uint256 assetAmount) external view returns (uint256);
 
-  function pairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) external view returns (uint256);
+  function calculatePairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) external view returns (uint256);
 
   function calculateUSBToXTokensOut(address account, uint256 usbAmount) external returns (uint256);
 
   function calculateInterest() external view returns (uint256, uint256);
-
-  function checkAAR() external; 
-
-  function settleInterest() external;
 }

@@ -46,7 +46,7 @@ contract AssetPoolCalculator {
     return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** assetPool.AARDecimals()).div(assetPool.usbTotalSupply());
   }
 
-  function pairedUSBAmountToRedeemByXTokens(IAssetPool assetPool, uint256 xTokenAmount) public view returns (uint256) {
+  function calculatePairedUSBAmountToRedeemByXTokens(IAssetPool assetPool, uint256 xTokenAmount) public view returns (uint256) {
     require(xTokenAmount > 0, "Amount must be greater than 0");
     require(IERC20(assetPool.xToken()).totalSupply() > 0, "No x tokens minted yet");
 

@@ -17,7 +17,7 @@ describe('Asset Pool', () => {
   it('Mint & Redemption (Without Interest & Fees) Works', async () => {
 
     const {
-      Alice, Bob, Caro, ethPriceFeed,
+      Alice, Bob, Caro, Dave, Ivy, ethPriceFeed,
       wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
 
@@ -124,7 +124,7 @@ describe('Asset Pool', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Caro.address, expectedETHxAmount)
       .to.emit(ethPool, 'XTokenMinted').withArgs(Caro.address, ethDepositAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
 
-    // Asset Pool State: M_ETH = 9, M_USB = 3000, M_ETHx = 16.5, AAR: 9 * 700 / 3000 = 210%
+    // Asset Pool State: M_ETH = 9, M_USB = 3000, M_ETHx = 16.5
     // P_ETH = $300, AAR: 9 * 300 / 3000 = 90%,
     // Expected behavior: $USB mint is paused, $ETHx mint is paused for 1 hour
     await dumpAssetPoolState(ethPool);
@@ -154,6 +154,74 @@ describe('Asset Pool', () => {
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-1'), ethDepositAmount])
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedETHxAmount)
       .to.emit(ethPool, 'XTokenMinted').withArgs(Alice.address, ethDepositAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+    // Update P_ETH = 350, AAR: 10 * 350 / 3000 = 116.67%, C1 does not take effect
+    // Alice redeem 350 $USB, expected out:
+    //  ETH: 350 / 350 = 1
+    ethPrice = ethers.utils.parseUnits('350', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    let redeemedUSBAmount = ethers.utils.parseUnits('350', await usbToken.decimals());
+    let expectedETHAmount = ethers.utils.parseEther('1');
+    let expectedFeeAmount = ethers.utils.parseEther('0');
+    expect(await ethPool.calculateRedemptionOutByUSB(redeemedUSBAmount)).to.deep.equal([expectedETHAmount, expectedFeeAmount]);
+
+    // Update P_ETH = 270, AAR: 10 * 270 / 3000 = 90%
+    // Alice redeem 270 $USB, expected out:
+    //  ETH: 270 * 10 / 3000 = 0.9
+    ethPrice = ethers.utils.parseUnits('270', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    redeemedUSBAmount = ethers.utils.parseUnits('270', await usbToken.decimals());
+    expectedETHAmount = ethers.utils.parseEther('0.9');
+    expectedFeeAmount = ethers.utils.parseEther('0');
+    expect(await ethPool.calculateRedemptionOutByUSB(redeemedUSBAmount)).to.deep.equal([expectedETHAmount, expectedFeeAmount]);
+
+    // Asset Pool State: M_ETH = 10, M_USB = 3000, M_ETHx = 55, P_ETH = 350, AAR: 10 * 350 / 3000 = 116.67%
+    // Update C1 = 10%, P_ETH = 1200, AAR: 400% (> 300%)
+    // Alice redeem 120 $USB, expected out:
+    //  ETH: 120 * (1 - 10%) / 1200 = 0.09
+    //  Fee: 120 * 10% / 1200 = 0.01
+    ethPrice = ethers.utils.parseUnits('1200', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPool.connect(Alice).updateParamValue(ethers.utils.formatBytes32String("C1"), ethers.utils.parseUnits('0.1', await settings.decimals())))
+      .to.emit(ethPool, 'UpdateParamValue').withArgs(ethers.utils.formatBytes32String("C1"), ethers.utils.parseUnits('0.1', await settings.decimals()));
+    expect(await ethPool.getParamValue(ethers.utils.formatBytes32String('C1'))).to.equal(ethers.utils.parseUnits('0.1', await settings.decimals()));
+    redeemedUSBAmount = ethers.utils.parseUnits('120', await usbToken.decimals());
+    expectedETHAmount = ethers.utils.parseEther('0.09');
+    expectedFeeAmount = ethers.utils.parseEther('0.01');
+    expect(await ethPool.calculateRedemptionOutByUSB(redeemedUSBAmount)).to.deep.equal([expectedETHAmount, expectedFeeAmount]);
+    await expect(ethPool.connect(Alice).redeemByUSB(redeemedUSBAmount))
+      .to.changeEtherBalances([ethPool.address, Alice.address, Ivy.address], [ethers.utils.parseEther('-0.1'), expectedETHAmount, expectedFeeAmount])
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, redeemedUSBAmount)
+      .to.emit(ethPool, 'AssetRedeemedWithUSB').withArgs(Alice.address, redeemedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
+      .to.emit(ethPool, 'AssetRedeemedWithUSBFeeCollected').withArgs(Alice.address, Ivy.address, redeemedUSBAmount, expectedFeeAmount, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+    // Asset Pool State: M_ETH = 9.9, M_USB = 2880, M_ETHx = 55, P_ETH = 1200, AAR: 9.9 * 1200 / 2880 = 4.125%
+    // Update C2 to 1%
+    // Alice redeems with 0.55 $ETHx, expected out:
+    //  Paired $USB: 0.55 * 2880.0 / 55.0 = 28.8
+    //  ETH: 0.55 * 9.9 * (1 - 1%) / 55 = 0.09801
+    //  Fee: 0.55 * 9.9 * 1% / 55 = 0.00099
+    // console.log(await ethxToken.balanceOf(Alice.address));
+    // console.log(await usbToken.balanceOf(Alice.address));
+    let redeemedETHxAmount = ethers.utils.parseUnits('0.55', await ethxToken.decimals());
+    let expectedPairedUSBAmount = ethers.utils.parseUnits('28.8', await usbToken.decimals());
+    expectedETHAmount = ethers.utils.parseEther('0.09801');
+    expectedFeeAmount = ethers.utils.parseEther('0.00099');
+    await expect(ethPool.connect(Alice).updateParamValue(ethers.utils.formatBytes32String("C2"), ethers.utils.parseUnits('0.01', await settings.decimals())))
+      .to.emit(ethPool, 'UpdateParamValue').withArgs(ethers.utils.formatBytes32String("C2"), ethers.utils.parseUnits('0.01', await settings.decimals()));
+    expect(await ethPool.getParamValue(ethers.utils.formatBytes32String('C2'))).to.equal(ethers.utils.parseUnits('0.01', await settings.decimals()));
+    expect(await ethPool.calculatePairedUSBAmountToRedeemByXTokens(redeemedETHxAmount)).to.equal(expectedPairedUSBAmount);
+    await expect(ethPool.connect(Alice).redeemByXTokens(redeemedETHxAmount))
+      .to.changeEtherBalances([ethPool.address, Alice.address, Ivy.address], [ethers.utils.parseEther('-0.099'), expectedETHAmount, expectedFeeAmount])
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, expectedPairedUSBAmount)
+      .to.emit(ethxToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, redeemedETHxAmount)
+      .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Alice.address, redeemedETHxAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
+      .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Alice.address, Ivy.address, redeemedETHxAmount, expectedFeeAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+
 
   });
 

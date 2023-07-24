@@ -82,13 +82,16 @@ async function dumpAssetPoolState(assetPool: AssetPool) {
   const usbToken = USB__factory.connect(await assetPool.usbToken(), provider);
   const ethxToken = USB__factory.connect(await assetPool.xToken(), provider);
 
+  const aar = await assetPool.AAR();
+  const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await assetPool.AARDecimals());
+
   console.log(`$${assetSymbol} Pool:`);
   console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.getAssetTotalAmount(), 18)}`);
   console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits(await assetPriceFeed.latestPrice(), await assetPriceFeed.decimals())}`);
   console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
-  console.log(`  AAR: ${ethers.utils.formatUnits(await assetPool.AAR(), await assetPool.AARDecimals())}`);
+  console.log(`  AAR: ${AAR}`);
   console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
 }
 

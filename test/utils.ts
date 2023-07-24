@@ -62,7 +62,7 @@ export async function deployContractsFixture() {
    */
   const ProtocolSettingsFactory = await ethers.getContractFactory('ProtocolSettings');
   expect(ProtocolSettingsFactory.bytecode.length / 2).lessThan(maxContractSize);
-  const ProtocolSettings = await ProtocolSettingsFactory.deploy(Alice.address);
+  const ProtocolSettings = await ProtocolSettingsFactory.deploy(Ivy.address);
   const settings = ProtocolSettings__factory.connect(ProtocolSettings.address, provider);
 
   const WandProtocolFactory = await ethers.getContractFactory('WandProtocol');
@@ -112,14 +112,19 @@ export async function dumpAssetPoolState(assetPool: AssetPool) {
   const usbToken = USB__factory.connect(await assetPool.usbToken(), provider);
   const ethxToken = USB__factory.connect(await assetPool.xToken(), provider);
 
+  const aar = await assetPool.AAR();
+  const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await assetPool.AARDecimals());
+
   console.log(`${assetSymbol} Pool:`);
   console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.getAssetTotalAmount(), 18)}`);
   console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits(await assetPriceFeed.latestPrice(), await assetPriceFeed.decimals())}`);
   console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
-  console.log(`  AAR: ${ethers.utils.formatUnits(await assetPool.AAR(), await assetPool.AARDecimals())}`);
+  console.log(`  AAR: ${AAR}`);
   console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
+  console.log(`  AARBelowSafeLineTime: ${await assetPool.AARBelowSafeLineTime()}`);
+  console.log(`  AARBelowCircuitBreakerLineTime: ${await assetPool.AARBelowCircuitBreakerLineTime()}`);
 }
 
 export async function dumpContracts(wandProtocolAddress: string) {

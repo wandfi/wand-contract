@@ -190,7 +190,7 @@ describe('Wand Protocol', () => {
     const expectedPairedUSBAmount = ethers.utils.parseUnits('143.692522991', await usbToken.decimals());
     const expectedETHAmount2 = ethers.utils.parseEther('0.16524900456');
     const expectedFee2 = ethers.utils.parseEther('0.000830397');
-    expectBigNumberEquals(await ethPool.pairedUSBAmountToRedeemByXTokens(bobRedeemETHxAmount), expectedPairedUSBAmount);
+    expectBigNumberEquals(await ethPool.calculatePairedUSBAmountToRedeemByXTokens(bobRedeemETHxAmount), expectedPairedUSBAmount);
     await expect(ethxToken.connect(Bob).approve(ethPool.address, bobRedeemETHxAmount)).not.to.be.reverted;
     await expect(usbToken.connect(Bob).approve(ethPool.address, expectedPairedUSBAmount.mul(11).div(10))).not.to.be.reverted;
     await expect(ethPool.connect(Bob).redeemByXTokens(bobRedeemETHxAmount))
@@ -211,8 +211,6 @@ describe('Wand Protocol', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceUSBSwapAmount)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, aliceUSBSwapAmount, anyValue, ethPrice4, await ethPriceFeed.decimals());
-
-
 
   });
 
