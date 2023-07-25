@@ -18,7 +18,7 @@ describe('Wand Protocol', () => {
   it('Basic E2E Scenario Works', async () => {
 
     const {
-      Alice, Bob, Caro, wbtc, ethPriceFeed, wbtcPriceFeed,
+      Alice, Bob, Caro, Ivy, wbtc, ethPriceFeed, wbtcPriceFeed,
       wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
 
@@ -173,10 +173,10 @@ describe('Wand Protocol', () => {
     const expectedFee = ethers.utils.parseEther('0.000025');
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice4)).not.to.be.reverted;
     await expect(ethPool.connect(Alice).redeemByUSB(aliceRedeemAmount))
-      .to.changeEtherBalances([Alice.address, ethPool.address], [expectedEthAmount.add(expectedFee), ethers.utils.parseEther('-0.025')])
+      .to.changeEtherBalances([Alice.address, Ivy.address, ethPool.address], [expectedEthAmount, expectedFee, ethers.utils.parseEther('-0.025')])
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceRedeemAmount)
       .to.emit(ethPool, 'AssetRedeemedWithUSB').withArgs(Alice.address, aliceRedeemAmount, expectedEthAmount, ethPrice4, await ethPriceFeed.decimals())
-      .to.emit(ethPool, 'AssetRedeemedWithUSBFeeCollected').withArgs(Alice.address, Alice.address, aliceRedeemAmount, expectedFee, ethPrice4, await ethPriceFeed.decimals());
+      .to.emit(ethPool, 'AssetRedeemedWithUSBFeeCollected').withArgs(Alice.address, Ivy.address, aliceRedeemAmount, expectedFee, ethPrice4, await ethPriceFeed.decimals());
 
     // Day 8. Bob redeems 0.1 $ETHx
     //  Musb_eth = 7000 - 100 = 6900; Methx = 4 + 0.8 + (some interest) = ~4.80192
@@ -198,7 +198,7 @@ describe('Wand Protocol', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(Bob.address, ethers.constants.AddressZero, bobRedeemETHxAmount)
       .to.emit(usbToken, 'Transfer').withArgs(Bob.address, ethers.constants.AddressZero, anyValue)
       .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Bob.address, bobRedeemETHxAmount, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals())
-      .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Bob.address, Alice.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
+      .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Bob.address, Ivy.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
 
     // Day 9. Alice 100 $USB -> $ETHx
     // await dumpAssetPoolState(ethPool);

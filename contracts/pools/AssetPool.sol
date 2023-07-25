@@ -437,8 +437,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   modifier doCheckAAR() {
-    _AAR(); // update _aarBelowSafeLineTime and _aarBelowCircuitBreakerLineTime
     _;
+    _AAR(); // update _aarBelowSafeLineTime and _aarBelowCircuitBreakerLineTime
   }
 
   /* =============== EVENTS ============= */

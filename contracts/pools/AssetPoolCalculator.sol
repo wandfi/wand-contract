@@ -152,11 +152,11 @@ contract AssetPoolCalculator {
       Terms memory T;
       T.T1 = S.M_USB_ETH.sub(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART)); // (Musb-eth - M_ETH * P_ETH / S.AART)
       T.T2 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
-      T.T3 = (10 ** S.AARDecimals).add(S.AART.sub(S.aar).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)).div(10 ** S.AARDecimals); // (1 + (S.AART - AAReth) * 0.1 / 2)
-      T.T4 = Delta_USB.sub(S.M_USB_ETH).add(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART)); // (Δusb - Musb-eth + M_ETH * P_ETH / S.AART)
+      T.T3 = (10 ** S.AARDecimals).add(S.AART.sub(S.aar).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)); // (1 + (S.AART - AAReth) * 0.1 / 2)
+      T.T4 = (S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART)).add(Delta_USB).sub(S.M_USB_ETH); // (M_ETH * P_ETH / S.AART + Δusb - Musb-eth)
       T.T5 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
 
-      return T.T1.mul(S.M_ETHx).div(T.T2).mul(T.T3).add(T.T4.mul(S.M_ETHx).div(T.T5));
+      return T.T1.mul(S.M_ETHx).div(T.T2).mul(T.T3).div(10 ** S.AARDecimals).add(T.T4.mul(S.M_ETHx).div(T.T5));
     }
 
     revert("Should not reach here");

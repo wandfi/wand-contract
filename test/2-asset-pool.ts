@@ -221,7 +221,7 @@ describe('Asset Pool', () => {
     await dumpAssetPoolState(ethPool);
   });
 
-  it.only('Dynamic AAR Adjustment Works', async () => {
+  it('Dynamic AAR Adjustment Works', async () => {
 
     const {
       Alice, Bob, Caro, Dave, Ivy, ethPriceFeed,
@@ -367,6 +367,31 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
     await dumpAssetPoolState(ethPool);
 
+    //================== Case: 𝐴𝐴𝑅' ≥ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑇==================
+
+    // Set P_ETH = 800, AAR = 2 * 800 / 900 = 1.77777777778
+    ethPrice = ethers.utils.parseUnits('800', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+
+    // Asset Pool State: M_ETH = 2, M_USB = 900, M_ETHx = 4.504317618492134335, P_ETH = $800, AAR = 177.777777778%
+    // Expected behavior:
+    //  r = 0.1 * (200% - 177.777777778%) = 0.02222222223
+    //  Alice swap 200 $USB for $ETHx
+    //  AAR' = 2 * 800 / (900 - 200) = 2.28571428571
+    //  Δethx = (Musb-eth - M_ETH * P_ETH / S.AART) 
+    //    * M_ETHx / (M_ETH * P_ETH - Musb-eth)
+    //    * (1 + (S.AART - AAReth) * 0.1 / 2)
+    //    + (Δusb - Musb-eth + M_ETH * P_ETH / S.AART) * M_ETHx / (M_ETH * P_ETH - Musb-eth)
+    //  Δethx = (900 - 2 * 800 / 2) * 4.504317618492134335 / (2 * 800 - 900) * (1 + (2 - 1.77777777778) * 0.1 / 2)
+    //    + (200 - 900 + 2 * 800 / 2) * 4.504317618492134335 / (2 * 800 - 900) = 1.2940976015
+    usbAmountToSwap = ethers.utils.parseUnits('200', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('1.2940976015', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
 
   });
 
