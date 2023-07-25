@@ -78,6 +78,11 @@ contract AssetPoolCalculator {
       S.r = S.AART.sub(S.aar).mul(S.BasisR).div(10 ** S.settingsDecimals);
     }
 
+    // console.log('aar: %s, aa_: %s, r: %s, ', S.aar, S.aar_, S.r);
+    // console.log('M_ETH: %s, P_ETH: %s', S.M_ETH, S.P_ETH);
+    // console.log('M_USB_ETH: %s, M_ETHx: %s', S.M_USB_ETH, S.M_ETHx);
+    // console.log('S.BasisR: %s, S.settingsDecimals: %s', S.BasisR, S.settingsDecimals);
+
     // If AAR'eth <= AAARS or AAReth >= S.AART
     //  Δethx = Δusb * M_ETHx * (1 + S.r) / (M_ETH * P_ETH - Musb-eth)
     if (S.aar_ <= S.AARS || S.aar >= S.AART) {
@@ -88,29 +93,29 @@ contract AssetPoolCalculator {
 
     // If S.AARS <= AAR'eth <= S.AART, and AAReth <= S.AARS
     //  Δethx = (Musb-eth - M_ETH * P_ETH / S.AARS) * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + S.r) 
-    //    + (Δusb - Musb-eth + M_ETH * P_ETH / S.AARS) * M_ETHx / (M_ETHx * P_ETH - Musb-eth)
+    //    + (Δusb - Musb-eth + M_ETH * P_ETH / S.AARS) * M_ETHx / (M_ETH * P_ETH - Musb-eth)
     //    * (1 + (2 * S.AART - S.AARS - AAR'eth) * 0.1 / 2)
     if (S.aar_ >= S.AARS && S.aar_ <= S.AART && S.aar <= S.AARS) {
       Terms memory T;
       T.T1 = S.M_USB_ETH.sub(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AARS)); // (Musb-eth - M_ETH * P_ETH / S.AARS)
       T.T2 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
-      T.T3 = (10 ** S.AARDecimals).add(S.r).div(10 ** S.AARDecimals);  // (1 + S.r)
-      T.T4 = Delta_USB.sub(S.M_USB_ETH).add(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AARS)); // (Δusb - Musb-eth + M_ETH * P_ETH / S.AARS)
-      T.T5 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETHx * P_ETH - Musb-eth)
+      T.T3 = (10 ** S.AARDecimals).add(S.r);  // (1 + r)
+      T.T4 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AARS).add(Delta_USB).sub(S.M_USB_ETH); // ((M_ETH * P_ETH / S.AARS) + Δusb - Musb-eth )
+      T.T5 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
       T.T6 = uint256(2).mul(S.AART).sub(S.AARS).sub(S.aar_).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals); // (2 * S.AART - S.AARS - AAR'eth) * 0.1 / 2
 
       return T.T1.mul(S.M_ETHx).div(T.T2).mul(T.T3).add(T.T4.mul(S.M_ETHx).div(T.T5).mul(
-        (10 ** S.AARDecimals).add(T.T6).div(10 ** S.AARDecimals))
-      );
+        (10 ** S.AARDecimals).add(T.T6))
+      ).div(10 ** S.AARDecimals);
     }
 
     // If S.AARS <= AAReth <= S.AART, and S.AARS <= AAR'eth <= S.AART
     //  Δethx = Δusb * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + (AAR'eth - AAReth) * 0.1 / 2)
     if (S.aar >= S.AARS && S.aar <= S.AART && S.aar_ >= S.AARS && S.aar_ <= S.AART) {
       return Delta_USB.mul(S.M_ETHx).div(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH)) // Δusb * M_ETHx / (M_ETH * P_ETH - Musb-eth)
-        .mul(10 ** S.AARDecimals.add(  // * (1 + (AAR'eth - AAReth) * 0.1 / 2)
-          (S.aar_).sub(S.aar)).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)
-        ).div(10 ** S.AARDecimals);
+        .mul((10 ** S.AARDecimals).add(  // * (1 + (AAR'eth - AAReth) * 0.1 / 2)
+          (S.aar_).sub(S.aar).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)
+        )).div(10 ** S.AARDecimals);
     }
 
     // If AAR'eth >= S.AART, and AAReth <= S.AARS
@@ -122,15 +127,20 @@ contract AssetPoolCalculator {
       Terms memory T;
       T.T1 = S.M_USB_ETH.sub(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AARS)); // (Musb-eth - M_ETH * P_ETH / S.AARS)
       T.T2 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
-      T.T3 = (10 ** S.AARDecimals).add(S.r).div(10 ** S.AARDecimals);  // (1 + S.r)
+      T.T3 = (10 ** S.AARDecimals).add(S.r);  // (1 + S.r)
       T.T4 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AARS)
         .sub(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART)); // (M_ETH * P_ETH / S.AARS - M_ETH * P_ETH / S.AART)
-      T.T5 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETHx * P_ETH - Musb-eth)
-      T.T6 = (10 ** S.AARDecimals).add(S.AART.sub(S.AARS).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)).div(10 ** S.AARDecimals); // (1 + (S.AART - S.AARS) * 0.1 / 2)
-      T.T7 = Delta_USB.sub(S.M_USB_ETH).add(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART)); // (Δusb - Musb-eth + M_ETH * P_ETH / S.AART)
+      T.T5 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
+      T.T6 = (10 ** S.AARDecimals).add(S.AART.sub(S.AARS).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)); // (1 + (S.AART - S.AARS) * 0.1 / 2)
+      T.T7 = (S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART)).add(Delta_USB).sub(S.M_USB_ETH); // (M_ETH * P_ETH / S.AART + Δusb - Musb-eth)
       T.T8 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH); // (M_ETH * P_ETH - Musb-eth)
 
-      return T.T1.mul(S.M_ETHx).div(T.T2).mul(T.T3).add(T.T4.mul(S.M_ETHx).div(T.T5).mul(T.T6)).add(T.T7.mul(S.M_ETHx).div(T.T8));
+      return T.T1.mul(S.M_ETHx).div(T.T2).mul(T.T3).div(10 ** S.AARDecimals).add(
+        T.T4.mul(S.M_ETHx).div(T.T5).mul(T.T6).div(10 ** S.AARDecimals)
+      )
+      .add(
+        T.T7.mul(S.M_ETHx).div(T.T8)
+      );
     }
 
     // If AAR'eth >= S.AART, and S.AARS <= AAReth <= S.AART

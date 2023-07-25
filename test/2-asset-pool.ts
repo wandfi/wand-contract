@@ -301,7 +301,71 @@ describe('Asset Pool', () => {
 
     //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑆 ==================
 
-    
+    // Asset Pool State: M_ETH = 2, M_USB = 1800, M_ETHx = 1.299509002955357142, P_ETH = $1140, AAR = 126.6666667%
+    // Expected behavior:
+    //  r = 0.1 * (200% - 150%) + 0.001 * 1.5 = ~0.0515002777
+    //  Alice swap 300 $USB for $ETHx
+    //  AAR' = 2 * 1140 / (1800 - 300) = 1.52
+    //  ΔETH = (1800 - 2 * 1140 / 1.5) * 1.299509002955357142 / (2 * 1140 - 1800) * (1 + 0.0515002777) +
+    //    ((2 * 1140) / 1.5 + 300 - 1800) * 1.299509002955357142 / (2 * 1140 - 1800) *
+    //    (1 + (2 * 2 - 1.5 - 1.52) * 0.1 / 2) = 0.85388591786
+    usbAmountToSwap = ethers.utils.parseUnits('300', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('0.85388570735', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+    //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑇 ==================
+
+    // Asset Pool State: M_ETH = 2, M_USB = 1500, M_ETHx = 2.153395131409002895, P_ETH = $1140, AAR = 152%
+    // Expected behavior:
+    //  r = 0.1 * (200% - 152%) = 0.048
+    //  Alice swap 100 $USB for $ETHx
+    //  AAR' = 2 * 1140 / (1500 - 100) = 1.62857142857
+    //  Δethx = Δusb * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + (AAR'eth - AAReth) * 0.1 / 2)
+    //  ΔETH = 100 * 2.153395131409002895 / (2 * 1140 - 1500) * (1 + (1.62857142857 - 1.52) * 0.1 / 2) = 0.2775749988
+    usbAmountToSwap = ethers.utils.parseUnits('100', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('0.2775749988', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+    //================== Case: 𝐴𝐴𝑅' ≥ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑆 ==================
+
+    // Set P_ETH = 1000, AAR = 2 * 1000 / 1400 = 1.42857142857
+    ethPrice = ethers.utils.parseUnits('1000', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPool.connect(Alice).checkAAR()).not.to.be.reverted;
+    await time.increase(ONE_HOUR_IN_SECS);
+
+    // Asset Pool State: M_ETH = 2, M_USB = 1400, M_ETHx = 2.430970130208011746, P_ETH = $1000, AAR = 142.857142857%
+    // Expected behavior:
+    //  r = 0.1 * (200% - 150%) + 0.001 * 1 = 0.051
+    //  Alice swap 500 $USB for $ETHx
+    //  AAR' = 2 * 1000 / (1400 - 500) = 2.22222222222
+    //  Δethx = (Musb-eth - M_ETH * P_ETH / S.AARS) * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + S.r)
+    //    + (M_ETH * P_ETH / S.AARS - M_ETH * P_ETH / S.AART)
+    //    * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + (S.AART - S.AARS) * 0.1 / 2)
+    //    + (Δusb - Musb-eth + M_ETH * P_ETH / S.AART) * M_ETHx / (M_ETH * P_ETH - Musb-eth)
+    //  Δethx = (1400 - 2 * 1000 / 1.5) * 2.430970130208011746 / (2 * 1000 - 1400) * (1 + 0.051)
+    //    + (2 * 1000 / 1.5 - 2 * 1000 / 2)
+    //    * 2.430970130208011746 / (2 * 1000 - 1400) * (1 + (2 - 1.5) * 0.1 / 2)
+    //    + (500 - 1400 + 2 * 1000 / 2) * 2.430970130208011746 / (2 * 1000 - 1400) = 2.07334741328
+    await dumpAssetPoolState(ethPool);
+    usbAmountToSwap = ethers.utils.parseUnits('500', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('2.07334741328', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
 
 
   });
