@@ -125,15 +125,14 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return IAssetPoolCalculator(assetPoolCalculator).calculatePairedUSBAmountToRedeemByXTokens(IAssetPool(this), xTokenAmount);
   }
 
-  function calculateUSBToXTokensOut(address account, uint256 usbAmount) public view returns (uint256) {
+  function calculateUSBToXTokensOut(uint256 usbAmount) public view returns (uint256) {
     uint256 aar = AAR();
     uint256 AARC = _assetPoolParamValue("AARC");
     uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
-    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "Circuit breaker AAR reached");
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
 
     Constants.AssetPoolState memory S = _getAssetPoolState();
-
-    return IAssetPoolCalculator(assetPoolCalculator).calculateUSBToXTokensOut(S, account, usbAmount);
+    return IAssetPoolCalculator(assetPoolCalculator).calculateUSBToXTokensOut(S, usbAmount);
   }
 
   function calculateMintUSBOut(uint256 assetAmount) public view returns (uint256) {
@@ -286,7 +285,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   function usbToXTokens(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {  
-    uint256 xTokenOut = calculateUSBToXTokensOut(_msgSender(), usbAmount);
+    require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough $USB balance");
+    uint256 xTokenOut = calculateUSBToXTokensOut(usbAmount);
 
     IUSB(usbToken).burn(_msgSender(), usbAmount);
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
@@ -334,6 +334,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     uint256 AARS = _assetPoolParamValue("AARS");
     uint256 AARC = _assetPoolParamValue("AARC");
+    // console.log('_AAR, _aarBelowSafeLineTime: %s, aar: %s, AARC: %s', _aarBelowSafeLineTime, aar, AARC);
     if (_aarBelowSafeLineTime == 0) {
       if (aar < AARS) {
         _aarBelowSafeLineTime = block.timestamp;
@@ -341,6 +342,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     } else if (aar >= AARS) {
       _aarBelowSafeLineTime = 0;
     }
+    // console.log('_AAR after, _aarBelowSafeLineTime: %s', _aarBelowSafeLineTime);
 
     // console.log('_AAR, _aarBelowCircuitBreakerLineTime: %s, aar: %s, AARC: %s', _aarBelowCircuitBreakerLineTime, aar, AARC);
     if (_aarBelowCircuitBreakerLineTime == 0) {
@@ -381,6 +383,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     S.RateR = _assetPoolParamValue("RateR");
     S.BasisR = _assetPoolParamValue("BasisR");
     S.BasisR2 = _assetPoolParamValue("BasisR2");
+    S.aarBelowSafeLineTime = _aarBelowSafeLineTime;
+    S.settingsDecimals = settingsDecimals;
 
     return S;
   }

@@ -204,7 +204,7 @@ describe('Wand Protocol', () => {
     // await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 9);
     const aliceUSBSwapAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
-    const calculatedETHxAmount = await ethPool.calculateUSBToXTokensOut(Alice.address, aliceUSBSwapAmount);
+    const calculatedETHxAmount = await ethPool.calculateUSBToXTokensOut(aliceUSBSwapAmount);
     await expect(usbToken.connect(Alice).approve(ethPool.address, aliceUSBSwapAmount)).not.to.be.reverted;
     // console.log(calculatedETHxAmount);
     await expect(ethPool.connect(Alice).usbToXTokens(aliceUSBSwapAmount))

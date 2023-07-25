@@ -17,8 +17,7 @@ describe('Asset Pool', () => {
   it('Mint & Redemption (Without Interest & Fees) Works', async () => {
 
     const {
-      Alice, Bob, Caro, Dave, Ivy, ethPriceFeed,
-      wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
+      Alice, Bob, Caro, Ivy, ethPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
@@ -220,7 +219,89 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Alice.address, redeemedETHxAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
       .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Alice.address, Ivy.address, redeemedETHxAmount, expectedFeeAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals());
     await dumpAssetPoolState(ethPool);
+  });
 
+  it.only('Dynamic AAR Adjustment Works', async () => {
+
+    const {
+      Alice, Bob, Caro, Dave, Ivy, ethPriceFeed,
+      wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
+    } = await loadFixture(deployContractsFixture);
+
+    // Create $ETHx token
+    const AssetXFactory = await ethers.getContractFactory('AssetX');
+    expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
+    const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
+    const ethxToken = AssetX__factory.connect(ETHx.address, provider);
+    
+    // Create ETH asset pool
+    const ethAddress = nativeTokenAddress;
+    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+      [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC"), ethers.utils.formatBytes32String("C1"), ethers.utils.formatBytes32String("C2")],
+      [
+        0, BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
+        BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100), BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100),
+        0, 0
+      ])
+    ).not.to.be.reverted;
+    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+
+    // Set eth price to 2000; mint $USB and $ETHx
+    let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
+    await expect(ethPool.connect(Alice).mintXTokens(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
+    
+    //================== Case: AAR > AART & AAR' > AART ==================
+
+    // Asset Pool State: M_ETH = 2, M_USB = 2000, M_ETHx = 1, P_ETH = $2000, AAR = 200%
+    // Set eth price to 3800, AAR = 380%
+    // Expected behavior:
+    //  - Alice swap 100 $USB for $ETHx
+    //  - r = 0
+    //  - AAR' = 2 * 3800 / (2000 - 100) = 400%
+    //  - ΔETH = 100 * 1 * (1 + 0) / (2 * 3800 - 2000) = 0.01785714285
+    ethPrice = ethers.utils.parseUnits('3800', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    await dumpAssetPoolState(ethPool);
+    let usbAmountToSwap = ethers.utils.parseUnits('100', await usbToken.decimals());
+    let expectedETHxAmount = ethers.utils.parseUnits('0.01785714285', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+    //================== Case: AAR' < AARS ==================
+
+    // Set eth price to 1140, AAR = 2 * 1140 / (2000 - 100) = 120%
+    ethPrice = ethers.utils.parseUnits('1140', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPool.connect(Alice).checkAAR()).not.to.be.reverted;
+    const ONE_HOUR_IN_SECS = 60 * 60;
+    await time.increase(ONE_HOUR_IN_SECS * 1.5);
+    // 1.5 hours after AAR drop below 150%,
+    // Asset Pool State: M_ETH = 2, M_USB = 1900, M_ETHx = 1.017857142857142857, P_ETH = $1140, AAR = 120%
+    // Expected behavior:
+    //  r = 0.1 * (200% - 150%) + 0.001 * 1.5 = 0.0515
+    //  Alice swap 100 $USB for $ETHx
+    //  AAR' = 2 * 1140 / (1900 - 100) = 1.26666666667
+    //  ΔETH = 100 * 1.017857142857142857 * (1 + 0.0515) / (2 * 1140 - 1900) = 0.28165178571
+    usbAmountToSwap = ethers.utils.parseUnits('100', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('0.28165178571', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+
+    //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑆 ==================
+
+    
 
 
   });

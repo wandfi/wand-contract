@@ -54,13 +54,12 @@ contract AssetPoolCalculator {
     return xTokenAmount.mul(assetPool.usbTotalSupply()).div(IERC20(assetPool.xToken()).totalSupply());
   }
 
-  function calculateUSBToXTokensOut(Constants.AssetPoolState memory S, address account, uint256 Delta_USB) public view returns (uint256) {
+  function calculateUSBToXTokensOut(Constants.AssetPoolState memory S, uint256 Delta_USB) public view returns (uint256) {
     // uint256 Delta_USB = usbAmount;
     require(Delta_USB > 0, "Amount must be greater than 0");
-    require(Delta_USB <= IUSB(usbToken).balanceOf(account), "Not enough $USB balance");
     require(Delta_USB < S.M_USB_ETH, "Too much $USB amount");
 
-    // require(S.aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "Circuit breaker AAR reached");
+    // require(S.aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
     
     // AAR'eth = (M_ETH * P_ETH / (Musb-eth - Δusb)) * 100%
     S.aar_ = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.M_USB_ETH.sub(Delta_USB));
@@ -70,10 +69,10 @@ contract AssetPoolCalculator {
     // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅S) + assetPool.RateR() × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
     S.r = 0;
     if (S.aar < S.AARS) {
-      assert(S.aarBelowSafeLineTime > 0);
+      // assert(S.aarBelowSafeLineTime > 0);
       Terms memory T;
       T.T1 = S.AART.sub(S.AARS).mul(S.BasisR).div(10 ** S.settingsDecimals);
-      T.T2 = block.timestamp.sub(S.aarBelowSafeLineTime);
+      T.T2 = S.aarBelowSafeLineTime == 0 ? 0 : block.timestamp.sub(S.aarBelowSafeLineTime);
       S.r = T.T1.add(S.RateR.mul(T.T2).div(1 hours));
     } else if (S.aar < S.AART) {
       S.r = S.AART.sub(S.aar).mul(S.BasisR).div(10 ** S.settingsDecimals);

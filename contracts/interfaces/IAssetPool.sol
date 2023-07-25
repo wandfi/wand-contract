@@ -27,7 +27,7 @@ interface IAssetPool {
 
   function calculatePairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) external view returns (uint256);
 
-  function calculateUSBToXTokensOut(address account, uint256 usbAmount) external returns (uint256);
+  function calculateUSBToXTokensOut(uint256 usbAmount) external returns (uint256);
 
   function calculateInterest() external view returns (uint256, uint256);
 }
