@@ -162,22 +162,32 @@ contract AssetPoolCalculator {
     revert("Should not reach here");
   }
 
-  function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public pure returns (uint256) {
+  function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public view returns (uint256) {
     require(assetAmount > 0, "Amount must be greater than 0");
 
     require(S.aar >= S.AARS, "AAR Below Safe Threshold");
     
     uint256 Delta_ETH = assetAmount;
 
+    // Special case (initial mint): If AAR'eth = max, Δusb = Δeth * P_ETH
+    if (S.aar == type(uint256).max) {
+      return Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
+    }
+
     // AAR'eth = (Δeth + M_ETH)* P_ETH / (Musb-eth + Δeth * P_ETH)) * 100%
     S.aar_ = Delta_ETH.add(S.M_ETH).mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(
       S.M_USB_ETH.add(Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS))
     );
-    // console.log('calculateMintUSBOut, aar: %s, aar`: %s', S.aar, S.S.aar_);
+    require(S.aar_ >= S.AARS, "AAR Below Safe Threshold after Mint");
 
-    // If AAR'eth <= S.AARS, or AAReth >= S.AART
+    // console.log('aar: %s, aa_: %s, r: %s, ', S.aar, S.aar_, S.r);
+    // console.log('M_ETH: %s, P_ETH: %s', S.M_ETH, S.P_ETH);
+    // console.log('M_USB_ETH: %s, M_ETHx: %s', S.M_USB_ETH, S.M_ETHx);
+    // console.log('S.BasisR2: %s, S.settingsDecimals: %s', S.BasisR2, S.settingsDecimals);
+
+    // If AAR'eth >= S.AART, and AAReth >= S.AART
     //  Δusb = Δeth * P_ETH
-    if (S.aar_ <= S.AARS || S.aar >= S.AART) {
+    if (S.aar_ >= S.AART && S.aar >= S.AART) {
       return Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
     }
 
@@ -189,12 +199,12 @@ contract AssetPoolCalculator {
       Terms memory T;
       T.T1 = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.AART.mul(S.M_USB_ETH).div(10 ** S.AARDecimals)); // (M_ETH * P_ETH - S.AART * Musb-eth)
       T.T2 = S.AART.sub(10 ** S.AARDecimals); // (S.AART - 1)
-      T.T3 = Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(T.T1.div(T.T2)); // (Δeth * P_ETH - (M_ETH * P_ETH - S.AART * Musb-eth) / (S.AART - 1))
+      T.T3 = Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(T.T1.mul(10 ** S.AARDecimals).div(T.T2)); // (Δeth * P_ETH - (M_ETH * P_ETH - S.AART * Musb-eth) / (S.AART - 1))
       T.T4 = (10 ** S.settingsDecimals).sub(
         S.AART.sub(S.aar_).mul(S.BasisR2).div(2).div(10 ** S.settingsDecimals)
       ); // (1 - (S.AART - AAR'eth) * 0.06 / 2)
 
-      return T.T1.div(T.T2).add(T.T3.mul(T.T4));
+      return T.T1.mul(10 ** S.AARDecimals).div(T.T2).add(T.T3.mul(T.T4).div((10 ** S.settingsDecimals)));
     }
 
     // If S.AARS <= AAR'eth <= S.AART, and S.AARS <= AAReth <= S.AART
