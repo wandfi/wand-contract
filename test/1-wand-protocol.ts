@@ -18,7 +18,7 @@ describe('Wand Protocol', () => {
   it('Basic E2E Scenario Works', async () => {
 
     const {
-      Alice, Bob, Caro, Ivy, wbtc, ethPriceFeed, wbtcPriceFeed,
+      Alice, Bob, Caro, Dave, Ivy, wbtc, ethPriceFeed, wbtcPriceFeed,
       wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
 
@@ -72,11 +72,24 @@ describe('Wand Protocol', () => {
     const wbtcPool = AssetPool__factory.connect(wbtcxPoolAddress, provider);
     expect(await usbInterestPool.rewardTokenAdded(wbtcxToken.address)).to.be.true;
 
+    // Deposit some $WBTC to mint $USB
+    const wbtcPrice = ethers.utils.parseUnits('30000', await wbtcPriceFeed.decimals());
+    const daveDepositWBTC = ethers.utils.parseUnits('1', await wbtc.decimals());
+    let expectedUsbAmount = ethers.utils.parseUnits('30000', await usbToken.decimals());
+    await expect(wbtcPriceFeed.connect(Alice).mockPrice(wbtcPrice)).not.to.be.reverted;
+    expect(await wbtcPool.calculateMintUSBOut(daveDepositWBTC)).to.equal(expectedUsbAmount);
+    await expect(wbtc.connect(Alice).mint(Dave.address, daveDepositWBTC)).not.to.be.reverted;
+    await expect(wbtc.connect(Dave).approve(wbtcPool.address, daveDepositWBTC)).not.to.be.reverted;
+    await expect(wbtcPool.connect(Dave).mintUSB(daveDepositWBTC))
+      .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Dave.address, expectedUsbAmount)
+      .to.emit(wbtcPool, 'USBMinted').withArgs(Dave.address, daveDepositWBTC, expectedUsbAmount, wbtcPrice, await wbtcPriceFeed.decimals());
+    expect(await usbToken.balanceOf(Dave.address)).to.equal(expectedUsbAmount);
+
     // Day 1. Suppose ETH price is $2000. Alice deposit 2 ETH to mint 4000 $USB
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS);
     const ethPrice1 = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
     const aliceDepositETH = ethers.utils.parseEther('2');
-    const expectedUsbAmount = ethers.utils.parseUnits('4000', await usbToken.decimals());
+    expectedUsbAmount = ethers.utils.parseUnits('4000', await usbToken.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice1)).not.to.be.reverted;
     expect(await ethPool.calculateMintUSBOut(aliceDepositETH)).to.equal(expectedUsbAmount);
     await expect(ethPool.connect(Alice).mintUSB(aliceDepositETH, {value: aliceDepositETH}))

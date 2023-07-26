@@ -234,9 +234,7 @@ contract AssetPoolCalculator {
 
     // Otherwise: Δethx = (Δeth * P_ETH * M_ETHx) / (M_ETH * P_ETH - Musb-eth)
     if (IERC20(assetPool.xToken()).totalSupply() > 0) {
-      // console.log('calculateMintXTokensOut 1, address(assetPool).balance: %s', address(assetPool).balance);
       uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, msgValue);
-      // console.log('calculateMintXTokensOut 2, assetTotalAmount: %s', assetTotalAmount);
 
       uint256 xTokenTotalAmount = IERC20(assetPool.xToken()).totalSupply();
 

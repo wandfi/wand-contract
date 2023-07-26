@@ -219,6 +219,8 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Alice.address, redeemedETHxAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
       .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Alice.address, Ivy.address, redeemedETHxAmount, expectedFeeAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals());
     await dumpAssetPoolState(ethPool);
+
+  
   });
 
   it('Dynamic AAR Adjustment for $USB->$ETHx Works', async () => {
@@ -391,6 +393,68 @@ describe('Asset Pool', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
     await dumpAssetPoolState(ethPool);
+
+    //================== Special case: AAR drop below AARC for the first time, AAR' > AARC ==================
+
+    // Asset Pool State: M_ETH = 2, M_USB = 700, M_ETHx = 5.79841521998828036, P_ETH = $800, AAR = 2.2857142857
+    // Set P_ETH = 360, AAR = 2 * 360 / 700 = 1.02857142857
+    // Expected behavior:
+    //  r = 0.1 * (200% - 150%) + 0.001 * 0 = 0.05
+    //  Alice swap 100 $USB for $ETHx
+    //  AAR' = 2 * 360 / (700 - 100) = 1.2
+    //  Δethx = Δusb * M_ETHx * (1 + r) / (M_ETH * P_ETH - Musb-eth)
+    //  Δethx = 100 * 5.79841521998828036 * (1 + 0.05) / (2 * 360 - 700) = 30.4416799049
+    //  After swap, AARBelowSafeLineTime and AARBelowCircuitBreakerLineTime is updated
+    ethPrice = ethers.utils.parseUnits('360', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    expect(await ethPool.AARBelowSafeLineTime()).to.equal(0);
+    expect(await ethPool.AARBelowCircuitBreakerLineTime()).to.equal(0);
+    usbAmountToSwap = ethers.utils.parseUnits('100', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('30.4416799049', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+    expect(await ethPool.AARBelowSafeLineTime()).to.greaterThan(0);
+    expect(await ethPool.AARBelowCircuitBreakerLineTime()).to.equal(0);
+
+    //================== Special case: AAR drop below AARC for the first time, AAR' < AARC ==================
+
+    // Asset Pool State: M_ETH = 2, M_USB = 600, M_ETHx = 36.24009512492675225, P_ETH = $360, AAR = 1.2
+    // 1 hour later, Set P_ETH = 303, AAR = 2 * 303 / 600 = 1.01
+    // Expected behavior:
+    //  r = 0.1 * (200% - 150%) + 0.001 * 1 = 0.051
+    //  Alice swap 10 $USB for $ETHx
+    //  AAR' = 2 * 303 / (600 - 10) = 1.02711864407
+    //  Δethx = Δusb * M_ETHx * (1 + r) / (M_ETH * P_ETH - Musb-eth)
+    //  Δethx = 10 * 36.24009512492675225 * (1 + 0.051) / (2 * 303 - 600) = 63.4805666272
+    await time.increase(ONE_HOUR_IN_SECS);
+    ethPrice = ethers.utils.parseUnits('303', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    usbAmountToSwap = ethers.utils.parseUnits('10', await usbToken.decimals());
+    expectedETHxAmount = ethers.utils.parseUnits('63.4805666272', await ethxToken.decimals());
+    expectBigNumberEquals(await ethPool.calculateUSBToXTokensOut(usbAmountToSwap), expectedETHxAmount);
+    await expect(ethPool.connect(Alice).usbToXTokens(usbAmountToSwap))
+      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
+      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
+    await dumpAssetPoolState(ethPool);
+    expect(await ethPool.AARBelowSafeLineTime()).to.greaterThan(0);
+    expect(await ethPool.AARBelowCircuitBreakerLineTime()).to.greaterThan(0);
+
+    // Now $USB -> $ETHx swap is disabled
+    await expect(ethPool.calculateUSBToXTokensOut(usbAmountToSwap)).to.be.revertedWith("AAR Below Circuit Breaker AAR Threshold");
+
+    //================== Special case: AAR drop below AARC for the first time, AAR' <= 100% ==================
+
+    // Asset Pool State: M_ETH = 2, M_USB = 590, M_ETHx = 99.720695304378183102, P_ETH = $303, AAR = 1.027118644
+    // Set P_ETH = 260, AAR = 2 * 260 / 590 = 0.8813559322
+    await time.increase(ONE_HOUR_IN_SECS * 2);
+    ethPrice = ethers.utils.parseUnits('260', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    await expect(ethPool.calculateUSBToXTokensOut(usbAmountToSwap)).to.be.revertedWith("AAR Below 100%");
 
   });
 
