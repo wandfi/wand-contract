@@ -106,7 +106,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @dev AAReth = (M_ETH * P_ETH / Musb-eth) * 100%
    */
   function AAR() public view returns (uint256) {
-    return IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this));
+    return IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), 0);
   }
 
   function AARDecimals() public pure returns (uint256) {
@@ -141,43 +141,11 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   function calculateMintXTokensOut(uint256 assetAmount) public view returns (uint256) {
-    uint256 aar = AAR();
-    // console.log('calculateMintXTokensOut, msg.value: %s', msg.value);
-    uint256 AARC = _assetPoolParamValue("AARC");
-    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
-    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
-
-    return IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, 0);
+    return _calculateMintXTokensOut(assetAmount);
   }
 
   function calculateRedemptionOutByUSB(uint256 usbAmount) public view returns (uint256, uint256) {
-    require(usbAmount > 0, "Amount must be greater than 0");
-    require(IUSB(usbToken).balanceOf(_msgSender()) >= usbAmount, "Not enough $USB balance");
-
-    uint256 assetAmount = 0;
-
-    uint256 aar = AAR();
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-
-    // if AAR >= 100%,  Δeth = (Δusb / P_ETH) * (1 -C1)
-    uint256 fee = 0;
-    if (aar >= 10 ** AARDecimals()) {
-      uint256 total = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice);
-      // C1 only takes effect when AAR >= [2 * (AART - 100%) + 100%]
-      uint256 AART = _assetPoolParamValue("AART");
-      uint256 C1 = _assetPoolParamValue("C1");
-      if (aar >= AART.sub(10 ** AARDecimals()).mul(2).add(10 ** AARDecimals())) {
-        fee = total.mul(C1).div(10 ** settingsDecimals);
-      }
-      assetAmount = total.sub(fee);
-    }
-    // else if AAR < 100%, Δeth = (Δusb * M_ETH) / Musb-eth
-    else {
-      uint256 assetTotalAmount = _getAssetTotalAmount();
-      assetAmount = usbAmount.mul(assetTotalAmount).div(_usbTotalSupply);
-    }
-
-    return (assetAmount, fee);
+    return _calculateRedemptionOutByUSB(usbAmount);
   }
 
   function calculateInterest() public view returns (uint256, uint256) {
@@ -205,7 +173,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param assetAmount: Amount of asset token used to mint
    */
   function mintUSB(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
-    uint256 usbOutAmount = calculateMintUSBOut(assetAmount);
+    Constants.AssetPoolState memory S = _getAssetPoolState();
+    uint256 usbOutAmount = IAssetPoolCalculator(assetPoolCalculator).calculateMintUSBOut(S, assetAmount);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     IUSB(usbToken).mint(_msgSender(), usbOutAmount);
@@ -220,14 +189,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param assetAmount: Amount of asset token used to mint
    */
   function mintXTokens(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
-    uint256 aar = AAR();
-    require(aar > 10 ** AARDecimals(), "AAR Below 100%");
-    // console.log('calculateMintXTokensOut, msg.value: %s', msg.value);
-    uint256 AARC = _assetPoolParamValue("AARC");
-    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
-    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
-
-    uint256 xTokenAmount = IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);
+    uint256 xTokenAmount = _calculateMintXTokensOut(assetAmount);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     IAssetX(xToken).mint(_msgSender(), xTokenAmount);
@@ -240,7 +202,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param usbAmount: Amount of $USB tokens used to redeem for asset tokens
    */
   function redeemByUSB(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {
-    (uint256 assetAmount, uint256 fee) = calculateRedemptionOutByUSB(usbAmount);
+    (uint256 assetAmount, uint256 fee) = _calculateRedemptionOutByUSB(usbAmount);
 
     IUSB(usbToken).burn(_msgSender(), usbAmount);
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
@@ -375,7 +337,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     S.P_ETH_DECIMALS = IPriceFeed(assetTokenPriceFeed).decimals();
     S.M_USB_ETH = _usbTotalSupply;
     S.M_ETHx = IERC20(xToken).totalSupply();
-    S.aar = AAR();
+    S.aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), msg.value);
     S.AART = _assetPoolParamValue("AART");
     S.AARS = _assetPoolParamValue("AARS");
     S.AARC = _assetPoolParamValue("AARC");
@@ -387,6 +349,51 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     S.settingsDecimals = settingsDecimals;
 
     return S;
+  }
+
+  function _calculateMintXTokensOut(uint256 assetAmount) internal view returns (uint256) {
+    require(assetAmount > 0, "Amount must be greater than 0");
+    if (IERC20(xToken).totalSupply() == 0) {
+      return assetAmount;
+    }
+
+    uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), msg.value);
+    require(aar > 10 ** AARDecimals(), "AAR Below 100%");
+    uint256 AARC = _assetPoolParamValue("AARC");
+    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
+    require(aar >= AARC || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod), "AAR Below Circuit Breaker AAR Threshold");
+
+    return IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);
+  }
+
+  function _calculateRedemptionOutByUSB(uint256 usbAmount) internal view returns (uint256, uint256) {
+    require(usbAmount > 0, "Amount must be greater than 0");
+    require(IUSB(usbToken).balanceOf(_msgSender()) >= usbAmount, "Not enough $USB balance");
+
+    uint256 assetAmount = 0;
+
+    uint256 aar = AAR();
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
+
+    // if AAR >= 100%,  Δeth = (Δusb / P_ETH) * (1 -C1)
+    uint256 fee = 0;
+    if (aar >= 10 ** AARDecimals()) {
+      uint256 total = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice);
+      // C1 only takes effect when AAR >= [2 * (AART - 100%) + 100%]
+      uint256 AART = _assetPoolParamValue("AART");
+      uint256 C1 = _assetPoolParamValue("C1");
+      if (aar >= AART.sub(10 ** AARDecimals()).mul(2).add(10 ** AARDecimals())) {
+        fee = total.mul(C1).div(10 ** settingsDecimals);
+      }
+      assetAmount = total.sub(fee);
+    }
+    // else if AAR < 100%, Δeth = (Δusb * M_ETH) / Musb-eth
+    else {
+      uint256 assetTotalAmount = _getAssetTotalAmount();
+      assetAmount = usbAmount.mul(assetTotalAmount).div(_usbTotalSupply);
+    }
+
+    return (assetAmount, fee);
   }
 
   function _settleInterest() internal {

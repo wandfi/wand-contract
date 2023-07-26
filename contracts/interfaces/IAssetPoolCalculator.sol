@@ -8,7 +8,7 @@ import "../libs/Constants.sol";
 
 interface IAssetPoolCalculator {
 
-  function AAR(IAssetPool assetPool) external pure returns (uint256);
+  function AAR(IAssetPool assetPool, uint256 msgValue) external pure returns (uint256);
 
   function calculatePairedUSBAmountToRedeemByXTokens(IAssetPool assetPool, uint256 xTokenAmount) external pure returns (uint256);
 

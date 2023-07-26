@@ -32,12 +32,12 @@ contract AssetPoolCalculator {
     usbToken = _usbToken;
   }
 
-  function AAR(IAssetPool assetPool) public view returns (uint256) {
+  function AAR(IAssetPool assetPool, uint256 msgValue) public view returns (uint256) {
     if (assetPool.usbTotalSupply() == 0) {
       return type(uint256).max;
     }
 
-    uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, 0);
+    uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, msgValue);
     if (assetTotalAmount == 0) {
       return 0;
     }
@@ -178,12 +178,13 @@ contract AssetPoolCalculator {
     S.aar_ = Delta_ETH.add(S.M_ETH).mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(
       S.M_USB_ETH.add(Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS))
     );
-    require(S.aar_ >= S.AARS, "AAR Below Safe Threshold after Mint");
 
     // console.log('aar: %s, aa_: %s, r: %s, ', S.aar, S.aar_, S.r);
     // console.log('M_ETH: %s, P_ETH: %s', S.M_ETH, S.P_ETH);
     // console.log('M_USB_ETH: %s, M_ETHx: %s', S.M_USB_ETH, S.M_ETHx);
     // console.log('S.BasisR2: %s, S.settingsDecimals: %s', S.BasisR2, S.settingsDecimals);
+
+    require(S.aar_ >= S.AARS, "AAR Below Safe Threshold after Mint");
 
     // If AAR'eth >= S.AART, and AAReth >= S.AART
     //  Δusb = Δeth * P_ETH
@@ -221,7 +222,7 @@ contract AssetPoolCalculator {
   }
 
   function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount, uint256 msgValue) public view returns (uint256) {
-    uint256 aar = AAR(assetPool);
+    uint256 aar = AAR(assetPool, msgValue);
     require(aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
     // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");

@@ -86,16 +86,16 @@ describe('Wand Protocol', () => {
     expect(await usbToken.balanceOf(Alice.address)).to.equal(expectedUsbAmount);
     // await dumpAssetPoolState(ethPool);
 
-    //  Day 2. ETH price is $3000. Bob deposit 1 ETH to mint 3000 $USB
+    //  Day 2. ETH price is $6000. Bob deposit 0.1 ETH to mint 600 $USB
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 2);
-    const ethPrice2 = ethers.utils.parseUnits('3000', await ethPriceFeed.decimals());
-    const bobDepositETH = ethers.utils.parseEther('1');
-    const expectedUsbAmount2 = ethers.utils.parseUnits('3000', await usbToken.decimals());
+    const ethPrice2 = ethers.utils.parseUnits('6000', await ethPriceFeed.decimals());
+    const bobDepositETH = ethers.utils.parseEther('0.1');
+    const expectedUsbAmount2 = ethers.utils.parseUnits('600', await usbToken.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice2)).not.to.be.reverted;
-    // await dumpAssetPoolState(ethPool);
+    await dumpAssetPoolState(ethPool);
     expect(await ethPool.calculateMintUSBOut(bobDepositETH)).to.equal(expectedUsbAmount2);
     await expect(ethPool.connect(Bob).mintUSB(bobDepositETH, {value: bobDepositETH}))
-      .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH])
+      .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-0.1'), bobDepositETH])
       .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Bob.address, expectedUsbAmount2)
       .to.emit(ethPool, 'USBMinted').withArgs(Bob.address, bobDepositETH, expectedUsbAmount2, ethPrice2, await ethPriceFeed.decimals());
     
@@ -105,6 +105,7 @@ describe('Wand Protocol', () => {
     const caroDepositETH = ethers.utils.parseEther('4');
     const expectedETHxAmount = ethers.utils.parseUnits('4', await ethxToken.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice3)).not.to.be.reverted;
+    await dumpAssetPoolState(ethPool);
     expect(await ethPool.calculateMintXTokensOut(caroDepositETH)).to.equal(expectedETHxAmount);
     await expect(ethPool.connect(Caro).mintXTokens(caroDepositETH, {value: caroDepositETH}))
       .to.changeEtherBalances([Caro.address, ethPool.address], [ethers.utils.parseEther('-4'), caroDepositETH])
@@ -113,15 +114,16 @@ describe('Wand Protocol', () => {
     expectBigNumberEquals(await ethxToken.balanceOf(Caro.address), expectedETHxAmount);
 
     // Day 4. Bob deposit 1 ETH to mint $ETH
-    // Current state: Meth = 4; Musb-eth = 7000;  APY = 3.65%; Peth = 3500; Methx = 4 + interest
+    // Current state: Meth = 6.1; Musb-eth = 4600.0;  APY = 3.65%; Peth = 3500; Methx = 4 + interest
     //  Interest generated: (1 day / 365) * 3.65% * 4 = ~0.0004 $ETHx
-    //  Expected amount: (1 * $3500 * 4) / (7 * $3500 - 7000) = ~0.8
+    //  Expected amount: (1 * $3500 * 4) / (6.1 * $3500 - 4600) = ~0.83582089552
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 4);
     const expectedInterest = ethers.utils.parseUnits('0.0004', await ethxToken.decimals());
     expectBigNumberEquals((await ethPool.calculateInterest())[0], expectedInterest);
     const bobDepositETH2 = ethers.utils.parseEther('1');
-    const expectedETHxAmount2 = ethers.utils.parseUnits('0.8', await ethxToken.decimals());
-    expect(await ethPool.calculateMintXTokensOut(bobDepositETH2)).to.equal(expectedETHxAmount2);
+    const expectedETHxAmount2 = ethers.utils.parseUnits('0.83582089552', await ethxToken.decimals());
+    await dumpAssetPoolState(ethPool);
+    expectBigNumberEquals(await ethPool.calculateMintXTokensOut(bobDepositETH2), expectedETHxAmount2);
     await expect(ethPool.connect(Bob).mintXTokens(bobDepositETH2, {value: bobDepositETH2}))
       .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH2])
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
@@ -131,28 +133,29 @@ describe('Wand Protocol', () => {
     expectBigNumberEquals(await ethxToken.balanceOf(ethPool.address), expectedInterest);
     expectBigNumberEquals(await ethxToken.balanceOf(Bob.address), expectedETHxAmount2);
 
-    // Day 5. Alice stakes 1000 $USB to earn interest; Bob stakes 2000 $USB to earn interest
+    // Day 5. Alice stakes 100 $USB to earn interest; Bob stakes 200 $USB to earn interest
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 5);
-    const aliceStakeAmount = ethers.utils.parseUnits('1000', await usbToken.decimals());
-    const bobStakeAmount = ethers.utils.parseUnits('2000', await usbToken.decimals());
+    const aliceStakeAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
+    const bobStakeAmount = ethers.utils.parseUnits('200', await usbToken.decimals());
     await expect(usbToken.connect(Alice).approve(usbInterestPool.address, aliceStakeAmount)).not.to.be.reverted;
     await expect(usbToken.connect(Bob).approve(usbInterestPool.address, bobStakeAmount)).not.to.be.reverted;
     await expect(usbInterestPool.connect(Alice).stake(aliceStakeAmount)).not.to.be.reverted;
     await expect(usbInterestPool.connect(Bob).stake(bobStakeAmount)).not.to.be.reverted;
 
     // Day 6. Two more days interest generated
-    //  Additional interest generated: (2 day / 365) * 3.65% * (4 + 0.8) = ~0.00096 $ETHx
+    //  Additional interest generated: (2 day / 365) * 3.65% * (4 + 0.83582089552) = ~0.00096716417 $ETHx
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 6);
-    const expectedInterest2 = ethers.utils.parseUnits('0.00096', await ethxToken.decimals());
+    await dumpAssetPoolState(ethPool);
+    const expectedInterest2 = ethers.utils.parseUnits('0.00096716417', await ethxToken.decimals());
     const totalInterest = expectedInterest.add(expectedInterest2);
     expectBigNumberEquals((await ethPool.calculateInterest())[1], totalInterest);
 
-    // Settle interest. Alice should get 1000 / (1000 + 2000) * (0.0004 + 0.00096) = ~0.00045333333 $ETHx, and Bob should get 0.00090666666 $ETHx
+    // Settle interest. Alice should get 100 / (100 + 200) * (0.0004 + 0.00096716417) = ~0.00045572139 $ETHx, and Bob should get 0.00091144278 $ETHx
     await expect(ethPool.connect(Bob).settleInterest())
       .to.emit(usbInterestPool, 'StakingRewardsAdded').withArgs(ethxToken.address, anyValue)
       .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
-    expectBigNumberEquals(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address), ethers.utils.parseUnits('0.00045333333', await ethxToken.decimals()));
-    expectBigNumberEquals(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address), ethers.utils.parseUnits('0.00090666666', await ethxToken.decimals()));
+    expectBigNumberEquals(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address), ethers.utils.parseUnits('0.00045572139', await ethxToken.decimals()));
+    expectBigNumberEquals(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address), ethers.utils.parseUnits('0.00091144278', await ethxToken.decimals()));
     await expect(usbInterestPool.connect(Alice).getStakingRewards(ethxToken.address))
       .to.emit(ethxToken, 'Transfer').withArgs(usbInterestPool.address, Alice.address, anyValue)
       .to.emit(usbInterestPool, 'StakingRewardsPaid').withArgs(ethxToken.address, Alice.address, anyValue);
@@ -172,6 +175,7 @@ describe('Wand Protocol', () => {
     const expectedEthAmount = ethers.utils.parseEther('0.024975');
     const expectedFee = ethers.utils.parseEther('0.000025');
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice4)).not.to.be.reverted;
+    await dumpAssetPoolState(ethPool);
     await expect(ethPool.connect(Alice).redeemByUSB(aliceRedeemAmount))
       .to.changeEtherBalances([Alice.address, Ivy.address, ethPool.address], [expectedEthAmount, expectedFee, ethers.utils.parseEther('-0.025')])
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceRedeemAmount)
@@ -179,17 +183,17 @@ describe('Wand Protocol', () => {
       .to.emit(ethPool, 'AssetRedeemedWithUSBFeeCollected').withArgs(Alice.address, Ivy.address, aliceRedeemAmount, expectedFee, ethPrice4, await ethPriceFeed.decimals());
 
     // Day 8. Bob redeems 0.1 $ETHx
-    //  Musb_eth = 7000 - 100 = 6900; Methx = 4 + 0.8 + (some interest) = ~4.80192
-    //  C2 = 0.5%;  Meth = 7.975
-    //  Expected paired $USB: 0.1 * 6900 / 4.80192 = ~143.692522991
-    //  Δeth: 0.1 * 7.975 * (1 - 0.5%) / 4.80192 = ~0.16524900456
-    //  Fee: 0.1 * 7.975 * 0.5% / 4.80192 = ~0.000830397
-    // await dumpAssetPoolState(ethPool);
+    //  Meth = 7.075, Musb_eth = 4600 - 100 = 4500; Methx = ~4.837755465681313425
+    //  C2 = 0.5%
+    //  Expected paired $USB: 0.1 * 4500 / 4.837755465681313425 = ~93.018343567
+    //  Δeth: 0.1 * 7.075 * (1 - 0.5%) / 4.837755465681313425 = ~0.14551427929
+    //  Fee: 0.1 * 7.075 * 0.5% / 4.837755465681313425 = ~0.00073122753
+    await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 8);
     const bobRedeemETHxAmount = ethers.utils.parseUnits('0.1', await ethxToken.decimals());
-    const expectedPairedUSBAmount = ethers.utils.parseUnits('143.692522991', await usbToken.decimals());
-    const expectedETHAmount2 = ethers.utils.parseEther('0.16524900456');
-    const expectedFee2 = ethers.utils.parseEther('0.000830397');
+    const expectedPairedUSBAmount = ethers.utils.parseUnits('93.018343567', await usbToken.decimals());
+    const expectedETHAmount2 = ethers.utils.parseEther('0.14551427929');
+    const expectedFee2 = ethers.utils.parseEther('0.00073122753');
     expectBigNumberEquals(await ethPool.calculatePairedUSBAmountToRedeemByXTokens(bobRedeemETHxAmount), expectedPairedUSBAmount);
     await expect(ethxToken.connect(Bob).approve(ethPool.address, bobRedeemETHxAmount)).not.to.be.reverted;
     await expect(usbToken.connect(Bob).approve(ethPool.address, expectedPairedUSBAmount.mul(11).div(10))).not.to.be.reverted;
@@ -201,7 +205,7 @@ describe('Wand Protocol', () => {
       .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Bob.address, Ivy.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
 
     // Day 9. Alice 100 $USB -> $ETHx
-    // await dumpAssetPoolState(ethPool);
+    await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 9);
     const aliceUSBSwapAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
     const calculatedETHxAmount = await ethPool.calculateUSBToXTokensOut(aliceUSBSwapAmount);
