@@ -219,7 +219,11 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Alice.address, redeemedETHxAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
       .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Alice.address, Ivy.address, redeemedETHxAmount, expectedFeeAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals());
     await dumpAssetPoolState(ethPool);
+    
+    // TODO: 
+    //================== Special case: AAR drop below AARC for the first time, AAR' > AARC ==================
 
+    //================== Special case: AAR drop below AARC for the first time, AAR' < AARC ==================
   
   });
 

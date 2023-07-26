@@ -10,6 +10,8 @@ interface IAssetPoolCalculator {
 
   function AAR(IAssetPool assetPool, uint256 msgValue) external pure returns (uint256);
 
+  function r(Constants.AssetPoolState memory S) external view returns (uint256);
+
   function calculatePairedUSBAmountToRedeemByXTokens(IAssetPool assetPool, uint256 xTokenAmount) external pure returns (uint256);
 
   function calculateUSBToXTokensOut(Constants.AssetPoolState memory S, uint256 usbAmount) external pure returns (uint256);

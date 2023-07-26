@@ -121,22 +121,39 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return _aarBelowCircuitBreakerLineTime;
   }
 
+  function r() public view returns (uint256) {
+    Constants.AssetPoolState memory S = _getAssetPoolState();
+    return IAssetPoolCalculator(assetPoolCalculator).r(S);
+  }
+
+  function R2() public view returns (uint256) {
+    uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), 0);
+    uint256 AART = _assetPoolParamValue("AART");
+    uint256 BasisR2 = _assetPoolParamValue("BasisR2");
+    if (aar >= AART) {
+      return 0;
+    }
+    return BasisR2.mul(AART.sub(aar)).div(10 ** AARDecimals());
+  }
+
+  function paused() public view returns (bool) {
+    uint256 aar = AAR();
+    uint256 AARC = _assetPoolParamValue("AARC");
+    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
+    return (aar < AARC) && (
+      _aarBelowCircuitBreakerLineTime != 0 &&
+      block.timestamp.sub(_aarBelowCircuitBreakerLineTime) < CircuitBreakPeriod
+    );
+  }
+
   function calculatePairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
     return IAssetPoolCalculator(assetPoolCalculator).calculatePairedUSBAmountToRedeemByXTokens(IAssetPool(this), xTokenAmount);
   }
 
   function calculateUSBToXTokensOut(uint256 usbAmount) public view returns (uint256) {
     uint256 aar = AAR();
-    uint256 AARC = _assetPoolParamValue("AARC");
-    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
     require(aar > 10 ** AARDecimals(), "AAR Below 100%");
-    require(
-      aar >= AARC || (
-        _aarBelowCircuitBreakerLineTime == 0 ||
-        block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod
-      ), 
-      "AAR Below Circuit Breaker AAR Threshold"
-    );
+    require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
     Constants.AssetPoolState memory S = _getAssetPoolState();
     return IAssetPoolCalculator(assetPoolCalculator).calculateUSBToXTokensOut(S, usbAmount);
@@ -366,16 +383,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
     uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), msg.value);
     require(aar > 10 ** AARDecimals(), "AAR Below 100%");
-    uint256 AARC = _assetPoolParamValue("AARC");
-    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
-
-    require(
-      aar >= AARC || (
-        _aarBelowCircuitBreakerLineTime == 0 ||
-        block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= CircuitBreakPeriod
-      ), 
-      "AAR Below Circuit Breaker AAR Threshold"
-    );
+    require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
     return IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);
   }

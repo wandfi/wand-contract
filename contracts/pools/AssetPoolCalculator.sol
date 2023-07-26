@@ -63,20 +63,7 @@ contract AssetPoolCalculator {
     
     // AAR'eth = (M_ETH * P_ETH / (Musb-eth - Δusb)) * 100%
     S.aar_ = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.M_USB_ETH.sub(Delta_USB));
-
-    // 𝑟 = 0 𝑖𝑓 𝐴𝐴𝑅 ≥ 2
-    // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2;
-    // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅S) + assetPool.RateR() × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
-    S.r = 0;
-    if (S.aar < S.AARS) {
-      // assert(S.aarBelowSafeLineTime > 0);
-      Terms memory T;
-      T.T1 = S.AART.sub(S.AARS).mul(S.BasisR).div(10 ** S.settingsDecimals);
-      T.T2 = S.aarBelowSafeLineTime == 0 ? 0 : block.timestamp.sub(S.aarBelowSafeLineTime);
-      S.r = T.T1.add(S.RateR.mul(T.T2).div(1 hours));
-    } else if (S.aar < S.AART) {
-      S.r = S.AART.sub(S.aar).mul(S.BasisR).div(10 ** S.settingsDecimals);
-    }
+    S.r = r(S);
 
     // console.log('aar: %s, aa_: %s, r: %s, ', S.aar, S.aar_, S.r);
     // console.log('M_ETH: %s, P_ETH: %s', S.M_ETH, S.P_ETH);
@@ -160,6 +147,22 @@ contract AssetPoolCalculator {
     }
 
     revert("Should not reach here");
+  }
+
+  // 𝑟 = 0 𝑖𝑓 𝐴𝐴𝑅 ≥ 2
+  // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2;
+  // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅S) + assetPool.RateR() × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
+  function r(Constants.AssetPoolState memory S) public view returns (uint256) {
+    if (S.aar < S.AARS) {
+      Terms memory T;
+      T.T1 = S.AART.sub(S.AARS).mul(S.BasisR).div(10 ** S.settingsDecimals);
+      T.T2 = S.aarBelowSafeLineTime == 0 ? 0 : block.timestamp.sub(S.aarBelowSafeLineTime);
+      return T.T1.add(S.RateR.mul(T.T2).div(1 hours));
+    } 
+    else if (S.aar < S.AART) {
+      return  S.AART.sub(S.aar).mul(S.BasisR).div(10 ** S.settingsDecimals);
+    }
+    return 0;
   }
 
   function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public view returns (uint256) {
