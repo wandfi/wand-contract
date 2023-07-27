@@ -386,7 +386,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     }
 
     uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), msg.value);
-    require(aar > 10 ** AARDecimals(), "AAR Below 100%");
+    require(_usbTotalSupply == 0 || aar > 10 ** AARDecimals(), "AAR Below 100%");
     require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
     return IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount, msg.value);

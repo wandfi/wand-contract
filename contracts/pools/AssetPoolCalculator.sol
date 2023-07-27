@@ -33,7 +33,10 @@ contract AssetPoolCalculator {
   }
 
   function AAR(IAssetPool assetPool, uint256 msgValue) public view returns (uint256) {
-    if (assetPool.usbTotalSupply() == 0) {
+    if (assetPool.usbTotalSupply() == 0 && IERC20(assetPool.xToken()).totalSupply() == 0) {
+      return 0;
+    }
+    else if (assetPool.usbTotalSupply() == 0 && IERC20(assetPool.xToken()).totalSupply() > 0) {
       return type(uint256).max;
     }
 
@@ -226,7 +229,7 @@ contract AssetPoolCalculator {
 
   function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount, uint256 msgValue) public view returns (uint256) {
     uint256 aar = AAR(assetPool, msgValue);
-    require(aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
+    require(assetPool.usbTotalSupply() == 0 || IERC20(assetPool.xToken()).totalSupply() == 0 || aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
     // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
 

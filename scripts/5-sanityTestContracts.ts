@@ -25,9 +25,9 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
 const deployer = new ethers.Wallet(privateKey, provider);
 
-const ethPoolAddress = '0xf33CBbA6F13172f40aab08cB547c822b4f06b8b8';
-const wbtcPoolAddress = '0x21A22e4bF6023650d98D87769aBC6bb1DD8ddd92';
-const stethxPoolAddress = '0x54BCdED07DA80c0cB8664dA04D49Ba3D772df1E8';
+const ethPoolAddress = '0x89BBE988c010846b935B07750A6Ff74A8c132534';
+const wbtcPoolAddress = '0x383ba522b4B515f17CA5fd46BA82b9598A02c309';
+const stethxPoolAddress = '0xDD92644966a1B495DFD0225313a9294501e83034';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
@@ -49,35 +49,35 @@ async function main() {
   await trans.wait();
   console.log(`Mocked $stETH price to $2000`);
 
-  // deposit 0.01 ETH to mint $USB
-  await dumpAssetPoolState(ethPool);
-  const ethAmount = ethers.utils.parseEther('0.01');
-  trans = await ethPool.connect(deployer).mintUSB(ethAmount, {value: ethAmount});
-  await trans.wait();
-  console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $USB`);
-  await dumpAssetPoolState(ethPool);
+  // // deposit 0.01 ETH to mint $ETHx
+  // const ethAmount = ethers.utils.parseEther('0.01');
+  // trans = await ethPool.connect(deployer).mintXTokens(ethAmount, {value: ethAmount});
+  // await trans.wait();
+  // console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $ETHx`);
+  // await dumpAssetPoolState(ethPool);
 
-  // deposit 0.01 ETH to mint $ETHx
-  trans = await ethPool.connect(deployer).mintXTokens(ethAmount, {value: ethAmount});
-  await trans.wait();
-  console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $ETHx`);
-  await dumpAssetPoolState(ethPool);
+  // // deposit 0.01 ETH to mint $USB
+  // await dumpAssetPoolState(ethPool);
+  // trans = await ethPool.connect(deployer).mintUSB(ethAmount, {value: ethAmount});
+  // await trans.wait();
+  // console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $USB`);
+  // await dumpAssetPoolState(ethPool);
 
-  // deposit 0.01 $WBTC to mint $USB
-  const wbtc = ERC20Mock__factory.connect(await wbtcPool.assetToken(), provider);
-  const wbtcAmount = ethers.utils.parseUnits('0.01', await wbtc.decimals());
-  trans = await wbtc.connect(deployer).mint(deployer.address, wbtcAmount);
-  await trans.wait();
-  console.log(`Minted ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC`);
-  trans = await wbtc.connect(deployer).approve(wbtcPool.address, wbtcAmount);
-  await trans.wait();
-  console.log(`Approved ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC`);
+  // // deposit 0.01 $WBTC to mint $USB
+  // const wbtc = ERC20Mock__factory.connect(await wbtcPool.assetToken(), provider);
+  // const wbtcAmount = ethers.utils.parseUnits('0.01', await wbtc.decimals());
+  // trans = await wbtc.connect(deployer).mint(deployer.address, wbtcAmount);
+  // await trans.wait();
+  // console.log(`Minted ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC`);
+  // trans = await wbtc.connect(deployer).approve(wbtcPool.address, wbtcAmount);
+  // await trans.wait();
+  // console.log(`Approved ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC`);
 
-  dumpAssetPoolState(wbtcPool);
-  trans = await wbtcPool.connect(deployer).mintUSB(wbtcAmount);
-  await trans.wait();
-  console.log(`Deposited ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC to mint $USB`);
-  dumpAssetPoolState(wbtcPool);
+  // dumpAssetPoolState(wbtcPool);
+  // trans = await wbtcPool.connect(deployer).mintUSB(wbtcAmount);
+  // await trans.wait();
+  // console.log(`Deposited ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC to mint $USB`);
+  // dumpAssetPoolState(wbtcPool);
 }
 
 async function dumpAssetPoolState(assetPool: AssetPool) {

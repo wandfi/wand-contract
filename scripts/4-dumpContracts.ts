@@ -18,7 +18,7 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // Goerli
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
-const wandProtocolAddress = '0x523411921f0089E05A29897D600D0d64fA88f218';
+const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);

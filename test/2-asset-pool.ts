@@ -40,8 +40,8 @@ describe('Asset Pool', () => {
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
 
-    // Initial AAR should be max uint256
-    expect (await ethPool.AAR()).to.equal(ethers.constants.MaxUint256);
+    // Initial AAR should be 0
+    expect (await ethPool.AAR()).to.equal(0);
 
     // Set C1 & C2 to 0 to faciliate testing
     await expect(ethPool.connect(Alice).updateParamValue(ethers.utils.formatBytes32String("C1"), 0))
@@ -64,7 +64,7 @@ describe('Asset Pool', () => {
     
     // Asset Pool State: M_ETH = 2, M_USB = 0, M_ETHx = 2, P_ETH = $3000
     // Alice deposit 1 ETH to mint $USB, expected output is: 1 * 3000 = 3000
-    // await dumpAssetPoolState(ethPool);
+    await dumpAssetPoolState(ethPool);
     ethPrice = ethers.utils.parseUnits('3000', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     ethDepositAmount = ethers.utils.parseEther('1');
@@ -256,8 +256,8 @@ describe('Asset Pool', () => {
     // Set eth price to 2000; mint $USB and $ETHx
     let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     await expect(ethPool.connect(Alice).mintXTokens(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
+    await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     
     //================== Case: AAR > AART & AAR' > AART ==================
 
@@ -491,9 +491,9 @@ describe('Asset Pool', () => {
     // Set eth price to 2000; mint $USB and $ETHx
     let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     await dumpAssetPoolState(ethPool);
     await expect(ethPool.connect(Alice).mintXTokens(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
+    await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     
     //================== Case: AAR > AART & AAR' > AART ==================
 

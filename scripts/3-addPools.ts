@@ -27,15 +27,15 @@ const deployer = new ethers.Wallet(privateKey, provider);
 
 // Based on Chainlink price feed for ETH/USD on Goerli
 // https://goerli.etherscan.io/address/0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e
-const ethPriceFeedAddress = '0x2f7DA0085A66599CEbC4d5fFc7d53d1C7711cf3e';
+const ethPriceFeedAddress = '0xDAf54D11EFdF5A2c3Fea091E2c0A556bCBb27cDC';
 
-const wbtcAddress = '0x25d8D02457C9FAB1f0a3CD4Fa4B526Eb32f81114';
-const wbtcPriceFeedAddress = '0x1BDCF0d340cD22277A345Df4cfecc0C78EeBDEE8'; // Mocked price feed for WBTC/USD on Goerli
+const wbtcAddress = '0xcAE964CfeEa795b8D545fBb0899e16A665218c65';
+const wbtcPriceFeedAddress = '0xf44C8d847FB8a0D13501Fe3Df38Cc5E799a550C0'; // Mocked price feed for WBTC/USD on Goerli
 
-const stethAddress = '0x9d098c1d4d628013344ac8927c681b55bec49666';
-const stethPriceFeedAddress = '0x02BF5dd6C1BE5C5c2BD8168A9Eb6cB03F38D6E17'; // Mocked price feed for stETH/USD on Goerli
+const stethAddress = '0x18F37A1CA2D1fD5B104009fD288A947431203C78';
+const stethPriceFeedAddress = '0x9B932019176Ab8E2cA55b6065ca37Dc284381f4E'; // Mocked price feed for stETH/USD on Goerli
 
-const wandProtocolAddress = '0x523411921f0089E05A29897D600D0d64fA88f218';
+const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
