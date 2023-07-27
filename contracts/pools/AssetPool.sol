@@ -129,9 +129,13 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   function R2() public view returns (uint256) {
     uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this), 0);
     uint256 AART = _assetPoolParamValue("AART");
+    uint256 AARS = _assetPoolParamValue("AARS");
     uint256 BasisR2 = _assetPoolParamValue("BasisR2");
     if (aar >= AART) {
       return 0;
+    }
+    else if (aar < AARS) {
+      return 10 ** AARDecimals();
     }
     return BasisR2.mul(AART.sub(aar)).div(10 ** AARDecimals());
   }

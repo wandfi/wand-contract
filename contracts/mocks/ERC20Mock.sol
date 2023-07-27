@@ -10,66 +10,66 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 contract ERC20Mock is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  EnumerableSet.AddressSet internal _minters;
+  EnumerableSet.AddressSet internal _admins;
 
   constructor(
     string memory name,
     string memory symbol
   ) Ownable() ERC20(name, symbol) {
-    _setMinter(_msgSender(), true);
+    _setAdmin(_msgSender(), true);
   }
 
   /* ================= VIEWS ================ */
 
-  function getMintersCount() public view returns (uint256) {
-    return _minters.length();
+  function getAdminsCount() public view returns (uint256) {
+    return _admins.length();
   }
 
-  function getMinter(uint256 index) public view returns (address) {
-    require(index < _minters.length(), "Invalid index");
-    return _minters.at(index);
+  function getAdmin(uint256 index) public view returns (address) {
+    require(index < _admins.length(), "Invalid index");
+    return _admins.at(index);
   }
 
-  function isMinter(address account) public view returns (bool) {
-    return _minters.contains(account);
+  function isAdmin(address account) public view returns (bool) {
+    return _admins.contains(account);
   }
 
   /* ================= MUTATIVE FUNCTIONS ================ */
 
-  function setMinter(address account, bool minter) external nonReentrant onlyOwner {
-    _setMinter(account, minter);
+  function setAdmin(address account, bool minter) external nonReentrant onlyOwner {
+    _setAdmin(account, minter);
   }
 
-  function mint(address to, uint256 value) public nonReentrant onlyMinter returns (bool) {
+  function mint(address to, uint256 value) public virtual nonReentrant onlyAdmin returns (bool) {
     _mint(to, value);
     return true;
   }
 
-    /* ========== INTERNAL FUNCTIONS ========== */
+  /* ========== INTERNAL FUNCTIONS ========== */
 
-  function _setMinter(address account, bool minter) internal {
+  function _setAdmin(address account, bool admin) internal {
     require(account != address(0), "Zero address detected");
 
-    if (minter) {
-      require(!_minters.contains(account), "Address is already minter");
-      _minters.add(account);
+    if (admin) {
+      require(!_admins.contains(account), "Address is already admin");
+      _admins.add(account);
     }
     else {
-      require(_minters.contains(account), "Address was not minter");
-      _minters.remove(account);
+      require(_admins.contains(account), "Address was not admin");
+      _admins.remove(account);
     }
 
-    emit UpdateMinter(account, minter);
+    emit UpdateAdmin(account, admin);
   }
 
   /* ============== MODIFIERS =============== */
 
-  modifier onlyMinter() {
-    require(isMinter(_msgSender()), "Caller is not minter");
+  modifier onlyAdmin() {
+    require(isAdmin(_msgSender()), "Caller is not admin");
     _;
   }
 
   /* ========== EVENTS ========== */
 
-  event UpdateMinter(address indexed account, bool minter);
+  event UpdateAdmin(address indexed account, bool admin);
 }

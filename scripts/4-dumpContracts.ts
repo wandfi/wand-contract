@@ -18,7 +18,7 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // Goerli
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
-const wandProtocolAddress = '0x99A966E3BB33080b6c8A752B932d51a1a0FEC30b';
+const wandProtocolAddress = '0x523411921f0089E05A29897D600D0d64fA88f218';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
@@ -43,10 +43,10 @@ async function main() {
     const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
     const assetPool = AssetPool__factory.connect(assetPoolAddress, provider);
     const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
-    console.log(`  $${assetSymbol} Pool`);
+    console.log(`  $${assetSymbol} Pool: ${assetPoolAddress}`);
     console.log(`    Asset Token: ${assetToken}`);
-    console.log(`    Asset Pool: ${assetPoolAddress}`);
-    console.log(`    Asset Price Feed: ${await assetPool.assetTokenPriceFeed()}`);
+    // console.log(`    Asset Pool: ${assetPoolAddress}`);
+    console.log(`    Asset Price Oracle: ${await assetPool.assetTokenPriceFeed()}`);
     console.log(`    $${await xToken.symbol()} Token: ${xToken.address}`);
   }
 

@@ -27,13 +27,15 @@ const deployer = new ethers.Wallet(privateKey, provider);
 
 // Based on Chainlink price feed for ETH/USD on Goerli
 // https://goerli.etherscan.io/address/0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e
-const ethPriceFeedAddress = '0xf6E8f6233FbfBbA5d42547B7A94819c0afF91D8A';
+const ethPriceFeedAddress = '0x2f7DA0085A66599CEbC4d5fFc7d53d1C7711cf3e';
 
-const wbtcAddress = '0xf8424b5359AAE2098eB9C8A51458b9D594B35096';
-// Mocked price feed for WBTC/USD on Goerli
-const wbtcPriceFeedAddress = '0x7286754f7523c2D84Ac9cdAb1F0f0e323f6745cc';
+const wbtcAddress = '0x25d8D02457C9FAB1f0a3CD4Fa4B526Eb32f81114';
+const wbtcPriceFeedAddress = '0x1BDCF0d340cD22277A345Df4cfecc0C78EeBDEE8'; // Mocked price feed for WBTC/USD on Goerli
 
-const wandProtocolAddress = '0x99A966E3BB33080b6c8A752B932d51a1a0FEC30b';
+const stethAddress = '0x9d098c1d4d628013344ac8927c681b55bec49666';
+const stethPriceFeedAddress = '0x02BF5dd6C1BE5C5c2BD8168A9Eb6cB03F38D6E17'; // Mocked price feed for stETH/USD on Goerli
+
+const wandProtocolAddress = '0x523411921f0089E05A29897D600D0d64fA88f218';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
@@ -120,6 +122,28 @@ async function main() {
   trans = await wbtcxToken.connect(deployer).setAssetPool(wbtcPoolAddress);
   await trans.wait();
   console.log(`Connected $WBTCx asset pool to $WBTCx token`);
+
+  // Create $stETH asset pool
+  const stETHx = await AssetXFactory.deploy(wandProtocol.address, "stETHx Token", "stETHx");
+  const stethxToken = AssetX__factory.connect(stETHx.address, provider);
+  console.log(`Deployed $stETHx token to ${stethxToken.address}`);
+
+  const stethY = BigNumber.from(10).pow(await settings.decimals()).mul(50).div(1000);  // 5%
+  const stethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
+  const stethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
+  const stethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
+  trans = await wandProtocol.connect(deployer).addAssetPool(
+    stethAddress, stethPriceFeedAddress, stethxToken.address,
+    [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
+    [stethY, stethAART, stethAARS, stethAARC]
+  );
+  await trans.wait();
+  const stethPoolAddress = await assetPoolFactory.getAssetPoolAddress(stethAddress);
+  console.log(`Deployed $stETH asset pool to ${stethPoolAddress}`);
+
+  trans = await stethxToken.connect(deployer).setAssetPool(stethPoolAddress);
+  await trans.wait();
+  console.log(`Connected $stETHx asset pool to $stETHx token`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -10,14 +10,10 @@ import {
   AssetPoolCalculator__factory
 } from '../typechain';
 
-const { BigNumber } = ethers;
-
 dotenv.config();
 
 const privateKey: string = process.env.PRIVATE_KEY || "";
 const infuraKey: string = process.env.INFURA_KEY || "";
-
-const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // Goerli
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);

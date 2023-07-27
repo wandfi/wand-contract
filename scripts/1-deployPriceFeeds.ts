@@ -4,6 +4,7 @@ import { ethers } from "hardhat";
 import {
   PriceFeedMock__factory,
   ERC20Mock__factory,
+  RebasableERC20Mock__factory
 } from '../typechain';
 
 dotenv.config();
@@ -23,6 +24,11 @@ async function main() {
   const wbtc = ERC20Mock__factory.connect(WBTC.address, provider);
   console.log(`Deployed Mocked WBTC token at ${wbtc.address}`);
 
+  const RebasableERC20MockFactory = await ethers.getContractFactory('RebasableERC20Mock');
+  const RebasableERC20Mock = await RebasableERC20MockFactory.deploy("Liquid staked Ether 2.0", "stETH");
+  const stETH = RebasableERC20Mock__factory.connect(RebasableERC20Mock.address, provider);
+  console.log(`Deployed Mocked stETH token at ${stETH.address}`);
+
   const CommonPriceFeedFactory = await ethers.getContractFactory('CommonPriceFeed');
   const commonPriceFeed = await CommonPriceFeedFactory.deploy('ETH', chainlinkETHUSD);
   const ethPriceFeed = PriceFeedMock__factory.connect(commonPriceFeed.address, provider);
@@ -32,6 +38,10 @@ async function main() {
   const WBTCPriceFeedMock = await PriceFeedMockFactory.deploy('WBTC', 6);
   const wbtcPriceFeed = PriceFeedMock__factory.connect(WBTCPriceFeedMock.address, provider);
   console.log(`Deployed Mocked PriceFeed for WBTC at ${wbtcPriceFeed.address}`);
+
+  const stETHPriceFeedMock = await PriceFeedMockFactory.deploy('stETH', 6);
+  const stETHPriceFeed = PriceFeedMock__factory.connect(stETHPriceFeedMock.address, provider);
+  console.log(`Deployed Mocked PriceFeed for stETH at ${stETHPriceFeed.address}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

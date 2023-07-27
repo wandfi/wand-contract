@@ -25,8 +25,9 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
 const deployer = new ethers.Wallet(privateKey, provider);
 
-const ethPoolAddress = '0x1e6537D3440372D5ff12bBE7C5e3B9191a5401EB';
-const wbtcPoolAddress = '0x6Cab6c94e2086Dec7c1265fAb6f2D08F57e9D9Bf';
+const ethPoolAddress = '0xf33CBbA6F13172f40aab08cB547c822b4f06b8b8';
+const wbtcPoolAddress = '0x21A22e4bF6023650d98D87769aBC6bb1DD8ddd92';
+const stethxPoolAddress = '0x54BCdED07DA80c0cB8664dA04D49Ba3D772df1E8';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
@@ -34,12 +35,19 @@ const wbtcPoolAddress = '0x6Cab6c94e2086Dec7c1265fAb6f2D08F57e9D9Bf';
 async function main() {
   const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
   const wbtcPool = AssetPool__factory.connect(wbtcPoolAddress, provider);
+  const stethPool = AssetPool__factory.connect(stethxPoolAddress, provider);
 
   // Mock $WBTC price to $30000
   const wbtcPriceFeed = PriceFeedMock__factory.connect(await wbtcPool.assetTokenPriceFeed(), provider);
   let trans = await wbtcPriceFeed.connect(deployer).mockPrice(BigNumber.from(30000).mul(BigNumber.from(10).pow(await wbtcPriceFeed.decimals())));
   await trans.wait();
   console.log(`Mocked $WBTC price to $30000`);
+
+  // Mock $stETH price to $2000
+  const stethPriceFeed = PriceFeedMock__factory.connect(await stethPool.assetTokenPriceFeed(), provider);
+  trans = await stethPriceFeed.connect(deployer).mockPrice(BigNumber.from(2000).mul(BigNumber.from(10).pow(await stethPriceFeed.decimals())));
+  await trans.wait();
+  console.log(`Mocked $stETH price to $2000`);
 
   // deposit 0.01 ETH to mint $USB
   await dumpAssetPoolState(ethPool);

@@ -12,6 +12,7 @@ import {
   InterestPoolFactory__factory,
   AssetPool,
   ERC20__factory,
+  RebasableERC20Mock__factory,
   WandProtocol,
   AssetPool__factory,
   InterestPool__factory
@@ -34,6 +35,10 @@ export async function deployContractsFixture() {
 
   const WBTC = await ERC20MockFactory.deploy("WBTC Token", "WBTC");
   const wbtc = ERC20Mock__factory.connect(WBTC.address, provider);
+
+  const RebasableERC20MockFactory = await ethers.getContractFactory('RebasableERC20Mock');
+  const RebasableERC20Mock = await RebasableERC20MockFactory.deploy("Liquid staked Ether 2.0", "stETH");
+  const stETH = RebasableERC20Mock__factory.connect(RebasableERC20Mock.address, provider);
 
   const PriceFeedMockFactory = await ethers.getContractFactory('PriceFeedMock');
   const EthPriceFeedMock = await PriceFeedMockFactory.deploy("ETH", 6);
@@ -99,7 +104,7 @@ export async function deployContractsFixture() {
   let trans = await wandProtocol.connect(Alice).initialize(usbToken.address, assetPoolCalculaor.address, assetPoolFactory.address, interestPoolFactory.address);
   await trans.wait();
 
-  return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
+  return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, stETH, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
 }
 
 export async function dumpAssetPoolState(assetPool: AssetPool) {
