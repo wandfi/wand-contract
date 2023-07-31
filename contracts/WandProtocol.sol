@@ -6,10 +6,10 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
-import "./interfaces/IWandProtocol.sol";
 import "./interfaces/IAssetPoolFactory.sol";
 import "./interfaces/IAssetPool.sol";
 import "./interfaces/IInterestPoolFactory.sol";
+import "./interfaces/IWandProtocol.sol";
 import "./settings/ProtocolSettings.sol";
 
 contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
@@ -90,20 +90,6 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
 
   function addRewardTokenToInterestPool(address stakingToken, address rewardToken) public onlyInitialized nonReentrant onlyOwner {
     IInterestPoolFactory(_interestPoolFactory).addRewardToken(stakingToken, rewardToken);
-  }
-
-  function _getXTokenList() internal view returns (address[] memory) {
-    // Get reward token list (currently only x tokens)
-    IAssetPoolFactory iAssetPoolFactory = IAssetPoolFactory(_assetPoolFactory);
-    address[] memory assetTokens = iAssetPoolFactory.assetTokens();
-    require(assetTokens.length > 0, "No asset pools created yet");
-
-    address[] memory xTokens = new address[](assetTokens.length);
-    for (uint256 i = 0; i < assetTokens.length; i++) {
-      xTokens[i] = IAssetPool(IAssetPoolFactory(_assetPoolFactory).getAssetPoolAddress(assetTokens[i])).xToken();
-    }
-
-    return xTokens;
   }
 
   /* ============== MODIFIERS =============== */

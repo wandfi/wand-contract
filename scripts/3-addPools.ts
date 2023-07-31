@@ -144,6 +144,14 @@ async function main() {
   trans = await stethxToken.connect(deployer).setAssetPool(stethPoolAddress);
   await trans.wait();
   console.log(`Connected $stETHx asset pool to $stETHx token`);
+
+  // Add $USB InterestPool to $ETHx/$WBTCx/$stETHx whitelist
+  trans = await ethxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  console.log(`Added $USB interest pool to $ETHx whitelist`);
+  trans = await wbtcxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  console.log(`Added $USB interest pool to $WBTCx whitelist`);
+  trans = await stethxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  console.log(`Added $USB interest pool to $stETHx whitelist`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

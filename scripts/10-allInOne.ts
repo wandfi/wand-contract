@@ -184,6 +184,14 @@ async function main() {
   await trans.wait();
   console.log(`Connected $stETHx asset pool to $stETHx token`);
 
+  // Add $USB InterestPool to $ETHx/$WBTCx/$stETHx whitelist
+  trans = await ethxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  console.log(`Added $USB interest pool to $ETHx whitelist`);
+  trans = await wbtcxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  console.log(`Added $USB interest pool to $WBTCx whitelist`);
+  trans = await stethxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  console.log(`Added $USB interest pool to $stETHx whitelist`);
+
   // Step 4: Add tester accounts
   for (let i = 0; i < _.size(testers); i++) {
     const tester = testers[i];
