@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.9;
+pragma solidity ^0.8.21;
 
 import "hardhat/console.sol";
 
@@ -75,9 +75,9 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
   }
 
   function paramConfig(bytes32 param) public view returns(ParamConfig memory) {
-    if (!_paramsSet.contains(param)) {
-      console.log('paramConfig, invalid param: %s', string(abi.encodePacked(param)));
-    }
+    // if (!_paramsSet.contains(param)) {
+    //   console.log('paramConfig, invalid param: %s', string(abi.encodePacked(param)));
+    // }
 
     require(param.length > 0, "Empty param name");
     require(_paramsSet.contains(param), "Invalid param name");
@@ -85,9 +85,9 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
   }
 
   function paramDefaultValue(bytes32 param) public view returns (uint256) {
-    if (!_paramsSet.contains(param)) {
-      console.log('paramDefaultValue, invalid param: %s', string(abi.encodePacked(param)));
-    }
+    // if (!_paramsSet.contains(param)) {
+    //   console.log('paramDefaultValue, invalid param: %s', string(abi.encodePacked(param)));
+    // }
 
     require(param.length > 0, "Empty param name");
     require(_paramsSet.contains(param), "Invalid param name");
