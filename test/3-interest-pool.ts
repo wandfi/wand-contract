@@ -64,7 +64,7 @@ describe('Interest Pool', () => {
     // Day 2. No interest distributed, since no $USB staking yet
     // ETH Pool State: M_ETH = 101, M_USB = 2000, M_USB_ETH = 2000, M_ETHx = 100
     // Expected interest:
-    //  New interest: (1 day / 365 days) * 3.5% * 100 = 0.01 $ETHx
+    //  New interest: (1 day / 365 days) * 3.65% * 100 = 0.01 $ETHx
     //  Total interest: 0.01 $ETHx 
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 2);
     let expectedNewInterest = ethers.utils.parseUnits("0.01", await ethxToken.decimals());
@@ -80,7 +80,7 @@ describe('Interest Pool', () => {
     // Day 3. New interest generated, but still not distributed
     // ETH Pool State: M_ETHx = 100.009999768518518518
     // Expected interest:
-    //  New interest: (1 day / 365 days) * 3.5% * 100.009999768518518518 = 0.01000099997 $ETHx
+    //  New interest: (1 day / 365 days) * 3.65% * 100.009999768518518518 = 0.01000099997 $ETHx
     //  Total interest: 0.02000099997 $ETHx 
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 3);
     expectedNewInterest = ethers.utils.parseUnits("0.01000099997", await ethxToken.decimals());
@@ -96,7 +96,7 @@ describe('Interest Pool', () => {
     // Day 4. Alice stake 100 $USB, and get all the interest
     // ETH Pool State: M_ETHx = 100.020000768495370369
     // Expected interest:
-    //  New interest: (1 day / 365 days) * 3.5% * 100.020000768495370369 = 0.01000200007 $ETHx
+    //  New interest: (1 day / 365 days) * 3.65% * 100.020000768495370369 = 0.01000200007 $ETHx
     //  Total interest: 0.03000300004 $ETHx
     let aliceStakeAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
     await expect(usbToken.connect(Alice).approve(usbInterestPool.address, aliceStakeAmount)).not.to.be.reverted;
@@ -119,6 +119,29 @@ describe('Interest Pool', () => {
     expectBigNumberEquals(expectedTotalInterest, await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
     expect(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address)).to.equal(0);
     await expect(usbInterestPool.connect(Alice).stakingRewardsEarned(usbToken.address, Alice.address)).to.be.revertedWith(/Invalid reward token/)
+
+    // Day 5. Bob stakes 50 $USB right before interest settlement, and get 1/3 of the new interest
+    // ETH Pool State: M_ETHx = 100.030002768572219906
+    // Expected interest:
+    //  New interest: (1 day / 365 days) * 3.65% * 100.030002768572219906 = 0.01000300027 $ETHx
+    //  Total interest: 0 + 0.01000300027 = 0.01000300027 $ETHx
+    await expect(usbToken.connect(Alice).transfer(Bob.address, ethers.utils.parseUnits('50', await usbToken.decimals()))).not.to.be.reverted;
+    let bobStakeAmount = ethers.utils.parseUnits('50', await usbToken.decimals());
+    await expect(usbToken.connect(Bob).approve(usbInterestPool.address, bobStakeAmount)).not.to.be.reverted;
+    await expect(usbInterestPool.connect(Bob).stake(bobStakeAmount))
+      .to.emit(usbToken, 'Transfer').withArgs(Bob.address, usbInterestPool.address, bobStakeAmount)
+      .to.emit(usbInterestPool, 'Staked').withArgs(Bob.address, bobStakeAmount);
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 5);
+    expectedNewInterest = ethers.utils.parseUnits("0.01000300027", await ethxToken.decimals());
+    expectedTotalInterest = ethers.utils.parseUnits("0.01000300027", await ethxToken.decimals());
+    interestInfo = await ethPool.calculateInterest();
+    expectBigNumberEquals(expectedNewInterest, interestInfo[0]);
+    expectBigNumberEquals(expectedTotalInterest, interestInfo[1]);
+
+    await expect(ethPool.connect(Alice).settleInterest())
+      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
+      .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
+    await dumpAssetPoolState(ethPool);
 
 
     

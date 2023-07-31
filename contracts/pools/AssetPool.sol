@@ -135,7 +135,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
       return 0;
     }
     else if (aar < AARS) {
-      return 10 ** AARDecimals();
+      return 10 ** settingsDecimals;
     }
     return BasisR2.mul(AART.sub(aar)).div(10 ** AARDecimals());
   }

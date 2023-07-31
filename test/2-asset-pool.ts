@@ -546,10 +546,10 @@ describe('Asset Pool', () => {
     //  - Alice deposit 1 ETH to mint $USB
     //  - R2 = 0.06 * (2 - 1.8089396132) = 0.0114636232
     //  - AAR' = (3.3 + 1) * 3800 / (6932.238040352 + 1 * 3800) = 1.52251561497
-    //  - Δusb = Δeth * P_ETH * (1 - (AAReth - AAR'eth) * 0.06 / 2)
-    //  - Δusb = 1 * 3800 * (1 - (1.8089396132 - 1.52251561497) * 0.06 / 2) = 3767.3476642
+    //  - Δusb = Δeth * P_ETH * (1 - (2 * AART - AAReth - AAR'eth) * 0.06 / 2)
+    //  - Δusb = 1 * 3800 * (1 - (2 * 2 - 1.8089396132 - 1.52251561497) * 0.06 / 2) = 3723.78589601
     ethAmountToDeposit = ethers.utils.parseEther('1');
-    expectedUSBAmount = ethers.utils.parseUnits('3767.34766438', await usbToken.decimals());
+    expectedUSBAmount = ethers.utils.parseUnits('3723.78589622', await usbToken.decimals());
     expectBigNumberEquals(await ethPool.calculateMintUSBOut(ethAmountToDeposit), expectedUSBAmount);
     await expect(ethPool.connect(Alice).mintUSB(ethAmountToDeposit, {value: ethAmountToDeposit}))
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-1'), ethAmountToDeposit])
@@ -559,11 +559,11 @@ describe('Asset Pool', () => {
 
     //================== Case: 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑆 ==================
 
-    // Asset Pool State: M_ETH = 4.3, M_USB = 10699.585704732, M_ETHx = 1, P_ETH = $3800, AAR = 1.5271619342
+    // Asset Pool State: M_ETH = 4.3, M_USB = 10656.023936572, M_ETHx = 1, P_ETH = $3800, AAR = 1.5334049639
     // Expected behavior
     //  - Alice deposit 1 ETH to mint $USB
-    //  - R2 = 0.06 * (2 - 1.5271619342) = 0.02837028394
-    //  - AAR' = (4.3 + 1) * 3800 / (10699.585704732 + 1 * 3800) = 1.38900520402
+    //  - R2 = 0.06 * (2 - 1.5334049639) = 0.02799570216
+    //  - AAR' = (4.3 + 1) * 3800 / (10656.023936572 + 1 * 3800) = 1.39319083092
     ethAmountToDeposit = ethers.utils.parseEther('1');
     await expect(ethPool.connect(Alice).mintUSB(ethAmountToDeposit)).to.be.rejectedWith(/AAR Below Safe Threshold after Mint/);
 

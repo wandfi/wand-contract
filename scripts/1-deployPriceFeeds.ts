@@ -39,7 +39,8 @@ async function main() {
   const wbtcPriceFeed = PriceFeedMock__factory.connect(WBTCPriceFeedMock.address, provider);
   console.log(`Deployed Mocked PriceFeed for WBTC at ${wbtcPriceFeed.address}`);
 
-  const stETHPriceFeedMock = await PriceFeedMockFactory.deploy('stETH', 6);
+  const PriceFeedMockForStETHFactory = await ethers.getContractFactory('PriceFeedMock');
+  const stETHPriceFeedMock = await PriceFeedMockForStETHFactory.deploy('stETH', 6);
   const stETHPriceFeed = PriceFeedMock__factory.connect(stETHPriceFeedMock.address, provider);
   console.log(`Deployed Mocked PriceFeed for stETH at ${stETHPriceFeed.address}`);
 }

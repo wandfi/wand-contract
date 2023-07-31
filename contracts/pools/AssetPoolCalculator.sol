@@ -168,7 +168,7 @@ contract AssetPoolCalculator {
     return 0;
   }
 
-  function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public view returns (uint256) {
+  function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public pure returns (uint256) {
     require(assetAmount > 0, "Amount must be greater than 0");
 
     require(S.aar >= S.AARS, "AAR Below Safe Threshold");
@@ -215,11 +215,12 @@ contract AssetPoolCalculator {
     }
 
     // If S.AARS <= AAR'eth <= S.AART, and S.AARS <= AAReth <= S.AART
-    //  Δusb = Δeth * P_ETH * (1 - (AAReth - AAR'eth) * 0.06 / 2)
+    //  Δusb = Δeth * P_ETH * (1 - (2 * AART - AAReth - AAR'eth) * 0.06 / 2)
     if (S.aar_ >= S.AARS && S.aar_ <= S.AART && S.aar >= S.AARS && S.aar <= S.AART) {
+      uint256 T = S.AART.mul(2).sub(S.aar).sub(S.aar_).mul(S.BasisR2);
       return Delta_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(
         (10 ** S.AARDecimals).sub(
-          S.aar.sub(S.aar_).mul(S.BasisR2).div(2).div(10 ** S.settingsDecimals)
+          T.div(2).div(10 ** S.settingsDecimals)
         )
       ).div(10 ** S.AARDecimals);
     }
