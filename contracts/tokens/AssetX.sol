@@ -97,7 +97,11 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
   function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
     require(_assetPool != address(0), "Zero address detected");
+
+    address prevAssetPool = assetPool;
     assetPool = _assetPool;
+    emit SetAssetPool(prevAssetPool, assetPool);
+
     _setWhitelistAddress(_assetPool, true);
   }
 
@@ -138,6 +142,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
   /* =============== EVENTS ============= */
 
+  event SetAssetPool(address indexed prevAssetPool, address indexed assetPool);
   event UpdatedFee(uint256 prevFee, uint256 newFee);
   event UpdateWhitelistAddress(address account, bool whitelisted);
   event TransferFeeCollected(address indexed from, address indexed to, uint256 value);
