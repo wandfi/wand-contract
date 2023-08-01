@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -49,7 +49,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
   /* ================= MUTATIVE FUNCTIONS ================ */
 
-  function transfer(address to, uint256 amount) public virtual override returns (bool) {
+  function transfer(address to, uint256 amount) public override nonReentrant returns (bool) {
     address from = _msgSender();
     if (fee == 0 || _whitelistAddresses.contains(from) || _whitelistAddresses.contains(to)) {
       _transfer(from, to, amount);
@@ -59,7 +59,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
     return _transferWithFees(from, to, amount);
   }
 
-  function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
+  function transferFrom(address from, address to, uint256 amount) public override nonReentrant returns (bool) {
     address spender = _msgSender();
     _spendAllowance(from, spender, amount);
     if (fee == 0 || _whitelistAddresses.contains(from) || _whitelistAddresses.contains(to)) {
@@ -72,16 +72,19 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function mint(address to, uint256 amount) public onlyAssetPool {
+  function mint(address to, uint256 amount) public nonReentrant onlyAssetPool {
     _mint(to, amount);
   }
 
-  function burn(address account, uint256 amount) public onlyAssetPool {
+  function burn(address account, uint256 amount) public nonReentrant onlyAssetPool {
     _burn(account, amount);
   }
 
   function setFee(uint256 newFee) external nonReentrant onlyOwner {
     require(newFee != fee, "Same transfer fee");
+
+    IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
+    require(settings.isValidParam("XTokensTransferFee", newFee), "Invalid fee");
     
     uint256 prevFee = fee;
     fee = newFee;

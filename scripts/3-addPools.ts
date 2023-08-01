@@ -147,10 +147,13 @@ async function main() {
 
   // Add $USB InterestPool to $ETHx/$WBTCx/$stETHx whitelist
   trans = await ethxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  await trans.wait();
   console.log(`Added $USB interest pool to $ETHx whitelist`);
   trans = await wbtcxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  await trans.wait();
   console.log(`Added $USB interest pool to $WBTCx whitelist`);
   trans = await stethxToken.connect(deployer).setWhitelistAddress(usbInterestPool.address, true);
+  await trans.wait();
   console.log(`Added $USB interest pool to $stETHx whitelist`);
 }
 

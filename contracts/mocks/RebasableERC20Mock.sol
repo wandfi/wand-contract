@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
@@ -123,7 +123,7 @@ contract RebasableERC20Mock is ERC20Mock {
    * - the caller must have allowance for ``accounts``'s tokens of at least
    * `amount`.
    */
-  function burnFrom(address account, uint256 amount) public override {
+  function burnFrom(address, uint256) public pure override {
     revert("Unsupported");
   }
 

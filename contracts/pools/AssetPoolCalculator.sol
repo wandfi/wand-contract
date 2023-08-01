@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.18;
 
 import "hardhat/console.sol";
 
@@ -100,11 +100,12 @@ contract AssetPoolCalculator {
     }
 
     // If S.AARS <= AAReth <= S.AART, and S.AARS <= AAR'eth <= S.AART
-    //  Δethx = Δusb * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + (AAR'eth - AAReth) * 0.1 / 2)
+    //  Δethx = Δusb * M_ETHx / (M_ETH * P_ETH - Musb-eth) * (1 + (2 * AART - AAReth - AAR'eth) * 0.1 / 2)
     if (S.aar >= S.AARS && S.aar <= S.AART && S.aar_ >= S.AARS && S.aar_ <= S.AART) {
+      uint256 T = (S.AART).mul(2).sub(S.aar).sub(S.aar_).mul(S.BasisR);
       return Delta_USB.mul(S.M_ETHx).div(S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH)) // Δusb * M_ETHx / (M_ETH * P_ETH - Musb-eth)
-        .mul((10 ** S.AARDecimals).add(  // * (1 + (AAR'eth - AAReth) * 0.1 / 2)
-          (S.aar_).sub(S.aar).mul(S.BasisR).div(2).div(10 ** S.settingsDecimals)
+        .mul((10 ** S.AARDecimals).add(  // * (1 + (2 * AART - AAReth - AAR'eth) * 0.1 / 2)
+          T.div(2).div(10 ** S.settingsDecimals)
         )).div(10 ** S.AARDecimals);
     }
 
