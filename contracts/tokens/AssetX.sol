@@ -99,6 +99,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
   }
 
   function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
+    require(assetPool == address(0), "AssetPool already set");
     require(_assetPool != address(0), "Zero address detected");
 
     address prevAssetPool = assetPool;
@@ -130,16 +131,22 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
     uint256 remainingAmount = amount.sub(feeAmount);
     address treasury = IProtocolSettings(IWandProtocol(wandProtocol).settings()).treasury();
 
-    _transfer(from, to, remainingAmount);
-    _transfer(from, treasury, feeAmount);
-    emit TransferFeeCollected(from, treasury, feeAmount);
+    if (remainingAmount > 0) {
+      _transfer(from, to, remainingAmount);
+    }
+
+    if (feeAmount > 0) {
+      _transfer(from, treasury, feeAmount);
+      emit TransferFeeCollected(from, treasury, feeAmount);
+    }
+    
     return true;
   }
 
   /* ============== MODIFIERS =============== */
 
   modifier onlyAssetPool() {
-    require(assetPool != address(0) && assetPool == _msgSender(), "Caller is not the AssetPool contract");
+    require(assetPool != address(0) && assetPool == _msgSender(), "Caller is not AssetPool");
     _;
   }
 
