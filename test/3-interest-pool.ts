@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, dumpContracts, expectBigNumberEquals } from './utils';
+import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, deployUniswapUsbEthPool, expectBigNumberEquals } from './utils';
 import { 
   AssetPool__factory,
   AssetX__factory,
@@ -91,6 +91,9 @@ describe('Interest Pool', () => {
     await expect(ethPool.connect(Alice).mintXTokens(ethers.utils.parseEther("100"), {value: ethers.utils.parseEther("100")})).not.to.be.rejected;
     await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     await dumpAssetPoolState(ethPool);
+
+    // const { usbEthPair } = await deployUniswapUsbEthPool(Alice, usbToken.address, ethers.utils.parseUnits('10', await usbToken.decimals()), ethers.utils.parseEther('1'));
+    // console.log(`usbEthPair: ${usbEthPair.address}`);
 
     // Day 2. No interest distributed, since no $USB staking yet
     // ETH Pool State: M_ETH = 101, M_USB = 2000, M_USB_ETH = 2000, M_ETHx = 100
@@ -287,7 +290,6 @@ describe('Interest Pool', () => {
     interestInfo = await ethPool.calculateInterest();
     expectBigNumberEquals(expectedNewInterest, interestInfo[0]);
     expectBigNumberEquals(expectedTotalInterest, interestInfo[1]);
-
   });
 
 });

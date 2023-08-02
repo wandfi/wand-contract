@@ -1,6 +1,8 @@
 import { BigNumber } from 'ethers';
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { 
   ERC20Mock__factory,
   PriceFeedMock__factory,
@@ -13,9 +15,12 @@ import {
   AssetPool,
   ERC20__factory,
   RebasableERC20Mock__factory,
-  WandProtocol,
   AssetPool__factory,
-  InterestPool__factory
+  InterestPool__factory,
+  WETH9__factory,
+  UniswapV2Factory__factory,
+  UniswapV2Router02__factory,
+  UniswapV2Pair__factory
 } from '../typechain';
 
 const { provider } = ethers;
@@ -105,6 +110,37 @@ export async function deployContractsFixture() {
   await trans.wait();
 
   return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, stETH, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory };
+}
+
+export async function deployUniswapUsbEthPool(signer: SignerWithAddress, usbAddress: string, initUsbAmount: BigNumber, initEthAmount: BigNumber) {
+  const WETH9 = await ethers.getContractFactory('WETH9');
+  const WETH9Contract = await WETH9.deploy();
+  const weth = WETH9__factory.connect(WETH9Contract.address, provider);
+
+  const UniswapV2Factory = await ethers.getContractFactory('UniswapV2Factory');
+  const UniswapV2FactoryContract = await UniswapV2Factory.deploy(ethers.constants.AddressZero);
+  const uniswapV2Factory = UniswapV2Factory__factory.connect(UniswapV2FactoryContract.address, provider);
+
+  const UniswapV2Router02 = await ethers.getContractFactory('UniswapV2Router02');
+  const UniswapV2Router02Contract = await UniswapV2Router02.deploy(uniswapV2Factory.address, weth.address);
+  const uniswapV2Router02 = UniswapV2Router02__factory.connect(UniswapV2Router02Contract.address, provider);
+
+  const usbToken = USB__factory.connect(usbAddress, provider);
+  const uniPairDeadline = (await time.latest()) + ONE_DAY_IN_SECS;
+  await expect(usbToken.connect(signer).approve(uniswapV2Router02.address, initUsbAmount)).not.to.be.reverted;
+
+  // Note: Update this value to the code hash used in test/UniswapV2Router02.sol:UniswapV2Library.pairFor()
+  const UniswapV2Pair = await ethers.getContractFactory('UniswapV2Pair');
+  console.log(`UniswapV2Pair bytecode hash: ${ethers.utils.keccak256(UniswapV2Pair.bytecode)}`);
+
+  let trans = await uniswapV2Router02.connect(signer).addLiquidityETH(usbToken.address, initUsbAmount, initUsbAmount, initEthAmount, await signer.getAddress(), uniPairDeadline, {
+    value: initEthAmount
+  });
+  await trans.wait();
+  const uniPairAddress = await uniswapV2Factory.getPair(usbToken.address, weth.address);
+  const usbEthPair = UniswapV2Pair__factory.connect(uniPairAddress, provider);
+
+  return { weth, uniswapV2Factory, uniswapV2Router02, usbEthPair };
 }
 
 export async function dumpAssetPoolState(assetPool: AssetPool) {

@@ -66,7 +66,13 @@ const config: HardhatUserConfig = {
         },
       },
       {
+        version: "0.4.18"
+      },
+      {
         version: "0.5.16"
+      },
+      {
+        version: "0.6.6"
       },
     ]
   },
@@ -101,7 +107,7 @@ config.networks = {
     chainId: 1337,
     gas: 'auto',
     gasPrice: 'auto',
-    // allowUnlimitedContractSize: true
+    allowUnlimitedContractSize: true
   },
 };
 
