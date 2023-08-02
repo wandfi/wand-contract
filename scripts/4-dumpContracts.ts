@@ -18,7 +18,7 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // Goerli
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
-const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
+const wandProtocolAddress = '0x5D55CCc45933A120b0962F3F230684EcFe6b66dC';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
@@ -59,7 +59,7 @@ async function main() {
     const interestPoolAddress = await interestPoolFactory.getInterestPoolAddress(stakingTokenAddress);
     const interestPool = InterestPool__factory.connect(interestPoolAddress, provider);
     const rewardTokens = await interestPool.rewardTokens();
-    console.log(`  $${await stakingToken.symbol()} Pool`);
+    console.log(`  $${await stakingToken.symbol()} Pool: ${interestPoolAddress}`);
     console.log(`    Staking Token: ${stakingTokenAddress}`);
     console.log(`    Reward Tokens:`);
     for (let j = 0; j < rewardTokens.length; j++) {
