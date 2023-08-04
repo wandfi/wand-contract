@@ -7,6 +7,4 @@ interface ICurvePool {
 
   function balances(uint256 i) external view returns (uint256);
 
-  function get_virtual_price() external view returns (uint256);
-
 }

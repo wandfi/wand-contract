@@ -176,6 +176,18 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     return _calculateRedemptionOutByUSB(usbAmount);
   }
 
+  function calculateRedemptionOutByXTokens(uint256 xTokenAmount) public view returns (uint256, uint256, uint256) {
+    uint256 pairedUSBAmount = calculatePairedUSBAmountToRedeemByXTokens(xTokenAmount);
+
+    // Δeth = Δethx * M_ETH / M_ETHx * (1 -C2)
+    uint256 C2 = _assetPoolParamValue("C2");
+    uint256 total = xTokenAmount.mul(_getAssetTotalAmount()).div(IAssetX(xToken).totalSupply());
+    uint256 fee = total.mul(C2).div(10 ** settingsDecimals);
+    uint256 assetAmount = total.sub(fee);
+
+    return (pairedUSBAmount, assetAmount, fee);
+  }
+
   function calculateInterest() public view returns (uint256, uint256) {
     uint256 newInterestAmount = 0;
     uint256 totalInterestAmount = newInterestAmount.add(_undistributedInterest);
@@ -251,13 +263,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
    * @param xTokenAmount: Amount of X tokens used to redeem for asset tokens
    */
   function redeemByXTokens(uint256 xTokenAmount) external nonReentrant doCheckAAR doSettleInterest {
-    uint256 pairedUSBAmount = calculatePairedUSBAmountToRedeemByXTokens(xTokenAmount);
-
-    // Δeth = Δethx * M_ETH / M_ETHx * (1 -C2)
-    uint256 C2 = _assetPoolParamValue("C2");
-    uint256 total = xTokenAmount.mul(_getAssetTotalAmount()).div(IAssetX(xToken).totalSupply());
-    uint256 fee = total.mul(C2).div(10 ** settingsDecimals);
-    uint256 assetAmount = total.sub(fee);
+    (uint256 pairedUSBAmount, uint256 assetAmount, uint256 fee) = calculateRedemptionOutByXTokens(xTokenAmount);
 
     IUSB(usbToken).burn(_msgSender(), pairedUSBAmount);
     _usbTotalSupply = _usbTotalSupply.sub(pairedUSBAmount);
@@ -394,6 +400,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
 
   function _calculateRedemptionOutByUSB(uint256 usbAmount) internal view returns (uint256, uint256) {
     require(usbAmount > 0, "Amount must be greater than 0");
+    require(usbAmount <= _usbTotalSupply, "Too large $USB amount");
     require(IUSB(usbToken).balanceOf(_msgSender()) >= usbAmount, "Not enough $USB balance");
 
     uint256 assetAmount = 0;

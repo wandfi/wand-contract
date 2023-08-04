@@ -20,7 +20,8 @@ import {
   WETH9__factory,
   UniswapV2Factory__factory,
   UniswapV2Router02__factory,
-  UniswapV2Pair__factory
+  UniswapV2Pair__factory,
+  CurvePoolMock__factory
 } from '../typechain';
 
 const { provider } = ethers;
@@ -138,9 +139,41 @@ export async function deployUniswapUsbEthPool(signer: SignerWithAddress, usbAddr
   });
   await trans.wait();
   const uniPairAddress = await uniswapV2Factory.getPair(usbToken.address, weth.address);
-  const usbEthPair = UniswapV2Pair__factory.connect(uniPairAddress, provider);
+  const uniLpToken = UniswapV2Pair__factory.connect(uniPairAddress, provider);
 
-  return { weth, uniswapV2Factory, uniswapV2Router02, usbEthPair };
+  return { weth, uniswapV2Factory, uniswapV2Router02, uniLpToken };
+}
+
+export async function deployCurveUsbUsdtPool(signer: SignerWithAddress, usbAddress: string, initUsbAmount: BigNumber) {
+  const usbToken = USB__factory.connect(usbAddress, provider);
+
+  const ERC20MockFactory = await ethers.getContractFactory('ERC20Mock');
+  const USDTMock = await ERC20MockFactory.deploy("USDT Mock", "USDT");
+  const usdt = ERC20Mock__factory.connect(USDTMock.address, provider);
+
+  const CurveLpMock = await ERC20MockFactory.deploy("Curve Lp Mock", "USB/WETH");
+  const curveLpToken = ERC20Mock__factory.connect(CurveLpMock.address, provider);
+
+  const CurvePoolMockFactory = await ethers.getContractFactory('CurvePoolMock');
+  const CurvePoolMock = await CurvePoolMockFactory.deploy([usbToken.address, usdt.address], curveLpToken.address);
+  const curvePool = CurvePoolMock__factory.connect(CurvePoolMock.address, provider);
+
+  let trans = await curveLpToken.connect(signer).setAdmin(curvePool.address, true);
+  await trans.wait();
+
+  // Mint same amount of usdt to usb
+  trans = await usdt.connect(signer).mint(await signer.getAddress(), initUsbAmount);
+  await trans.wait();
+
+  trans = await usbToken.connect(signer).approve(curvePool.address, initUsbAmount);
+  await trans.wait();
+  trans = await usdt.connect(signer).approve(curvePool.address, initUsbAmount);
+  await trans.wait();
+
+  trans = await curvePool.connect(signer).add_liquidity([initUsbAmount, initUsbAmount], 0);
+  await trans.wait();
+
+  return { curvePool, curveLpToken };
 }
 
 export async function dumpAssetPoolState(assetPool: AssetPool) {

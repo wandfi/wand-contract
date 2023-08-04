@@ -51,10 +51,13 @@ contract AssetPoolCalculator {
 
   function calculatePairedUSBAmountToRedeemByXTokens(IAssetPool assetPool, uint256 xTokenAmount) public view returns (uint256) {
     require(xTokenAmount > 0, "Amount must be greater than 0");
-    require(IERC20(assetPool.xToken()).totalSupply() > 0, "No x tokens minted yet");
+
+    uint256 xTokenTotalSupply = IERC20(assetPool.xToken()).totalSupply();
+    require(xTokenTotalSupply > 0, "No x tokens minted yet");
+    require(xTokenAmount <= xTokenTotalSupply, "Amount must be less than total supply");
 
     // Δusb = Δethx * Musb-eth / M_ETHx
-    return xTokenAmount.mul(assetPool.usbTotalSupply()).div(IERC20(assetPool.xToken()).totalSupply());
+    return xTokenAmount.mul(assetPool.usbTotalSupply()).div(xTokenTotalSupply);
   }
 
   function calculateUSBToXTokensOut(Constants.AssetPoolState memory S, uint256 Delta_USB) public view returns (uint256) {

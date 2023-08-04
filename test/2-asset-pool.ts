@@ -155,21 +155,33 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'XTokenMinted').withArgs(Alice.address, ethDepositAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
     await dumpAssetPoolState(ethPool);
 
-    // Update P_ETH = 350, AAR: 10 * 350 / 3000 = 116.67%, C1 does not take effect
+    // Update M_ETH = 10, P_ETH = 350, M_USB = 3000, AAR: 10 * 350 / 3000 = 116.67%, C1 does not take effect
+    // Alice redeem 3000 $USB, expected out:
+    //  ETH: 3000 / 350 = 8.57142857143
     // Alice redeem 350 $USB, expected out:
     //  ETH: 350 / 350 = 1
     ethPrice = ethers.utils.parseUnits('350', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    let redeemedUSBAmount = ethers.utils.parseUnits('350', await usbToken.decimals());
-    let expectedETHAmount = ethers.utils.parseEther('1');
+    let maxRedeemableUSBAmount = await ethPool.usbTotalSupply();
+    let redeemedUSBAmount = ethers.utils.parseUnits('8.571428571428571428', await usbToken.decimals());
     let expectedFeeAmount = ethers.utils.parseEther('0');
+    await expect(ethPool.connect(Alice).calculateRedemptionOutByUSB(maxRedeemableUSBAmount.add(1))).to.be.revertedWith(/Too large \$USB amount/);
+    expect(await ethPool.calculateRedemptionOutByUSB(maxRedeemableUSBAmount)).to.deep.equal([redeemedUSBAmount, expectedFeeAmount]);
+    redeemedUSBAmount = ethers.utils.parseUnits('350', await usbToken.decimals());
+    let expectedETHAmount = ethers.utils.parseEther('1');
     expect(await ethPool.calculateRedemptionOutByUSB(redeemedUSBAmount)).to.deep.equal([expectedETHAmount, expectedFeeAmount]);
 
     // Update P_ETH = 270, AAR: 10 * 270 / 3000 = 90%
+    // Alice redeem 3000 $USB, expectd out:
+    //  ETH: 3000 * 10 / 3000 = 10
     // Alice redeem 270 $USB, expected out:
     //  ETH: 270 * 10 / 3000 = 0.9
     ethPrice = ethers.utils.parseUnits('270', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    maxRedeemableUSBAmount = await ethPool.usbTotalSupply();
+    expectedETHAmount = ethers.utils.parseEther('10');
+    expectedFeeAmount = ethers.utils.parseEther('0');
+    expect(await ethPool.calculateRedemptionOutByUSB(maxRedeemableUSBAmount)).to.deep.equal([expectedETHAmount, expectedFeeAmount]);
     redeemedUSBAmount = ethers.utils.parseUnits('270', await usbToken.decimals());
     expectedETHAmount = ethers.utils.parseEther('0.9');
     expectedFeeAmount = ethers.utils.parseEther('0');
