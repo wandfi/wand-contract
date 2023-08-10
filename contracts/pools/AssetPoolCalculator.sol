@@ -32,7 +32,7 @@ contract AssetPoolCalculator {
     usbToken = _usbToken;
   }
 
-  function AAR(IAssetPool assetPool, uint256 msgValue) public view returns (uint256) {
+  function AAR(IAssetPool assetPool) public view returns (uint256) {
     if (assetPool.usbTotalSupply() == 0 && IERC20(assetPool.xToken()).totalSupply() == 0) {
       return 0;
     }
@@ -40,7 +40,7 @@ contract AssetPoolCalculator {
       return type(uint256).max;
     }
 
-    uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, msgValue);
+    uint256 assetTotalAmount = assetPool.getAssetTotalAmount();
     if (assetTotalAmount == 0) {
       return 0;
     }
@@ -232,8 +232,8 @@ contract AssetPoolCalculator {
     revert("Should not reach here");
   }
 
-  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount, uint256 msgValue) public view returns (uint256) {
-    uint256 aar = AAR(assetPool, msgValue);
+  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount) public view returns (uint256) {
+    uint256 aar = AAR(assetPool);
     require(assetPool.usbTotalSupply() == 0 || IERC20(assetPool.xToken()).totalSupply() == 0 || aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
     // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
@@ -245,7 +245,7 @@ contract AssetPoolCalculator {
 
     // Otherwise: Δethx = (Δeth * P_ETH * M_ETHx) / (M_ETH * P_ETH - Musb-eth)
     if (IERC20(assetPool.xToken()).totalSupply() > 0) {
-      uint256 assetTotalAmount = _getAssetTotalAmount(assetPool, msgValue);
+      uint256 assetTotalAmount = assetPool.getAssetTotalAmount();
 
       uint256 xTokenTotalAmount = IERC20(assetPool.xToken()).totalSupply();
 
@@ -258,15 +258,4 @@ contract AssetPoolCalculator {
     return xTokenAmount;
   }
 
-  function _getAssetTotalAmount(IAssetPool assetPool, uint256 msgValue) internal view returns (uint256) {
-    // console.log('_getAssetTotalAmount, msg.value: %s', msg.value);
-    address assetToken = assetPool.getAssetToken();
-
-    if (assetToken == Constants.NATIVE_TOKEN) {
-      return address(assetPool).balance.sub(msgValue);
-    }
-    else {
-      return IERC20(assetToken).balanceOf(address(assetPool));
-    }
-  }
 }

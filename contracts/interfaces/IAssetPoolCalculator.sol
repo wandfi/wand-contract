@@ -8,7 +8,7 @@ import "../libs/Constants.sol";
 
 interface IAssetPoolCalculator {
 
-  function AAR(IAssetPool assetPool, uint256 msgValue) external pure returns (uint256);
+  function AAR(IAssetPool assetPool) external pure returns (uint256);
 
   function r(Constants.AssetPoolState memory S) external view returns (uint256);
 
@@ -18,6 +18,6 @@ interface IAssetPoolCalculator {
 
   function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) external pure returns (uint256);
 
-  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount, uint256 msgValue) external pure returns (uint256);
+  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount) external pure returns (uint256);
 
 }

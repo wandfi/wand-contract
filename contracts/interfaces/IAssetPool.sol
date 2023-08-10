@@ -8,6 +8,8 @@ interface IAssetPool {
    */
   function usbTotalSupply() external view returns (uint256);
 
+  function getAssetTotalAmount() external view returns (uint256);
+
   function getAssetToken() external view returns (address);
 
   function getAssetTokenPrice() external view returns (uint256, uint256);
