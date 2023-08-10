@@ -34,6 +34,12 @@ $ hh test
 $ hh test ./test/xxx.ts
 ```
 
+**To run forge tests**
+
+```sh
+$ forge test
+```
+
 ## Contract Addresses
 
 ### Goerli
