@@ -59,6 +59,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     require(assetPoolParams.length == assetPoolParamsValues.length, "Invalid params length");
 
     wandProtocol = IWandProtocol(_wandProtocol);
+    require(msg.sender == wandProtocol.assetPoolFactory(), "AssetPool should only be created by factory contract");
+
     assetToken = _assetToken;
     assetTokenPriceFeed = _assetTokenPriceFeed;
     xToken = _xToken;
@@ -216,10 +218,11 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     Constants.AssetPoolState memory S = _getAssetPoolState();
     uint256 usbOutAmount = IAssetPoolCalculator(assetPoolCalculator).calculateMintUSBOut(S, assetAmount);
 
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-    IUSB(usbToken).mint(_msgSender(), usbOutAmount);
     _usbTotalSupply = _usbTotalSupply.add(usbOutAmount);
 
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
+    IUSB(usbToken).mint(_msgSender(), usbOutAmount);
+   
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
     emit USBMinted(_msgSender(), assetAmount, usbOutAmount, assetTokenPrice, assetTokenPriceDecimals);
   }
@@ -244,9 +247,9 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   function redeemByUSB(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {
     (uint256 assetAmount, uint256 fee) = _calculateRedemptionOutByUSB(usbAmount);
 
-    IUSB(usbToken).burn(_msgSender(), usbAmount);
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
-
+    IUSB(usbToken).burn(_msgSender(), usbAmount);
+    
     TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
     emit AssetRedeemedWithUSB(_msgSender(), usbAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
@@ -265,8 +268,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   function redeemByXTokens(uint256 xTokenAmount) external nonReentrant doCheckAAR doSettleInterest {
     (uint256 pairedUSBAmount, uint256 assetAmount, uint256 fee) = calculateRedemptionOutByXTokens(xTokenAmount);
 
-    IUSB(usbToken).burn(_msgSender(), pairedUSBAmount);
     _usbTotalSupply = _usbTotalSupply.sub(pairedUSBAmount);
+    IUSB(usbToken).burn(_msgSender(), pairedUSBAmount);
     IAssetX(xToken).burn(_msgSender(), xTokenAmount);
 
     TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
@@ -284,8 +287,8 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough $USB balance");
     uint256 xTokenOut = calculateUSBToXTokensOut(usbAmount);
 
-    IUSB(usbToken).burn(_msgSender(), usbAmount);
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
+    IUSB(usbToken).burn(_msgSender(), usbAmount);
     IAssetX(xToken).mint(_msgSender(), xTokenOut);
 
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();

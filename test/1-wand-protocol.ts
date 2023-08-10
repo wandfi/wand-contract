@@ -50,6 +50,7 @@ describe('Wand Protocol', () => {
     expect(UsbInterestPoolFactory.bytecode.length / 2).lessThan(maxContractSize);
     const UsbInterestPool = await UsbInterestPoolFactory.deploy(wandProtocol.address, interestPoolFactory.address, usbToken.address, [ethxToken.address]);
     const usbInterestPool = UsbInterestPool__factory.connect(UsbInterestPool.address, provider);
+    await expect(interestPoolFactory.connect(Bob).notifyInterestPoolAdded(usbToken.address, usbInterestPool.address)).to.be.rejectedWith(/Ownable: caller is not the owner/);
     await expect(interestPoolFactory.connect(Alice).notifyInterestPoolAdded(usbToken.address, usbInterestPool.address))
       .to.emit(interestPoolFactory, 'InterestPoolAdded').withArgs(usbToken.address, usbInterestPool.address);
 
@@ -234,7 +235,49 @@ describe('Wand Protocol', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceUSBSwapAmount)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, aliceUSBSwapAmount, anyValue, ethPrice4, await ethPriceFeed.decimals());
-
   });
 
+  it('Could not Send Ethers to Wand Contracts', async () => {
+
+    const {
+      Alice, Bob, ethPriceFeed,
+      wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
+    } = await loadFixture(deployContractsFixture);
+
+    // Create $ETHx token
+    const AssetXFactory = await ethers.getContractFactory('AssetX');
+    expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
+    const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
+    const ethxToken = AssetX__factory.connect(ETHx.address, provider);
+    
+    // Create ETH asset pool
+    const ethAddress = nativeTokenAddress;
+    const ethY = BigNumber.from(10).pow(await settings.decimals()).mul(365).div(10000);  // 3.65%
+    const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
+    const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
+    const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
+    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+      [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
+      [ethY, ethAART, ethAARS, ethAARC]))
+      .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+
+    // Deploy $USB InterestPool
+    const UsbInterestPoolFactory = await ethers.getContractFactory('UsbInterestPool');
+    expect(UsbInterestPoolFactory.bytecode.length / 2).lessThan(maxContractSize);
+    const UsbInterestPool = await UsbInterestPoolFactory.deploy(wandProtocol.address, interestPoolFactory.address, usbToken.address, [ethxToken.address]);
+    const usbInterestPool = UsbInterestPool__factory.connect(UsbInterestPool.address, provider);
+    await expect(interestPoolFactory.connect(Bob).notifyInterestPoolAdded(usbToken.address, usbInterestPool.address)).to.be.rejectedWith(/Ownable: caller is not the owner/);
+    await expect(interestPoolFactory.connect(Alice).notifyInterestPoolAdded(usbToken.address, usbInterestPool.address))
+      .to.emit(interestPoolFactory, 'InterestPoolAdded').withArgs(usbToken.address, usbInterestPool.address);
+
+    await expect (Alice.sendTransaction({to: wandProtocol.address, value: ethers.utils.parseEther('1')})).to.be.rejectedWith(/there's no fallback nor receive function/);
+    await expect (Alice.sendTransaction({to: ethPool.address, value: ethers.utils.parseEther('1')})).to.be.rejectedWith(/there's no fallback nor receive function/);
+    await expect (Alice.sendTransaction({to: usbInterestPool.address, value: ethers.utils.parseEther('1')})).to.be.rejectedWith(/there's no fallback nor receive function/);
+    await expect (Alice.sendTransaction({to: usbToken.address, value: ethers.utils.parseEther('1')})).to.be.rejectedWith(/there's no fallback nor receive function/);
+    await expect (Alice.sendTransaction({to: ethxToken.address, value: ethers.utils.parseEther('1')})).to.be.rejectedWith(/there's no fallback nor receive function/);
+
+  });
 });

@@ -28,7 +28,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Ownable, ReentrancyGuard {
   EnumerableSet.AddressSet private _stakingTokens;
   mapping(address => address) private _interestPoolsByStakingToken;
 
-  constructor(address _wandProtocol) {
+  constructor(address _wandProtocol) Ownable() {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
   }
