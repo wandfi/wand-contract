@@ -2,9 +2,12 @@
 pragma solidity ^0.8.18;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import "../interfaces/IPriceFeed.sol";
 
 contract CommonPriceFeed is IPriceFeed {
+  using SafeCast for int256;
 
   string internal asset;
   AggregatorV3Interface internal assetToUSD;
@@ -22,16 +25,16 @@ contract CommonPriceFeed is IPriceFeed {
     return asset;
   }
 
-  function latestPrice() external view override returns (uint256) {
-    // Chainlink Data Feeds use int instead of uint because some prices can be negative, like when oil futures dropped below 0.
-    // But in our case, prices should always be positive, so we can safely cast to uint.
-    (, int256 price, , , ) = assetToUSD.latestRoundData();
-    require(price >= 0, "CommonPriceFeed: negative price");
-    return uint256(price);
-  }
-
-  function latestTimestamp() external view returns (uint256) {
-    (, , , uint256 timestamp, ) = assetToUSD.latestRoundData();
-    return timestamp;
+  function latestPrice() external view override returns (uint256, uint256) {
+    (uint80 roundId, int256 answer, , uint256 updatedAt, uint80 answeredInRound) = assetToUSD.latestRoundData();
+    /*
+      answeredInRound: The round ID in which the answer was computed
+      updatedAt: Timestamp of when the round was updated
+      answer: The answer for this round
+    */
+    require(answeredInRound >= roundId, "answer is stale");
+    require(updatedAt > 0, "round is incomplete");
+    require(answer > 0, "Invalid feed answer");
+    return (answer.toUint256(), updatedAt);
   }
 }

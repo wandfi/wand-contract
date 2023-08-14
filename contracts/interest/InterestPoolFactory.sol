@@ -100,11 +100,14 @@ contract InterestPoolFactory is IInterestPoolFactory, Ownable, ReentrancyGuard {
       if (pool.rewardTokenAdded(rewardToken)) {
         uint256 amount = totalAmount.mul(pool.totalStakingAmountInUSB()).div(totalStakingAmountInUSB);
         if (amount > 0) {
+          // fees may be charged when transferring reward tokens to interest pool
+          uint256 balanceBefore = IERC20(rewardToken).balanceOf(address(pool));
           require(
             IERC20(rewardToken).transferFrom(_msgSender(), address(pool), amount),
             'InterestPoolFactory::distributeInterestRewards: transfer reward token failed'
           );
-          pool.notifyRewardsAdded(rewardToken, amount);
+          uint256 balanceAfter = IERC20(rewardToken).balanceOf(address(pool));
+          pool.notifyRewardsAdded(rewardToken, balanceAfter.sub(balanceBefore));
         }
       }
     }

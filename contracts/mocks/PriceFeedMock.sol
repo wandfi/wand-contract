@@ -33,12 +33,8 @@ contract PriceFeedMock is IPriceFeed, Ownable, ReentrancyGuard {
     return asset;
   }
 
-  function latestPrice() external view override returns (uint256) {
-    return mockedPrice;
-  }
-
-  function latestTimestamp() external view returns (uint256) {
-    return mockedPriceTimestamp;
+  function latestPrice() external view override returns (uint256, uint256) {
+    return (mockedPrice, mockedPriceTimestamp);
   }
 
   function mockPrice(uint256 _mockPrice) external nonReentrant onlyTester {

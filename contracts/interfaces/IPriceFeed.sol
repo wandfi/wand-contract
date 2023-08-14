@@ -15,10 +15,5 @@ interface IPriceFeed {
   /**
    * @notice Returns the latest price of the asset in USD
    */
-  function latestPrice() external view returns (uint256);
-
-  /**
-   * @notice Returns the timestamp of the latest price update
-   */
-  function latestTimestamp() external view returns (uint256);
+  function latestPrice() external view returns (uint256, uint256);
 }

@@ -94,7 +94,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   }
 
   function getAssetTokenPrice() public view returns (uint256, uint256) {
-    uint256 price = IPriceFeed(assetTokenPriceFeed).latestPrice();
+    (uint256 price, ) = IPriceFeed(assetTokenPriceFeed).latestPrice();
     uint256 priceDecimals = IPriceFeed(assetTokenPriceFeed).decimals();
 
     return (price, priceDecimals);
@@ -369,7 +369,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
   function _getAssetPoolState() internal view returns (Constants.AssetPoolState memory) {
     Constants.AssetPoolState memory S;
     S.M_ETH = _assetTotalAmount;
-    S.P_ETH = IPriceFeed(assetTokenPriceFeed).latestPrice();
+    (S.P_ETH, ) = IPriceFeed(assetTokenPriceFeed).latestPrice();
     S.P_ETH_DECIMALS = IPriceFeed(assetTokenPriceFeed).decimals();
     S.M_USB_ETH = _usbTotalSupply;
     S.M_ETHx = IERC20(xToken).totalSupply();

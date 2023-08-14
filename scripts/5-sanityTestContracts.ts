@@ -95,7 +95,7 @@ async function dumpAssetPoolState(assetPool: AssetPool) {
 
   console.log(`$${assetSymbol} Pool:`);
   console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.getAssetTotalAmount(), 18)}`);
-  console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits(await assetPriceFeed.latestPrice(), await assetPriceFeed.decimals())}`);
+  console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits((await assetPriceFeed.latestPrice())[0], await assetPriceFeed.decimals())}`);
   console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
