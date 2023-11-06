@@ -86,12 +86,11 @@ contract ProtoInterestPool is Ownable, ReentrancyGuard {
 
   function addRewards(uint256 rewardsAmount) external updateReward(address(0)) onlyOwner {
     require(rewardsAmount > 0, "Too small rewards amount");
+    require(_totalSupply > 0, "No user stakes");
 
     rewardsToken.safeTransferFrom(msg.sender, address(this), rewardsAmount);
 
-    if (_totalSupply > 0) {
-      rewardPerToken = rewardPerToken.add(rewardsAmount.mul(1e18).div(_totalSupply));
-    }
+    rewardPerToken = rewardPerToken.add(rewardsAmount.mul(1e18).div(_totalSupply));
 
     emit RewardAdded(rewardsAmount);
   }

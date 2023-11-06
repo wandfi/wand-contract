@@ -33,6 +33,13 @@ describe('Proto Interest Pool', () => {
     await expect(usb.connect(Alice).mint(Bob.address, ethers.utils.parseUnits('10000', await usb.decimals()))).not.to.be.reverted;
     await expect(usb.connect(Alice).mint(Caro.address, ethers.utils.parseUnits('10000'))).not.to.be.reverted;
 
+    let totalReward = ethers.utils.parseUnits('10000');
+    await expect(ethx.connect(Alice).mint(Alice.address, totalReward)).not.to.be.reverted;
+    await expect(ethx.connect(Alice).approve(protoInterestPool.address, totalReward)).not.to.be.reverted;
+    await expect(protoInterestPool.connect(Alice).addRewards(totalReward))
+      .to.emit(protoInterestPool, 'RewardAdded').withArgs(totalReward);
+    
+
     // Bob stakes 800 $USB, and Caro stakes 200 $USB
     let bobStakeAmount = ethers.utils.parseUnits('800');
     let caroStakeAmount = ethers.utils.parseUnits('200');
@@ -44,7 +51,7 @@ describe('Proto Interest Pool', () => {
 
     // Deposit 10000 $USB as reward
     await time.increaseTo(genesisTime);
-    const totalReward = ethers.utils.parseUnits('10000');
+    totalReward = ethers.utils.parseUnits('10000');
     await expect(ethx.connect(Alice).mint(Alice.address, totalReward)).not.to.be.reverted;
     await expect(ethx.connect(Alice).approve(protoInterestPool.address, totalReward)).not.to.be.reverted;
     await expect(protoInterestPool.connect(Alice).addRewards(totalReward))
