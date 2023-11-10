@@ -123,7 +123,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Ownable, ReentrancyGuard {
   }
 
   modifier onlyAssetPool() {
-    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an AssetPool contract");
+    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not a Vault contract");
     _;
   }
 

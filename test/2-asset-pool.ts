@@ -6,7 +6,7 @@ import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { nativeTokenAddress, maxContractSize, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
 import { 
-  AssetPool__factory,
+  Vault__factory,
   AssetX__factory,
 } from '../typechain';
 
@@ -38,7 +38,7 @@ describe('Asset Pool', () => {
       .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Initial AAR should be 0
     expect (await ethPool.AAR()).to.equal(0);
@@ -263,7 +263,7 @@ describe('Asset Pool', () => {
     ).not.to.be.reverted;
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Set eth price to 2000; mint $USB and $ETHx
     let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
@@ -499,7 +499,7 @@ describe('Asset Pool', () => {
     ).not.to.be.reverted;
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Set eth price to 2000; mint $USB and $ETHx
     let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());

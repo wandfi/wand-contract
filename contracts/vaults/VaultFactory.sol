@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "./AssetPool.sol";
+import "./Vault.sol";
 import "../interfaces/IAssetPool.sol";
 import "../interfaces/IAssetPoolFactory.sol";
 
-contract AssetPoolFactory is IAssetPoolFactory {
+contract VaultFactory is IAssetPoolFactory {
 
   address public immutable wandProtocol;
 
@@ -33,9 +33,9 @@ contract AssetPoolFactory is IAssetPoolFactory {
     require(assetToken != address(0), "Zero address detected");
     require(assetPriceFeed != address(0), "Zero address detected");
 
-    require(_assetTokenToPools[assetToken] == address(0), "AssetPool already exists");
+    require(_assetTokenToPools[assetToken] == address(0), "Vault already exists");
 
-    address pool = address(new AssetPool(wandProtocol, assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues));
+    address pool = address(new Vault(wandProtocol, assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues));
 
     _assetTokens.push(assetToken);
     _assetTokenToPools[assetToken] = pool;

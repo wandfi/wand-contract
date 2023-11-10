@@ -6,11 +6,9 @@ import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, deployUniswapUsbEthPool, deployCurveUsbUsdtPool, expectBigNumberEquals } from './utils';
 import { 
-  AssetPool__factory,
+  Vault__factory,
   AssetX__factory,
-  UsbInterestPool__factory,
-  UniLpInterestPool__factory,
-  CurveLpInterestPool__factory
+  UsbInterestPool__factory
 } from '../typechain';
 
 const { provider, BigNumber } = ethers;
@@ -45,7 +43,7 @@ describe('Interest Pool', () => {
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Create $WBTC asset pool
     const WBTCx = await AssetXFactory.deploy(wandProtocol.address, "WBTCx Token", "WBTCx");
@@ -59,7 +57,7 @@ describe('Interest Pool', () => {
     ).to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
     const wbtcPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
     await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcPoolAddress)).not.to.be.reverted;
-    const wbtcPool = AssetPool__factory.connect(wbtcPoolAddress, provider);
+    const wbtcPool = Vault__factory.connect(wbtcPoolAddress, provider);
 
     // Deploy $USB InterestPool
     const UsbInterestPoolFactory = await ethers.getContractFactory('UsbInterestPool');
@@ -289,256 +287,5 @@ describe('Interest Pool', () => {
     interestInfo = await ethPool.calculateInterest();
     expectBigNumberEquals(expectedNewInterest, interestInfo[0]);
     expectBigNumberEquals(expectedTotalInterest, interestInfo[1]);
-  });
-
-  it('Uniswap and Curve Lp Interest Pool Works', async () => {
-
-    const {
-      Alice, Bob, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
-    } = await loadFixture(deployContractsFixture);
-
-    // Day 0
-    const genesisTime = await time.latest();
-
-    // Create $ETHx token
-    const AssetXFactory = await ethers.getContractFactory('AssetX');
-    expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
-    const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
-    const ethxToken = AssetX__factory.connect(ETHx.address, provider);
-    
-    // Create ETH asset pool
-    const ethAddress = nativeTokenAddress;
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
-      [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC"), ethers.utils.formatBytes32String("C1"), ethers.utils.formatBytes32String("C2")],
-      [
-        BigNumber.from(10).pow(await settings.decimals()).mul(365).div(10000), BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
-        BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100), BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100),
-        0, 0
-      ])
-    ).not.to.be.reverted;
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
-    await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
-
-    // Create $WBTC asset pool
-    const WBTCx = await AssetXFactory.deploy(wandProtocol.address, "WBTCx Token", "WBTCx");
-    const wbtcxToken = AssetX__factory.connect(WBTCx.address, provider);
-    await expect(wandProtocol.connect(Alice).addAssetPool(wbtc.address, wbtcPriceFeed.address, wbtcxToken.address,
-      [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
-      [
-        BigNumber.from(10).pow(await settings.decimals()).mul(73).div(1000), BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
-        BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100), BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100)
-      ])
-    ).to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
-    const wbtcPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
-    await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcPoolAddress)).not.to.be.reverted;
-    const wbtcPool = AssetPool__factory.connect(wbtcPoolAddress, provider);
-
-    // Deploy $USB InterestPool
-    const UsbInterestPoolFactory = await ethers.getContractFactory('UsbInterestPool');
-    expect(UsbInterestPoolFactory.bytecode.length / 2).lessThan(maxContractSize);
-    const UsbInterestPool = await UsbInterestPoolFactory.deploy(wandProtocol.address, interestPoolFactory.address, usbToken.address, [ethxToken.address, wbtcxToken.address]);
-    const usbInterestPool = UsbInterestPool__factory.connect(UsbInterestPool.address, provider);
-    await expect(interestPoolFactory.connect(Alice).notifyInterestPoolAdded(usbToken.address, usbInterestPool.address))
-      .to.emit(interestPoolFactory, 'InterestPoolAdded').withArgs(usbToken.address, usbInterestPool.address);
-    console.log(`UsbInterestPool code size: ${UsbInterestPoolFactory.bytecode.length / 2} bytes`);
-
-    // Day 1. Set ETH price to $2000, Alice deposit 100 ETH to mint 100 $ETHx, and 10 ETH to mint 20000 $USB
-    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS);
-    let ethPrice = BigNumber.from(2000).mul(BigNumber.from(10).pow(await ethPriceFeed.decimals()));
-    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await expect(ethPool.connect(Alice).mintXTokens(ethers.utils.parseEther("100"), {value: ethers.utils.parseEther("100")})).not.to.be.rejected;
-    await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("10"), {value: ethers.utils.parseEther("10")})).not.to.be.rejected;
-    await dumpAssetPoolState(ethPool);
-
-    // Create Uniswap USB/WETH Pair
-    const { uniLpToken } = await deployUniswapUsbEthPool(Alice, usbToken.address, ethers.utils.parseUnits('2000', await usbToken.decimals()), ethers.utils.parseEther('1'));
-    console.log(`Alice Uniswap Lp Token balance: ${ethers.utils.formatUnits(await uniLpToken.balanceOf(Alice.address), await uniLpToken.decimals())}`);
-
-    // Create Curve USB/USDT Pool
-    const { curvePool, curveLpToken } = await deployCurveUsbUsdtPool(Alice, usbToken.address, ethers.utils.parseUnits('1000', await usbToken.decimals()));
-    console.log(`Alice Curve Lp Token balance: ${ethers.utils.formatUnits(await curveLpToken.balanceOf(Alice.address), await curveLpToken.decimals())}`);
-
-    // Deploy Uniswap Lp Interest Pool
-    const UniLpInterestPoolFactory = await ethers.getContractFactory('UniLpInterestPool');
-    expect(UniLpInterestPoolFactory.bytecode.length / 2).lessThan(maxContractSize);
-    const UniLpInterestPool = await UniLpInterestPoolFactory.deploy(
-      wandProtocol.address, interestPoolFactory.address, uniLpToken.address, 
-      [ethxToken.address, wbtcxToken.address]
-    );
-    const uniLpInterestPool = UniLpInterestPool__factory.connect(UniLpInterestPool.address, provider);
-    await expect(interestPoolFactory.connect(Bob).notifyInterestPoolAdded(uniLpToken.address, uniLpInterestPool.address)).to.be.revertedWith(/Ownable: caller is not the owner/); 
-    await expect(interestPoolFactory.connect(Alice).notifyInterestPoolAdded(uniLpToken.address, uniLpInterestPool.address))
-      .to.emit(interestPoolFactory, 'InterestPoolAdded').withArgs(uniLpToken.address, uniLpInterestPool.address);
-    console.log(`UniLpInterestPool code size: ${UniLpInterestPoolFactory.bytecode.length / 2} bytes`);
-
-    // Deploy Curve Lp Interest Pool
-    const CurveLpInterestPoolFactory = await ethers.getContractFactory('CurveLpInterestPool');
-    expect(CurveLpInterestPoolFactory.bytecode.length / 2).lessThan(maxContractSize);
-    const CurveLpInterestPool = await CurveLpInterestPoolFactory.deploy(
-      wandProtocol.address, interestPoolFactory.address,
-      curveLpToken.address, curvePool.address,
-      await curvePool.N_COINS(),
-      [ethxToken.address, wbtcxToken.address]
-    );
-    const curveLpInterestPool = CurveLpInterestPool__factory.connect(CurveLpInterestPool.address, provider);
-    await expect(interestPoolFactory.connect(Alice).notifyInterestPoolAdded(curveLpToken.address, curveLpInterestPool.address))
-      .to.emit(interestPoolFactory, 'InterestPoolAdded').withArgs(curveLpToken.address, curveLpInterestPool.address);
-    console.log(`CurveLpInterestPool code size: ${CurveLpInterestPoolFactory.bytecode.length / 2} bytes`);
-
-    // Add all InterestPools to $ETHx's and $WBTCx's whitelist
-    await expect(ethxToken.connect(Alice).setWhitelistAddress(usbInterestPool.address, true))
-      .to.emit(ethxToken, 'UpdateWhitelistAddress').withArgs(usbInterestPool.address, true);
-    await expect(ethxToken.connect(Alice).setWhitelistAddress(uniLpInterestPool.address, true))
-      .to.emit(ethxToken, 'UpdateWhitelistAddress').withArgs(uniLpInterestPool.address, true);
-    await expect(ethxToken.connect(Alice).setWhitelistAddress(curveLpInterestPool.address, true))
-      .to.emit(ethxToken, 'UpdateWhitelistAddress').withArgs(curveLpInterestPool.address, true);
-    await expect(wbtcxToken.connect(Alice).setWhitelistAddress(usbInterestPool.address, true))
-      .to.emit(wbtcxToken, 'UpdateWhitelistAddress').withArgs(usbInterestPool.address, true);
-    await expect(wbtcxToken.connect(Alice).setWhitelistAddress(uniLpInterestPool.address, true))
-      .to.emit(wbtcxToken, 'UpdateWhitelistAddress').withArgs(uniLpInterestPool.address, true);
-    await expect(wbtcxToken.connect(Alice).setWhitelistAddress(curveLpInterestPool.address, true))
-      .to.emit(wbtcxToken, 'UpdateWhitelistAddress').withArgs(curveLpInterestPool.address, true);
-    expect (await usbInterestPool.rewardTokenAdded(ethxToken.address)).to.equal(true);
-    expect (await usbInterestPool.rewardTokenAdded(wbtcxToken.address)).to.equal(true);
-    expect (await uniLpInterestPool.rewardTokenAdded(ethxToken.address)).to.equal(true);
-    expect (await uniLpInterestPool.rewardTokenAdded(wbtcxToken.address)).to.equal(true);
-    expect (await curveLpInterestPool.rewardTokenAdded(ethxToken.address)).to.equal(true);
-    expect (await curveLpInterestPool.rewardTokenAdded(wbtcxToken.address)).to.equal(true);
-
-    await expect(wandProtocol.connect(Alice).addRewardTokenToInterestPool(uniLpToken.address, wbtcxToken.address)).to.be.revertedWith(/Reward token already added/);
-
-    // Day 2. No interest distributed, since no $USB staking yet
-    // ETH Pool State: M_ETH = 110, M_USB = 20000, M_USB_ETH = 20000, M_ETHx = 100
-    // Expected interest:
-    //  New interest: (1 day / 365 days) * 3.65% * 100 = 0.01 $ETHx
-    //  Total interest: 0.01 $ETHx 
-    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 2);
-    let expectedNewInterest = ethers.utils.parseUnits("0.01", await ethxToken.decimals());
-    let expectedTotalInterest = ethers.utils.parseUnits("0.01", await ethxToken.decimals());
-    let interestInfo = await ethPool.calculateInterest();
-    expectBigNumberEquals(expectedNewInterest, interestInfo[0]);
-    expectBigNumberEquals(expectedTotalInterest, interestInfo[1]);
-    await expect(ethPool.connect(Alice).settleInterest())
-      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
-      .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, false);
-    await dumpAssetPoolState(ethPool);
-
-    // For $WBTC asset pool, no interest is generated, since no $USB or $WBTCx minted
-    interestInfo = await wbtcPool.calculateInterest();
-    expect(interestInfo[0]).to.equal(0);
-    expect(interestInfo[1]).to.equal(0);
-
-    // Day 3. New interest generated
-    // ETH Pool State: M_ETHx = 100.009999768518518518;
-    // Expected interest:
-    //  New interest: (1 day / 365 days) * 3.65% * 100.009999768518518518 = 0.01000099997 $ETHx
-    //  Total interest: 0.02000099997 $ETHx 
-    // $USB interest pool:
-    //  Alice stakes: 100 $USB, total staked: 100 $USB
-    //  Total interest: 0.02000099997 * 100 / (100 + 670.82039325) = 0.00259476787 ETHx
-    // $UniLp interest pool:
-    //  Alice stakes 10 LP, Bob stakes 5 LP
-    //    total staked: 15 / 44.721359549995792928 * 2000 = 670.82039325 $USB
-    //  Total interest: 0.02000099997 * 670.82039325 / (100 + 670.82039325) = 0.01740623209 ETHx
-    // $CurveLp interest pool:
-    //  No stakes, no interest
-    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 3);
-    expectedNewInterest = ethers.utils.parseUnits("0.01000099997", await ethxToken.decimals());
-    expectedTotalInterest = ethers.utils.parseUnits("0.02000099997", await ethxToken.decimals());
-    interestInfo = await ethPool.calculateInterest();
-    expectBigNumberEquals(expectedNewInterest, interestInfo[0]);
-    expectBigNumberEquals(expectedTotalInterest, interestInfo[1]);
-    let usbInterestPoolTotalInterest = ethers.utils.parseUnits("0.00259476787", await ethxToken.decimals());
-    let uniLpInterestPoolTotalInterest = ethers.utils.parseUnits("0.01740623209", await ethxToken.decimals());
-    await expect(usbToken.connect(Alice).approve(usbInterestPool.address, ethers.utils.parseUnits("100", await usbToken.decimals()))).not.to.be.reverted;
-    await expect(usbInterestPool.connect(Alice).stake(ethers.utils.parseUnits("100", await usbToken.decimals())))
-      .to.emit(usbToken, 'Transfer').withArgs(Alice.address, usbInterestPool.address, ethers.utils.parseUnits("100", await usbToken.decimals()))
-      .to.emit(usbInterestPool, 'Staked').withArgs(Alice.address, ethers.utils.parseUnits("100", await usbToken.decimals()));
-
-    await expect(uniLpToken.connect(Alice).approve(uniLpInterestPool.address, ethers.utils.parseUnits("10", await uniLpToken.decimals()))).not.to.be.reverted;
-    await expect(uniLpInterestPool.connect(Alice).stake(ethers.utils.parseUnits("10", await uniLpToken.decimals())))
-      .to.emit(uniLpToken, 'Transfer').withArgs(Alice.address, uniLpInterestPool.address, ethers.utils.parseUnits("10", await uniLpToken.decimals()))
-      .to.emit(uniLpInterestPool, 'Staked').withArgs(Alice.address, ethers.utils.parseUnits("10", await uniLpToken.decimals()));
-
-    await expect(uniLpToken.connect(Alice).transfer(Bob.address, ethers.utils.parseUnits("5", await uniLpToken.decimals()))).not.to.be.reverted;
-    await expect(uniLpToken.connect(Bob).approve(uniLpInterestPool.address, ethers.utils.parseUnits("5", await uniLpToken.decimals()))).not.to.be.reverted;
-    await expect(uniLpInterestPool.connect(Bob).stake(ethers.utils.parseUnits("5", await uniLpToken.decimals())))
-      .to.emit(uniLpToken, 'Transfer').withArgs(Bob.address, uniLpInterestPool.address, ethers.utils.parseUnits("5", await uniLpToken.decimals()))
-      .to.emit(uniLpInterestPool, 'Staked').withArgs(Bob.address, ethers.utils.parseUnits("5", await uniLpToken.decimals()));
-
-    await expect(ethPool.connect(Bob).settleInterest())
-      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
-      .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, usbInterestPool.address, anyValue)
-      .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, uniLpInterestPool.address, anyValue)
-      .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
-    await dumpAssetPoolState(ethPool);
-
-    expectBigNumberEquals(usbInterestPoolTotalInterest, await ethxToken.balanceOf(usbInterestPool.address));
-    expectBigNumberEquals(uniLpInterestPoolTotalInterest, await ethxToken.balanceOf(uniLpInterestPool.address));
-
-    expectBigNumberEquals(usbInterestPoolTotalInterest, await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
-    expectBigNumberEquals(uniLpInterestPoolTotalInterest.mul(10).div(15), await uniLpInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
-    expectBigNumberEquals(uniLpInterestPoolTotalInterest.mul(5).div(15), await uniLpInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address));
-
-    // Day 4. New interest generated
-    // ETH Pool State: M_ETHx = 100.020001578761572198;
-    // Expected interest:
-    //  New interest: (1 day / 365 days) * 3.65% * 100.020001578761572198 = 0.01000200015 $ETHx
-    //  Total interest: 0.01000200015 $ETHx 
-    // $USB interest pool:
-    //  Alice stakes: 100 $USB, total staked: 100 $USB
-    //  Total interest: 0.01000200015 * 100 / (100 + 670.82039325 + 150) = 0.00108620532 ETHx
-    // $UniLp interest pool:
-    //  Alice stakes 10 LP, Bob stakes 5 LP
-    //  Total staked: 15 / 44.721359549995792928 * 2000 = 670.82039325 $USB
-    //  Total interest: 0.01000200015 * 670.82039325 / (100 + 670.82039325 + 150) = 0.00728648683 ETHx
-    // $CurveLp interest pool:
-    //  Alice stakes 100 LP, Bob stakes 50 LP
-    //  Total staked: 150 / 1000 * 1000 = 150 $USB
-    //  Total interest: 0.01000200015 * 150 / (100 + 670.82039325 + 150) = 0.00162930798 ETHx
-    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 4);
-    expectedNewInterest = ethers.utils.parseUnits("0.01000200015", await ethxToken.decimals());
-    expectedTotalInterest = ethers.utils.parseUnits("0.01000200015", await ethxToken.decimals());
-    interestInfo = await ethPool.calculateInterest();
-    expectBigNumberEquals(expectedNewInterest, interestInfo[0]);
-    expectBigNumberEquals(expectedTotalInterest, interestInfo[1]);
-    usbInterestPoolTotalInterest = ethers.utils.parseUnits("0.00108620532", await ethxToken.decimals()).add(usbInterestPoolTotalInterest);
-    uniLpInterestPoolTotalInterest = ethers.utils.parseUnits("0.00728648683", await ethxToken.decimals()).add(uniLpInterestPoolTotalInterest);
-    let curveLpInterestPoolTotalInterest = ethers.utils.parseUnits("0.00162930798", await ethxToken.decimals());
-
-    await expect(curveLpToken.connect(Alice).approve(curveLpInterestPool.address, ethers.utils.parseUnits("100", await curveLpToken.decimals()))).not.to.be.reverted;
-    await expect(curveLpInterestPool.connect(Alice).stake(ethers.utils.parseUnits("100", await curveLpToken.decimals())))
-      .to.emit(curveLpToken, 'Transfer').withArgs(Alice.address, curveLpInterestPool.address, ethers.utils.parseUnits("100", await curveLpToken.decimals()))
-      .to.emit(curveLpInterestPool, 'Staked').withArgs(Alice.address, ethers.utils.parseUnits("100", await curveLpToken.decimals()));
-
-    await expect(curveLpToken.connect(Alice).transfer(Bob.address, ethers.utils.parseUnits("50", await curveLpToken.decimals()))).not.to.be.reverted;
-    await expect(curveLpToken.connect(Bob).approve(curveLpInterestPool.address, ethers.utils.parseUnits("50", await curveLpToken.decimals()))).not.to.be.reverted;
-    await expect(curveLpInterestPool.connect(Bob).stake(ethers.utils.parseUnits("50", await curveLpToken.decimals())))
-      .to.emit(curveLpToken, 'Transfer').withArgs(Bob.address, curveLpInterestPool.address, ethers.utils.parseUnits("50", await curveLpToken.decimals()))
-      .to.emit(curveLpInterestPool, 'Staked').withArgs(Bob.address, ethers.utils.parseUnits("50", await curveLpToken.decimals()));
-    
-    expectBigNumberEquals(await usbInterestPool.totalStakingAmountInUSB(), ethers.utils.parseUnits("100", await usbToken.decimals()));
-    expectBigNumberEquals(await uniLpInterestPool.totalStakingAmountInUSB(), ethers.utils.parseUnits("670.82039325", await usbToken.decimals()));
-    expectBigNumberEquals(await curveLpInterestPool.totalStakingAmountInUSB(), ethers.utils.parseUnits("150", await usbToken.decimals()));
-
-    await expect(ethPool.connect(Bob).settleInterest())
-      .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
-      .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, usbInterestPool.address, anyValue)
-      .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, uniLpInterestPool.address, anyValue)
-      .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, curveLpInterestPool.address, anyValue)
-      .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
-    await dumpAssetPoolState(ethPool);
-
-    expectBigNumberEquals(usbInterestPoolTotalInterest, await ethxToken.balanceOf(usbInterestPool.address));
-    expectBigNumberEquals(uniLpInterestPoolTotalInterest, await ethxToken.balanceOf(uniLpInterestPool.address));
-    expectBigNumberEquals(curveLpInterestPoolTotalInterest, await ethxToken.balanceOf(curveLpInterestPool.address));
-
-    expectBigNumberEquals(usbInterestPoolTotalInterest, await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
-    expectBigNumberEquals(uniLpInterestPoolTotalInterest.mul(10).div(15), await uniLpInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
-    expectBigNumberEquals(uniLpInterestPoolTotalInterest.mul(5).div(15), await uniLpInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address));
-    expectBigNumberEquals(curveLpInterestPoolTotalInterest.mul(100).div(150), await curveLpInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
-    expectBigNumberEquals(curveLpInterestPoolTotalInterest.mul(50).div(150), await curveLpInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address));
   });
 });

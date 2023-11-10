@@ -26,7 +26,7 @@ contract USB is IUSB, Ownable, ERC20, ReentrancyGuard {
   }
 
   modifier onlyAssetPool() {
-    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an AssetPool contract");
+    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an Vault contract");
     _;
   }
 }

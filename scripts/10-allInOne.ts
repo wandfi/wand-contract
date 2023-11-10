@@ -9,11 +9,11 @@ import {
   ProtocolSettings__factory,
   WandProtocol__factory,
   USB__factory,
-  AssetPoolFactory__factory,
-  AssetPoolCalculator__factory,
+  VaultFactory__factory,
+  VaultCalculator__factory,
   InterestPoolFactory__factory,
   AssetX__factory,
-  AssetPool__factory,
+  Vault__factory,
   UsbInterestPool__factory,
   InterestPool__factory
 } from '../typechain';
@@ -84,15 +84,15 @@ async function main() {
   const usbToken = USB__factory.connect(USB.address, provider);
   console.log(`Deployed $USB token to ${usbToken.address}`);
 
-  const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
-  const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
-  console.log(`Deployed AssetPoolFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
+  const AssetPoolFactoryFactory = await ethers.getContractFactory('VaultFactory');
+  const VaultFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
+  const assetPoolFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
+  console.log(`Deployed VaultFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
-  const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculator');
-  const AssetPoolCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
-  const assetPoolCalculaor = AssetPoolCalculator__factory.connect(AssetPoolCalculator.address, provider);
-  console.log(`Deployed AssetPoolCalculator to ${assetPoolCalculaor.address}  (${AssetPoolCalculaorFactory.bytecode.length / 2} bytes)`);
+  const AssetPoolCalculaorFactory = await ethers.getContractFactory('VaultCalculator');
+  const VaultCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
+  const assetPoolCalculaor = VaultCalculator__factory.connect(VaultCalculator.address, provider);
+  console.log(`Deployed VaultCalculator to ${assetPoolCalculaor.address}  (${AssetPoolCalculaorFactory.bytecode.length / 2} bytes)`);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   const InterestPoolFactory = await InterestPoolFactoryFactory.deploy(wandProtocol.address);
@@ -124,7 +124,7 @@ async function main() {
   await trans.wait();
 
   const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
-  const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+  const ethPool = Vault__factory.connect(ethPoolAddress, provider);
   console.log(`Deployed $ETH asset pool to ${ethPoolAddress}`);
 
   trans = await ethxToken.connect(deployer).setAssetPool(ethPoolAddress);
@@ -263,8 +263,8 @@ async function main() {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
-  console.log(`  AssetPoolCalculator: ${await wandProtocol.assetPoolCalculator()}`);
-  console.log(`  AssetPoolFactory: ${await wandProtocol.assetPoolFactory()}`);
+  console.log(`  VaultCalculator: ${await wandProtocol.assetPoolCalculator()}`);
+  console.log(`  VaultFactory: ${await wandProtocol.assetPoolFactory()}`);
   console.log(`  InterestPoolFactory: ${await wandProtocol.interestPoolFactory()}`);
 
   const assetTokens = await assetPoolFactory.assetTokens();
@@ -275,7 +275,7 @@ async function main() {
     const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
     const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
-    const assetPool = AssetPool__factory.connect(assetPoolAddress, provider);
+    const assetPool = Vault__factory.connect(assetPoolAddress, provider);
     const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
     console.log(`  $${assetSymbol} Pool: ${assetPoolAddress}`);
     console.log(`    Asset Token: ${assetToken}`);

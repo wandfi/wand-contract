@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { maxContractSize, nativeTokenAddress, deployContractsFixture } from './utils';
 import { 
-  AssetPool__factory,
+  Vault__factory,
   AssetX__factory,
 } from '../typechain';
 
@@ -38,8 +38,8 @@ describe('Wand Protocol', () => {
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/AssetPool already set/);
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Vault already set/);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Set ETH price to $2000, Alice deposit 100 ETH to mint 100 $ETHx, and 1 ETH to mint 2000 $USB
     let ethPrice = BigNumber.from(2000).mul(BigNumber.from(10).pow(await ethPriceFeed.decimals()));
@@ -49,7 +49,7 @@ describe('Wand Protocol', () => {
     // await dumpAssetPoolState(ethPool);
 
     // $ETHx could only be minted or burned by the asset pool, not even the owner
-    await expect(ethxToken.connect(Alice).mint(Alice.address, 100)).to.be.revertedWith(/Caller is not AssetPool/);
+    await expect(ethxToken.connect(Alice).mint(Alice.address, 100)).to.be.revertedWith(/Caller is not Vault/);
 
     // By default, fee is enabled for $ETHx transfer. Default value is 0.08%
     // Alice transfer 10 $ETHx to Bob, Bob receives 9.992 $ETHx

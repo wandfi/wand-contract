@@ -20,7 +20,7 @@ import "../interfaces/IAssetX.sol";
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 
-contract AssetPool is IAssetPool, Context, ReentrancyGuard {
+contract Vault is IAssetPool, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -60,7 +60,7 @@ contract AssetPool is IAssetPool, Context, ReentrancyGuard {
     require(assetPoolParams.length == assetPoolParamsValues.length, "Invalid params length");
 
     wandProtocol = IWandProtocol(_wandProtocol);
-    require(msg.sender == wandProtocol.assetPoolFactory(), "AssetPool should only be created by factory contract");
+    require(msg.sender == wandProtocol.assetPoolFactory(), "Vault should only be created by factory contract");
 
     assetToken = _assetToken;
     assetTokenPriceFeed = _assetTokenPriceFeed;

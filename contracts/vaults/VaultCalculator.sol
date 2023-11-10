@@ -10,7 +10,7 @@ import "../interfaces/IAssetPool.sol";
 import "../interfaces/IUSB.sol";
 import "../libs/Constants.sol";
 
-contract AssetPoolCalculator {
+contract VaultCalculator {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 

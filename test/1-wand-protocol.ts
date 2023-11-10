@@ -6,7 +6,7 @@ import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, dumpContracts, expectBigNumberEquals } from './utils';
 import { 
-  AssetPool__factory,
+  Vault__factory,
   AssetX__factory,
   UsbInterestPool__factory
 } from '../typechain';
@@ -43,7 +43,7 @@ describe('Wand Protocol', () => {
       .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Deploy $USB InterestPool
     const UsbInterestPoolFactory = await ethers.getContractFactory('UsbInterestPool');
@@ -71,7 +71,7 @@ describe('Wand Protocol', () => {
     // Check $WBTCx is added as a reward token to $USB interest pool
     const wbtcxPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
     await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcxPoolAddress)).not.to.be.reverted;
-    const wbtcPool = AssetPool__factory.connect(wbtcxPoolAddress, provider);
+    const wbtcPool = Vault__factory.connect(wbtcxPoolAddress, provider);
     expect(await usbInterestPool.rewardTokenAdded(wbtcxToken.address)).to.be.true;
 
     // Deposit some $WBTC to mint $WBTCx and $USB
@@ -262,7 +262,7 @@ describe('Wand Protocol', () => {
       .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+    const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Deploy $USB InterestPool
     const UsbInterestPoolFactory = await ethers.getContractFactory('UsbInterestPool');

@@ -5,9 +5,9 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   USB__factory,
-  AssetPoolFactory__factory,
+  VaultFactory__factory,
   InterestPoolFactory__factory,
-  AssetPoolCalculator__factory
+  VaultCalculator__factory
 } from '../typechain';
 
 dotenv.config();
@@ -28,15 +28,15 @@ const treasuryAddress = deployer.address;
  *  - Deploy ProtocolSettings
  *  - Deploy WandProtocol
  *  - Deploy USB
- *  - Deploy AssetPoolCalculator
- *  - Deploy AssetPoolFactory
+ *  - Deploy VaultCalculator
+ *  - Deploy VaultFactory
  *  - Deploy InterestPoolFactory
- *  - Register USB/AssetPoolCalculator/AssetPoolFactory/InterestPoolFactory to WandProtocol
+ *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
  * 
  *  - Create AssetPools
  *    - Deploy AssetX (WandProtocol.addAssetPool)
- *    - Create AssetPool
- *    - Set AssetPool to AssetX
+ *    - Create Vault
+ *    - Set Vault to AssetX
  *  - Create InterestPools
  *   - Deploy $USB InterestPool
  *   - Notifiy InterestPoolFactory
@@ -57,15 +57,15 @@ async function main() {
   const usbToken = USB__factory.connect(USB.address, provider);
   console.log(`Deployed $USB token to ${usbToken.address}`);
 
-  const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
-  const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
-  console.log(`Deployed AssetPoolFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
+  const AssetPoolFactoryFactory = await ethers.getContractFactory('VaultFactory');
+  const VaultFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
+  const assetPoolFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
+  console.log(`Deployed VaultFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
-  const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculator');
-  const AssetPoolCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
-  const assetPoolCalculaor = AssetPoolCalculator__factory.connect(AssetPoolCalculator.address, provider);
-  console.log(`Deployed AssetPoolCalculator to ${assetPoolCalculaor.address}  (${AssetPoolCalculaorFactory.bytecode.length / 2} bytes)`);
+  const AssetPoolCalculaorFactory = await ethers.getContractFactory('VaultCalculator');
+  const VaultCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
+  const assetPoolCalculaor = VaultCalculator__factory.connect(VaultCalculator.address, provider);
+  console.log(`Deployed VaultCalculator to ${assetPoolCalculaor.address}  (${AssetPoolCalculaorFactory.bytecode.length / 2} bytes)`);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   const InterestPoolFactory = await InterestPoolFactoryFactory.deploy(wandProtocol.address);

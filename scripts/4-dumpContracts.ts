@@ -3,9 +3,9 @@ import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import {
   WandProtocol__factory,
-  AssetPoolFactory__factory,
+  VaultFactory__factory,
   InterestPoolFactory__factory,
-  AssetPool__factory,
+  Vault__factory,
   ERC20__factory,
   InterestPool__factory
 } from '../typechain';
@@ -28,11 +28,11 @@ async function main() {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
-  console.log(`  AssetPoolCalculator: ${await wandProtocol.assetPoolCalculator()}`);
-  console.log(`  AssetPoolFactory: ${await wandProtocol.assetPoolFactory()}`);
+  console.log(`  VaultCalculator: ${await wandProtocol.assetPoolCalculator()}`);
+  console.log(`  VaultFactory: ${await wandProtocol.assetPoolFactory()}`);
   console.log(`  InterestPoolFactory: ${await wandProtocol.interestPoolFactory()}`);
 
-  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
+  const assetPoolFactory = VaultFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
   const assetTokens = await assetPoolFactory.assetTokens();
   console.log(`Asset Pools:`);
   for (let i = 0; i < assetTokens.length; i++) {
@@ -41,7 +41,7 @@ async function main() {
     const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
     const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
-    const assetPool = AssetPool__factory.connect(assetPoolAddress, provider);
+    const assetPool = Vault__factory.connect(assetPoolAddress, provider);
     const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
     console.log(`  $${assetSymbol} Pool: ${assetPoolAddress}`);
     console.log(`    Asset Token: ${assetToken}`);

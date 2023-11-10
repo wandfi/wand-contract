@@ -9,13 +9,13 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   USB__factory,
-  AssetPoolCalculator__factory,
-  AssetPoolFactory__factory,
+  VaultCalculator__factory,
+  VaultFactory__factory,
   InterestPoolFactory__factory,
-  AssetPool,
+  Vault,
   ERC20__factory,
   RebasableERC20Mock__factory,
-  AssetPool__factory,
+  Vault__factory,
   InterestPool__factory,
   WETH9__factory,
   UniswapV2Factory__factory,
@@ -58,15 +58,15 @@ export async function deployContractsFixture() {
    *  - Deploy ProtocolSettings
    *  - Deploy WandProtocol
    *  - Deploy USB
-   *  - Deploy AssetPoolCalculator
-   *  - Deploy AssetPoolFactory
+   *  - Deploy VaultCalculator
+   *  - Deploy VaultFactory
    *  - Deploy InterestPoolFactory
-   *  - Register USB/AssetPoolCalculator/AssetPoolFactory/InterestPoolFactory to WandProtocol
+   *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
    * 
    *  - Create AssetPools
    *    - Deploy AssetX (WandProtocol.addAssetPool)
-   *    - Create AssetPool
-   *    - Set AssetPool to AssetX
+   *    - Create Vault
+   *    - Set Vault to AssetX
    *  - Create InterestPools
    *   - Deploy $USB InterestPool
    *   - Notifiy InterestPoolFactory
@@ -86,20 +86,20 @@ export async function deployContractsFixture() {
   const USB = await USBFactory.deploy(wandProtocol.address, "USB Token", "USB");
   const usbToken = USB__factory.connect(USB.address, provider);
 
-  const AssetPoolFactoryFactory = await ethers.getContractFactory('AssetPoolFactory');
+  const AssetPoolFactoryFactory = await ethers.getContractFactory('VaultFactory');
   expect(AssetPoolFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
-  console.log(`AssetPoolFactory code size: ${AssetPoolFactoryFactory.bytecode.length / 2} bytes`);
-  const AssetPoolFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(AssetPoolFactory.address, provider);
+  console.log(`VaultFactory code size: ${AssetPoolFactoryFactory.bytecode.length / 2} bytes`);
+  const VaultFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
+  const assetPoolFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
 
-  const AssetPool = await ethers.getContractFactory('AssetPool');
-  expect(AssetPool.bytecode.length / 2).lessThan(maxContractSize);
-  console.log(`AssetPool code size: ${AssetPool.bytecode.length / 2} bytes`);
+  const Vault = await ethers.getContractFactory('Vault');
+  expect(Vault.bytecode.length / 2).lessThan(maxContractSize);
+  console.log(`Vault code size: ${Vault.bytecode.length / 2} bytes`);
 
-  const AssetPoolCalculaorFactory = await ethers.getContractFactory('AssetPoolCalculator');
+  const AssetPoolCalculaorFactory = await ethers.getContractFactory('VaultCalculator');
   expect(AssetPoolCalculaorFactory.bytecode.length / 2).lessThan(maxContractSize);
-  const AssetPoolCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
-  const assetPoolCalculaor = AssetPoolCalculator__factory.connect(AssetPoolCalculator.address, provider);
+  const VaultCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
+  const assetPoolCalculaor = VaultCalculator__factory.connect(VaultCalculator.address, provider);
 
   const InterestPoolFactoryFactory = await ethers.getContractFactory('InterestPoolFactory');
   expect(InterestPoolFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -176,7 +176,7 @@ export async function deployCurveUsbUsdtPool(signer: SignerWithAddress, usbAddre
   return { curvePool, curveLpToken };
 }
 
-export async function dumpAssetPoolState(assetPool: AssetPool) {
+export async function dumpAssetPoolState(assetPool: Vault) {
   const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
 
@@ -206,11 +206,11 @@ export async function dumpContracts(wandProtocolAddress: string) {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
-  console.log(`  AssetPoolCalculator: ${await wandProtocol.assetPoolCalculator()}`);
-  console.log(`  AssetPoolFactory: ${await wandProtocol.assetPoolFactory()}`);
+  console.log(`  VaultCalculator: ${await wandProtocol.assetPoolCalculator()}`);
+  console.log(`  VaultFactory: ${await wandProtocol.assetPoolFactory()}`);
   console.log(`  InterestPoolFactory: ${await wandProtocol.interestPoolFactory()}`);
 
-  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
+  const assetPoolFactory = VaultFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
   const assetTokens = await assetPoolFactory.assetTokens();
   console.log(`Asset Pools:`);
   for (let i = 0; i < assetTokens.length; i++) {
@@ -219,7 +219,7 @@ export async function dumpContracts(wandProtocolAddress: string) {
     const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
     const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
-    const assetPool = AssetPool__factory.connect(assetPoolAddress, provider);
+    const assetPool = Vault__factory.connect(assetPoolAddress, provider);
     const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
     console.log(`  $${assetSymbol} Pool`);
     console.log(`    Asset Token: ${assetToken}`);

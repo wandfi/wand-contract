@@ -5,8 +5,8 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   USB__factory,
-  AssetPool__factory,
-  AssetPool,
+  Vault__factory,
+  Vault,
   ERC20__factory,
   PriceFeedMock__factory,
   ERC20Mock__factory
@@ -31,7 +31,7 @@ const ethPoolAddress = '0x89BBE988c010846b935B07750A6Ff74A8c132534';
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
 
 async function main() {
-  const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+  const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
   // deposit 0.01 ETH to mint $USB
   await dumpAssetPoolState(ethPool);
@@ -42,7 +42,7 @@ async function main() {
   await dumpAssetPoolState(ethPool);
 }
 
-async function dumpAssetPoolState(assetPool: AssetPool) {
+async function dumpAssetPoolState(assetPool: Vault) {
   const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
 

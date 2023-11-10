@@ -5,8 +5,8 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   USB__factory,
-  AssetPool__factory,
-  AssetPool,
+  Vault__factory,
+  Vault,
   ERC20__factory,
   PriceFeedMock__factory,
   ERC20Mock__factory
@@ -33,9 +33,9 @@ const stethxPoolAddress = '0xDD92644966a1B495DFD0225313a9294501e83034';
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
 
 async function main() {
-  const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
-  const wbtcPool = AssetPool__factory.connect(wbtcPoolAddress, provider);
-  const stethPool = AssetPool__factory.connect(stethxPoolAddress, provider);
+  const ethPool = Vault__factory.connect(ethPoolAddress, provider);
+  const wbtcPool = Vault__factory.connect(wbtcPoolAddress, provider);
+  const stethPool = Vault__factory.connect(stethxPoolAddress, provider);
 
   // Mock $WBTC price to $30000
   const wbtcPriceFeed = PriceFeedMock__factory.connect(await wbtcPool.assetTokenPriceFeed(), provider);
@@ -80,7 +80,7 @@ async function main() {
   // dumpAssetPoolState(wbtcPool);
 }
 
-async function dumpAssetPoolState(assetPool: AssetPool) {
+async function dumpAssetPoolState(assetPool: Vault) {
   const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
 

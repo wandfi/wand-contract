@@ -99,7 +99,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
   }
 
   function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
-    require(assetPool == address(0), "AssetPool already set");
+    require(assetPool == address(0), "Vault already set");
     require(_assetPool != address(0), "Zero address detected");
 
     address prevAssetPool = assetPool;
@@ -146,7 +146,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
   /* ============== MODIFIERS =============== */
 
   modifier onlyAssetPool() {
-    require(assetPool != address(0) && assetPool == _msgSender(), "Caller is not AssetPool");
+    require(assetPool != address(0) && assetPool == _msgSender(), "Caller is not Vault");
     _;
   }
 

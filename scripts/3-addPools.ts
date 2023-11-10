@@ -5,10 +5,10 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   USB__factory,
-  AssetPoolFactory__factory,
+  VaultFactory__factory,
   InterestPoolFactory__factory,
   AssetX__factory,
-  AssetPool__factory,
+  Vault__factory,
   UsbInterestPool__factory
 } from '../typechain';
 
@@ -45,15 +45,15 @@ const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
  *  - Deploy ProtocolSettings
  *  - Deploy WandProtocol
  *  - Deploy USB
- *  - Deploy AssetPoolCalculator
- *  - Deploy AssetPoolFactory
+ *  - Deploy VaultCalculator
+ *  - Deploy VaultFactory
  *  - Deploy InterestPoolFactory
- *  - Register USB/AssetPoolCalculator/AssetPoolFactory/InterestPoolFactory to WandProtocol
+ *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
  * 
  *  - Create AssetPools
  *    - Deploy AssetX (WandProtocol.addAssetPool)
- *    - Create AssetPool
- *    - Set AssetPool to AssetX
+ *    - Create Vault
+ *    - Set Vault to AssetX
  *  - Create InterestPools
  *   - Deploy $USB InterestPool
  *   - Notifiy InterestPoolFactory
@@ -61,7 +61,7 @@ const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
 async function main() {
   const wandProtocol = WandProtocol__factory.connect(wandProtocolAddress, provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
-  const assetPoolFactory = AssetPoolFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
+  const assetPoolFactory = VaultFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
   const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
   const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
 
@@ -85,7 +85,7 @@ async function main() {
   await trans.wait();
 
   const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
-  const ethPool = AssetPool__factory.connect(ethPoolAddress, provider);
+  const ethPool = Vault__factory.connect(ethPoolAddress, provider);
   console.log(`Deployed $ETH asset pool to ${ethPoolAddress}`);
 
   trans = await ethxToken.connect(deployer).setAssetPool(ethPoolAddress);
