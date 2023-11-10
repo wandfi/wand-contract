@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../interfaces/IWandProtocol.sol";
-import "../interfaces/IAssetPoolFactory.sol";
+import "../interfaces/IVaultFactory.sol";
 import "../interfaces/IInterestPool.sol";
 import "../interfaces/IInterestPoolFactory.sol";
 
@@ -123,7 +123,7 @@ contract InterestPoolFactory is IInterestPoolFactory, Ownable, ReentrancyGuard {
   }
 
   modifier onlyAssetPool() {
-    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not a Vault contract");
+    require(IVaultFactory(IWandProtocol(wandProtocol).vaultFactory()).isAssetPool(_msgSender()), "Caller is not a Vault contract");
     _;
   }
 

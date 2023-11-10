@@ -10,8 +10,8 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../interfaces/IWandProtocol.sol";
-import "../interfaces/IAssetPool.sol";
-import "../interfaces/IAssetPoolCalculator.sol";
+import "../interfaces/IVault.sol";
+import "../interfaces/IVaultCalculator.sol";
 import "../interfaces/IInterestPoolFactory.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IProtocolSettings.sol";
@@ -20,14 +20,14 @@ import "../interfaces/IAssetX.sol";
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 
-contract Vault is IAssetPool, Context, ReentrancyGuard {
+contract Vault is IVault, Context, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
   IWandProtocol public immutable wandProtocol;
   IProtocolSettings public immutable settings;
-  address public immutable assetPoolCalculator;
+  address public immutable vaultCalculator;
   address public immutable assetToken;
   address public immutable assetTokenPriceFeed;
   address public immutable usbToken;
@@ -60,12 +60,12 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
     require(assetPoolParams.length == assetPoolParamsValues.length, "Invalid params length");
 
     wandProtocol = IWandProtocol(_wandProtocol);
-    require(msg.sender == wandProtocol.assetPoolFactory(), "Vault should only be created by factory contract");
+    require(msg.sender == wandProtocol.vaultFactory(), "Vault should only be created by factory contract");
 
     assetToken = _assetToken;
     assetTokenPriceFeed = _assetTokenPriceFeed;
     xToken = _xToken;
-    assetPoolCalculator = wandProtocol.assetPoolCalculator();
+    vaultCalculator = wandProtocol.vaultCalculator();
     usbToken = wandProtocol.usbToken();
 
     settings = IProtocolSettings(IWandProtocol(_wandProtocol).settings());
@@ -109,7 +109,7 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
    * @dev AAReth = (M_ETH * P_ETH / Musb-eth) * 100%
    */
   function AAR() public view returns (uint256) {
-    return IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this));
+    return IVaultCalculator(vaultCalculator).AAR(IVault(this));
   }
 
   function AARDecimals() public pure returns (uint256) {
@@ -126,11 +126,11 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
 
   function r() public view returns (uint256) {
     Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IAssetPoolCalculator(assetPoolCalculator).r(S);
+    return IVaultCalculator(vaultCalculator).r(S);
   }
 
   function R2() public view returns (uint256) {
-    uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this));
+    uint256 aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
     uint256 AART = _assetPoolParamValue("AART");
     uint256 AARS = _assetPoolParamValue("AARS");
     uint256 BasisR2 = _assetPoolParamValue("BasisR2");
@@ -154,7 +154,7 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
   }
 
   function calculatePairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
-    return IAssetPoolCalculator(assetPoolCalculator).calculatePairedUSBAmountToRedeemByXTokens(IAssetPool(this), xTokenAmount);
+    return IVaultCalculator(vaultCalculator).calculatePairedUSBAmountToRedeemByXTokens(IVault(this), xTokenAmount);
   }
 
   function calculateUSBToXTokensOut(uint256 usbAmount) public view returns (uint256) {
@@ -163,12 +163,12 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
     require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
     Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IAssetPoolCalculator(assetPoolCalculator).calculateUSBToXTokensOut(S, usbAmount);
+    return IVaultCalculator(vaultCalculator).calculateUSBToXTokensOut(S, usbAmount);
   }
 
   function calculateMintUSBOut(uint256 assetAmount) public view returns (uint256) {
     Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IAssetPoolCalculator(assetPoolCalculator).calculateMintUSBOut(S, assetAmount);
+    return IVaultCalculator(vaultCalculator).calculateMintUSBOut(S, assetAmount);
   }
 
   function calculateMintXTokensOut(uint256 assetAmount) public view returns (uint256) {
@@ -217,7 +217,7 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
    */
   function mintUSB(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
     Constants.AssetPoolState memory S = _getAssetPoolState();
-    uint256 usbOutAmount = IAssetPoolCalculator(assetPoolCalculator).calculateMintUSBOut(S, assetAmount);
+    uint256 usbOutAmount = IVaultCalculator(vaultCalculator).calculateMintUSBOut(S, assetAmount);
 
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
     _usbTotalSupply = _usbTotalSupply.add(usbOutAmount);
@@ -373,7 +373,7 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
     S.P_ETH_DECIMALS = IPriceFeed(assetTokenPriceFeed).decimals();
     S.M_USB_ETH = _usbTotalSupply;
     S.M_ETHx = IERC20(xToken).totalSupply();
-    S.aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this));
+    S.aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
     S.AART = _assetPoolParamValue("AART");
     S.AARS = _assetPoolParamValue("AARS");
     S.AARC = _assetPoolParamValue("AARC");
@@ -393,11 +393,11 @@ contract Vault is IAssetPool, Context, ReentrancyGuard {
       return assetAmount;
     }
 
-    uint256 aar = IAssetPoolCalculator(assetPoolCalculator).AAR(IAssetPool(this));
+    uint256 aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
     require(_usbTotalSupply == 0 || aar > 10 ** AARDecimals(), "AAR Below 100%");
     require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
-    return IAssetPoolCalculator(assetPoolCalculator).calculateMintXTokensOut(IAssetPool(this), assetAmount);
+    return IVaultCalculator(vaultCalculator).calculateMintXTokensOut(IVault(this), assetAmount);
   }
 
   function _calculateRedemptionOutByUSB(uint256 usbAmount) internal view returns (uint256, uint256) {

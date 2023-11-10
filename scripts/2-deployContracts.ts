@@ -59,8 +59,8 @@ async function main() {
 
   const AssetPoolFactoryFactory = await ethers.getContractFactory('VaultFactory');
   const VaultFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
-  const assetPoolFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
-  console.log(`Deployed VaultFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
+  const vaultFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
+  console.log(`Deployed VaultFactory to ${vaultFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
   const AssetPoolCalculaorFactory = await ethers.getContractFactory('VaultCalculator');
   const VaultCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
@@ -72,7 +72,7 @@ async function main() {
   const interestPoolFactory = InterestPoolFactory__factory.connect(InterestPoolFactory.address, provider);
   console.log(`Deployed InterestPoolFactory to ${interestPoolFactory.address} (${InterestPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
-  let trans = await wandProtocol.connect(deployer).initialize(usbToken.address, assetPoolCalculaor.address, assetPoolFactory.address, interestPoolFactory.address);
+  let trans = await wandProtocol.connect(deployer).initialize(usbToken.address, assetPoolCalculaor.address, vaultFactory.address, interestPoolFactory.address);
   await trans.wait();
   console.log(`Initialized WandProtocol`);
 }

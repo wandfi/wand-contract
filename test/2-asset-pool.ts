@@ -17,7 +17,7 @@ describe('Asset Pool', () => {
   it('Mint & Redemption (Without Interest & Fees) Works', async () => {
 
     const {
-      Alice, Bob, Caro, Ivy, ethPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory
+      Alice, Bob, Caro, Ivy, ethPriceFeed, wandProtocol, settings, usbToken, vaultFactory
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
@@ -35,8 +35,8 @@ describe('Asset Pool', () => {
     await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAART, ethAARS, ethAARC]))
-      .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+      .to.emit(vaultFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
@@ -242,7 +242,7 @@ describe('Asset Pool', () => {
   it('Dynamic AAR Adjustment for $USB->$ETHx Works', async () => {
 
     const {
-      Alice, ethPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory
+      Alice, ethPriceFeed, wandProtocol, settings, usbToken, vaultFactory
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
@@ -261,7 +261,7 @@ describe('Asset Pool', () => {
         0, 0
       ])
     ).not.to.be.reverted;
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
@@ -478,7 +478,7 @@ describe('Asset Pool', () => {
   it('Dynamic AAR Adjustment for $USB mint Works', async () => {
 
     const {
-      Alice, ethPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory
+      Alice, ethPriceFeed, wandProtocol, settings, usbToken, vaultFactory
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
@@ -497,7 +497,7 @@ describe('Asset Pool', () => {
         0, 0
       ])
     ).not.to.be.reverted;
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 

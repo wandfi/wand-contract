@@ -11,9 +11,9 @@ interface IWandProtocol {
 
   function usbToken() external view returns (address);
 
-  function assetPoolCalculator() external view returns (address);
+  function vaultCalculator() external view returns (address);
 
-  function assetPoolFactory() external view returns (address);
+  function vaultFactory() external view returns (address);
 
   function interestPoolFactory() external view returns (address);
 

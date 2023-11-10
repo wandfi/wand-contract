@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../interfaces/IWandProtocol.sol";
-import "../interfaces/IAssetPoolFactory.sol";
+import "../interfaces/IVaultFactory.sol";
 import "../interfaces/IUSB.sol";
 
 contract USB is IUSB, Ownable, ERC20, ReentrancyGuard {
@@ -26,7 +26,7 @@ contract USB is IUSB, Ownable, ERC20, ReentrancyGuard {
   }
 
   modifier onlyAssetPool() {
-    require(IAssetPoolFactory(IWandProtocol(wandProtocol).assetPoolFactory()).isAssetPool(_msgSender()), "Caller is not an Vault contract");
+    require(IVaultFactory(IWandProtocol(wandProtocol).vaultFactory()).isAssetPool(_msgSender()), "Caller is not an Vault contract");
     _;
   }
 }

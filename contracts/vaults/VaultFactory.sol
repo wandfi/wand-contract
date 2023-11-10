@@ -2,10 +2,10 @@
 pragma solidity ^0.8.18;
 
 import "./Vault.sol";
-import "../interfaces/IAssetPool.sol";
-import "../interfaces/IAssetPoolFactory.sol";
+import "../interfaces/IVault.sol";
+import "../interfaces/IVaultFactory.sol";
 
-contract VaultFactory is IAssetPoolFactory {
+contract VaultFactory is IVaultFactory {
 
   address public immutable wandProtocol;
 
@@ -44,9 +44,9 @@ contract VaultFactory is IAssetPoolFactory {
     emit AssetPoolAdded(assetToken, assetPriceFeed, _assetTokenToPools[assetToken]);
   }
 
-  /* ========== IAssetPoolFactory ========== */
+  /* ========== IVaultFactory ========== */
 
-  function getAssetPoolAddress(address assetToken) external view override returns (address) {
+  function getVaultAddress(address assetToken) external view override returns (address) {
     require(_assetTokenToPools[assetToken] != address(0), "Invalid asset token");
     return _assetTokenToPools[assetToken];
   }

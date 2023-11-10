@@ -19,7 +19,7 @@ describe('Wand Protocol', () => {
 
     const {
       Alice, Bob, Caro, Dave, Ivy, wbtc, ethPriceFeed, wbtcPriceFeed,
-      wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
+      wandProtocol, settings, usbToken, vaultFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
 
     // Day 0
@@ -40,8 +40,8 @@ describe('Wand Protocol', () => {
     await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAART, ethAARS, ethAARC]))
-      .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+      .to.emit(vaultFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
@@ -64,12 +64,12 @@ describe('Wand Protocol', () => {
     await expect(wandProtocol.connect(Alice).addAssetPool(wbtc.address, wbtcPriceFeed.address, wbtcxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [wbtcY, wbtcAART, wbtcAARS, wbtcAARC])
-    ).to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
+    ).to.emit(vaultFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
 
     await dumpContracts(wandProtocol.address);
     
     // Check $WBTCx is added as a reward token to $USB interest pool
-    const wbtcxPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
+    const wbtcxPoolAddress = await vaultFactory.getVaultAddress(wbtc.address);
     await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcxPoolAddress)).not.to.be.reverted;
     const wbtcPool = Vault__factory.connect(wbtcxPoolAddress, provider);
     expect(await usbInterestPool.rewardTokenAdded(wbtcxToken.address)).to.be.true;
@@ -241,7 +241,7 @@ describe('Wand Protocol', () => {
 
     const {
       Alice, Bob, ethPriceFeed,
-      wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
+      wandProtocol, settings, usbToken, vaultFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
@@ -259,8 +259,8 @@ describe('Wand Protocol', () => {
     await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAART, ethAARS, ethAARC]))
-      .to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+      .to.emit(vaultFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 

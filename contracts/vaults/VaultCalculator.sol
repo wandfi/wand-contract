@@ -6,7 +6,7 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-import "../interfaces/IAssetPool.sol";
+import "../interfaces/IVault.sol";
 import "../interfaces/IUSB.sol";
 import "../libs/Constants.sol";
 
@@ -32,7 +32,7 @@ contract VaultCalculator {
     usbToken = _usbToken;
   }
 
-  function AAR(IAssetPool assetPool) public view returns (uint256) {
+  function AAR(IVault assetPool) public view returns (uint256) {
     if (assetPool.usbTotalSupply() == 0 && IERC20(assetPool.xToken()).totalSupply() == 0) {
       return 0;
     }
@@ -49,7 +49,7 @@ contract VaultCalculator {
     return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** assetPool.AARDecimals()).div(assetPool.usbTotalSupply());
   }
 
-  function calculatePairedUSBAmountToRedeemByXTokens(IAssetPool assetPool, uint256 xTokenAmount) public view returns (uint256) {
+  function calculatePairedUSBAmountToRedeemByXTokens(IVault assetPool, uint256 xTokenAmount) public view returns (uint256) {
     require(xTokenAmount > 0, "Amount must be greater than 0");
 
     uint256 xTokenTotalSupply = IERC20(assetPool.xToken()).totalSupply();
@@ -232,7 +232,7 @@ contract VaultCalculator {
     revert("Should not reach here");
   }
 
-  function calculateMintXTokensOut(IAssetPool assetPool, uint256 assetAmount) public view returns (uint256) {
+  function calculateMintXTokensOut(IVault assetPool, uint256 assetAmount) public view returns (uint256) {
     uint256 aar = AAR(assetPool);
     require(assetPool.usbTotalSupply() == 0 || IERC20(assetPool.xToken()).totalSupply() == 0 || aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);

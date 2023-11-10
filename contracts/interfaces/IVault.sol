@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-interface IAssetPool {
+interface IVault {
 
   /**
    * @notice Total amount of $USB tokens minted (burned subtracted) by this pool

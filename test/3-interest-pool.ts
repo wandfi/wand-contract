@@ -18,7 +18,7 @@ describe('Interest Pool', () => {
   it('$USB Interest Pool with $ETHx Rewards Works', async () => {
 
     const {
-      Alice, Bob, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, assetPoolFactory, interestPoolFactory
+      Alice, Bob, wbtc, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, vaultFactory, interestPoolFactory
     } = await loadFixture(deployContractsFixture);
 
     // Day 0
@@ -40,7 +40,7 @@ describe('Interest Pool', () => {
         0, 0
       ])
     ).not.to.be.reverted;
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
@@ -54,8 +54,8 @@ describe('Interest Pool', () => {
         BigNumber.from(10).pow(await settings.decimals()).mul(73).div(1000), BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
         BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100), BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100)
       ])
-    ).to.emit(assetPoolFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
-    const wbtcPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
+    ).to.emit(vaultFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
+    const wbtcPoolAddress = await vaultFactory.getVaultAddress(wbtc.address);
     await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcPoolAddress)).not.to.be.reverted;
     const wbtcPool = Vault__factory.connect(wbtcPoolAddress, provider);
 

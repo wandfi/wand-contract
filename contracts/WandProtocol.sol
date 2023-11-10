@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
-import "./interfaces/IAssetPoolFactory.sol";
-import "./interfaces/IAssetPool.sol";
+import "./interfaces/IVaultFactory.sol";
+import "./interfaces/IVault.sol";
 import "./interfaces/IInterestPoolFactory.sol";
 import "./interfaces/IWandProtocol.sol";
 import "./settings/ProtocolSettings.sol";
@@ -18,9 +18,9 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   address internal immutable _settings;
 
   address internal _usbToken;
-  address internal _assetPoolFactory;
+  address internal _vaultFactory;
   address internal _interestPoolFactory;
-  address internal _assetPoolCalculator;
+  address internal _vaultCalculator;
 
   bool public initialized;
 
@@ -43,12 +43,12 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
     return _usbToken;
   }
 
-  function assetPoolCalculator() public view override returns (address) {
-    return _assetPoolCalculator;
+  function vaultCalculator() public view override returns (address) {
+    return _vaultCalculator;
   }
 
-  function assetPoolFactory() public view override returns (address) {
-    return _assetPoolFactory;
+  function vaultFactory() public view override returns (address) {
+    return _vaultFactory;
   }
 
   function interestPoolFactory() public view override returns (address) {
@@ -65,8 +65,8 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
     require(_interestPoolFactory_ != address(0), "Zero address detected");
 
     _usbToken = _usbToken_;
-    _assetPoolCalculator = _assetPoolCalculator_;
-    _assetPoolFactory = _assetPoolFactory_;
+    _vaultCalculator = _assetPoolCalculator_;
+    _vaultFactory = _assetPoolFactory_;
     _interestPoolFactory = _interestPoolFactory_;
 
     initialized = true;
@@ -80,7 +80,7 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
     bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues
   ) external onlyInitialized nonReentrant onlyOwner {
 
-    IAssetPoolFactory(_assetPoolFactory).addAssetPool(assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues);
+    IVaultFactory(_vaultFactory).addAssetPool(assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues);
 
     // Now iterate all interest pools and add the new X token (if not already added)
     IInterestPoolFactory(_interestPoolFactory).addRewardTokenToAllPools(xToken);

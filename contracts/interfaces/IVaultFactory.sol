@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-interface IAssetPoolFactory {
+interface IVaultFactory {
 
-  function getAssetPoolAddress(address assetToken) external view returns (address);
+  function getVaultAddress(address assetToken) external view returns (address);
 
   function isAssetPool(address addr) external view returns (bool);
 

@@ -61,7 +61,7 @@ const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
 async function main() {
   const wandProtocol = WandProtocol__factory.connect(wandProtocolAddress, provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
-  const assetPoolFactory = VaultFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
+  const vaultFactory = VaultFactory__factory.connect(await wandProtocol.vaultFactory(), provider);
   const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);
   const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
 
@@ -84,7 +84,7 @@ async function main() {
   );
   await trans.wait();
 
-  const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+  const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
   const ethPool = Vault__factory.connect(ethPoolAddress, provider);
   console.log(`Deployed $ETH asset pool to ${ethPoolAddress}`);
 
@@ -116,7 +116,7 @@ async function main() {
     [wbtcY, wbtcAART, wbtcAARS, wbtcAARC]
   );
   await trans.wait();
-  const wbtcPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtcAddress);
+  const wbtcPoolAddress = await vaultFactory.getVaultAddress(wbtcAddress);
   console.log(`Deployed $WBTC asset pool to ${wbtcPoolAddress}`);
 
   trans = await wbtcxToken.connect(deployer).setAssetPool(wbtcPoolAddress);
@@ -138,7 +138,7 @@ async function main() {
     [stethY, stethAART, stethAARS, stethAARC]
   );
   await trans.wait();
-  const stethPoolAddress = await assetPoolFactory.getAssetPoolAddress(stethAddress);
+  const stethPoolAddress = await vaultFactory.getVaultAddress(stethAddress);
   console.log(`Deployed $stETH asset pool to ${stethPoolAddress}`);
 
   trans = await stethxToken.connect(deployer).setAssetPool(stethPoolAddress);

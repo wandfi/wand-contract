@@ -86,8 +86,8 @@ async function main() {
 
   const AssetPoolFactoryFactory = await ethers.getContractFactory('VaultFactory');
   const VaultFactory = await AssetPoolFactoryFactory.deploy(wandProtocol.address);
-  const assetPoolFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
-  console.log(`Deployed VaultFactory to ${assetPoolFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
+  const vaultFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
+  console.log(`Deployed VaultFactory to ${vaultFactory.address} (${AssetPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
   const AssetPoolCalculaorFactory = await ethers.getContractFactory('VaultCalculator');
   const VaultCalculator = await AssetPoolCalculaorFactory.deploy(usbToken.address);
@@ -99,7 +99,7 @@ async function main() {
   const interestPoolFactory = InterestPoolFactory__factory.connect(InterestPoolFactory.address, provider);
   console.log(`Deployed InterestPoolFactory to ${interestPoolFactory.address} (${InterestPoolFactoryFactory.bytecode.length / 2} bytes)`);
 
-  let trans = await wandProtocol.connect(deployer).initialize(usbToken.address, assetPoolCalculaor.address, assetPoolFactory.address, interestPoolFactory.address);
+  let trans = await wandProtocol.connect(deployer).initialize(usbToken.address, assetPoolCalculaor.address, vaultFactory.address, interestPoolFactory.address);
   await trans.wait();
   console.log(`Initialized WandProtocol`);
 
@@ -123,7 +123,7 @@ async function main() {
   );
   await trans.wait();
 
-  const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+  const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
   const ethPool = Vault__factory.connect(ethPoolAddress, provider);
   console.log(`Deployed $ETH asset pool to ${ethPoolAddress}`);
 
@@ -155,7 +155,7 @@ async function main() {
     [wbtcY, wbtcAART, wbtcAARS, wbtcAARC]
   );
   await trans.wait();
-  const wbtcPoolAddress = await assetPoolFactory.getAssetPoolAddress(wbtc.address);
+  const wbtcPoolAddress = await vaultFactory.getVaultAddress(wbtc.address);
   console.log(`Deployed $WBTC asset pool to ${wbtcPoolAddress}`);
 
   trans = await wbtcxToken.connect(deployer).setAssetPool(wbtcPoolAddress);
@@ -177,7 +177,7 @@ async function main() {
     [stethY, stethAART, stethAARS, stethAARC]
   );
   await trans.wait();
-  const stethPoolAddress = await assetPoolFactory.getAssetPoolAddress(stETH.address);
+  const stethPoolAddress = await vaultFactory.getVaultAddress(stETH.address);
   console.log(`Deployed $stETH asset pool to ${stethPoolAddress}`);
 
   trans = await stethxToken.connect(deployer).setAssetPool(stethPoolAddress);
@@ -263,18 +263,18 @@ async function main() {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
-  console.log(`  VaultCalculator: ${await wandProtocol.assetPoolCalculator()}`);
-  console.log(`  VaultFactory: ${await wandProtocol.assetPoolFactory()}`);
+  console.log(`  VaultCalculator: ${await wandProtocol.vaultCalculator()}`);
+  console.log(`  VaultFactory: ${await wandProtocol.vaultFactory()}`);
   console.log(`  InterestPoolFactory: ${await wandProtocol.interestPoolFactory()}`);
 
-  const assetTokens = await assetPoolFactory.assetTokens();
+  const assetTokens = await vaultFactory.assetTokens();
   console.log(`Asset Pools:`);
   for (let i = 0; i < assetTokens.length; i++) {
     const assetToken = assetTokens[i];
     const isETH = assetToken == nativeTokenAddress;
     const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
-    const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
+    const assetPoolAddress = await vaultFactory.getVaultAddress(assetToken);
     const assetPool = Vault__factory.connect(assetPoolAddress, provider);
     const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
     console.log(`  $${assetSymbol} Pool: ${assetPoolAddress}`);

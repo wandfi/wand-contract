@@ -16,7 +16,7 @@ describe('Wand Protocol', () => {
 
     const {
       Alice, Bob, Caro, Ivy, ethPriceFeed,
-      wandProtocol, settings, assetPoolFactory
+      wandProtocol, settings, vaultFactory
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
@@ -35,7 +35,7 @@ describe('Wand Protocol', () => {
         0, 0
       ])
     ).not.to.be.reverted;
-    const ethPoolAddress = await assetPoolFactory.getAssetPoolAddress(ethAddress);
+    const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Vault already set/);

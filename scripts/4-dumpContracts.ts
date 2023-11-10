@@ -28,19 +28,19 @@ async function main() {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
-  console.log(`  VaultCalculator: ${await wandProtocol.assetPoolCalculator()}`);
-  console.log(`  VaultFactory: ${await wandProtocol.assetPoolFactory()}`);
+  console.log(`  VaultCalculator: ${await wandProtocol.vaultCalculator()}`);
+  console.log(`  VaultFactory: ${await wandProtocol.vaultFactory()}`);
   console.log(`  InterestPoolFactory: ${await wandProtocol.interestPoolFactory()}`);
 
-  const assetPoolFactory = VaultFactory__factory.connect(await wandProtocol.assetPoolFactory(), provider);
-  const assetTokens = await assetPoolFactory.assetTokens();
+  const vaultFactory = VaultFactory__factory.connect(await wandProtocol.vaultFactory(), provider);
+  const assetTokens = await vaultFactory.assetTokens();
   console.log(`Asset Pools:`);
   for (let i = 0; i < assetTokens.length; i++) {
     const assetToken = assetTokens[i];
     const isETH = assetToken == nativeTokenAddress;
     const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
-    const assetPoolAddress = await assetPoolFactory.getAssetPoolAddress(assetToken);
+    const assetPoolAddress = await vaultFactory.getVaultAddress(assetToken);
     const assetPool = Vault__factory.connect(assetPoolAddress, provider);
     const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
     console.log(`  $${assetSymbol} Pool: ${assetPoolAddress}`);
