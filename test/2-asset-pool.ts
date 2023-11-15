@@ -32,10 +32,10 @@ describe('Asset Pool', () => {
     const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
     const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
     const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAART, ethAARS, ethAARC]))
-      .to.emit(vaultFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+      .to.emit(vaultFactory, 'VaultAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
@@ -253,7 +253,7 @@ describe('Asset Pool', () => {
     
     // Create ETH asset pool
     const ethAddress = nativeTokenAddress;
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC"), ethers.utils.formatBytes32String("C1"), ethers.utils.formatBytes32String("C2")],
       [
         0, BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
@@ -489,7 +489,7 @@ describe('Asset Pool', () => {
     
     // Create ETH asset pool
     const ethAddress = nativeTokenAddress;
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC"), ethers.utils.formatBytes32String("C1"), ethers.utils.formatBytes32String("C2")],
       [
         0, BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),

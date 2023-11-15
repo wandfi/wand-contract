@@ -64,7 +64,7 @@ export async function deployContractsFixture() {
    *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
    * 
    *  - Create AssetPools
-   *    - Deploy AssetX (WandProtocol.addAssetPool)
+   *    - Deploy AssetX (WandProtocol.addVault)
    *    - Create Vault
    *    - Set Vault to AssetX
    *  - Create InterestPools

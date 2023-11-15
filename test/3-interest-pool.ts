@@ -32,7 +32,7 @@ describe('Interest Pool', () => {
     
     // Create ETH asset pool
     const ethAddress = nativeTokenAddress;
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC"), ethers.utils.formatBytes32String("C1"), ethers.utils.formatBytes32String("C2")],
       [
         BigNumber.from(10).pow(await settings.decimals()).mul(365).div(10000), BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
@@ -48,13 +48,13 @@ describe('Interest Pool', () => {
     // Create $WBTC asset pool
     const WBTCx = await AssetXFactory.deploy(wandProtocol.address, "WBTCx Token", "WBTCx");
     const wbtcxToken = AssetX__factory.connect(WBTCx.address, provider);
-    await expect(wandProtocol.connect(Alice).addAssetPool(wbtc.address, wbtcPriceFeed.address, wbtcxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(wbtc.address, wbtcPriceFeed.address, wbtcxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [
         BigNumber.from(10).pow(await settings.decimals()).mul(73).div(1000), BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100),
         BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100), BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100)
       ])
-    ).to.emit(vaultFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
+    ).to.emit(vaultFactory, 'VaultAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
     const wbtcPoolAddress = await vaultFactory.getVaultAddress(wbtc.address);
     await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcPoolAddress)).not.to.be.reverted;
     const wbtcPool = Vault__factory.connect(wbtcPoolAddress, provider);

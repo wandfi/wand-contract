@@ -51,7 +51,7 @@ const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
  *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
  * 
  *  - Create AssetPools
- *    - Deploy AssetX (WandProtocol.addAssetPool)
+ *    - Deploy AssetX (WandProtocol.addVault)
  *    - Create Vault
  *    - Set Vault to AssetX
  *  - Create InterestPools
@@ -77,7 +77,7 @@ async function main() {
   const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
   const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
   const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-  let trans = await wandProtocol.connect(deployer).addAssetPool(
+  let trans = await wandProtocol.connect(deployer).addVault(
     ethAddress, ethPriceFeedAddress, ethxToken.address,
     [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
     [ethY, ethAART, ethAARS, ethAARC]
@@ -110,7 +110,7 @@ async function main() {
   const wbtcAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
   const wbtcAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
   const wbtcAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-  trans = await wandProtocol.connect(deployer).addAssetPool(
+  trans = await wandProtocol.connect(deployer).addVault(
     wbtcAddress, wbtcPriceFeedAddress, wbtcxToken.address,
     [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
     [wbtcY, wbtcAART, wbtcAARS, wbtcAARC]
@@ -132,7 +132,7 @@ async function main() {
   const stethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
   const stethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
   const stethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-  trans = await wandProtocol.connect(deployer).addAssetPool(
+  trans = await wandProtocol.connect(deployer).addVault(
     stethAddress, stethPriceFeedAddress, stethxToken.address,
     [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
     [stethY, stethAART, stethAARS, stethAARC]

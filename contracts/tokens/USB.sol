@@ -3,30 +3,220 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-import "../interfaces/IWandProtocol.sol";
-import "../interfaces/IVaultFactory.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../interfaces/IUSB.sol";
+import "../interfaces/IVaultFactory.sol";
+import "../interfaces/IWandProtocol.sol";
 
-contract USB is IUSB, Ownable, ERC20, ReentrancyGuard {
+contract USB is IUSB, Ownable, ReentrancyGuard {
+  using SafeMath for uint256;
+
+  uint256 constant internal INFINITE_ALLOWANCE = type(uint256).max;
+
   address public immutable wandProtocol;
 
-  constructor(address _wandProtocol, string memory _name, string memory _symbol) Ownable() ERC20(_name, _symbol) {
+  uint256 private _totalSupply;
+
+  uint256 private _totalShares;
+  mapping(address => uint256) private _shares;
+
+  mapping (address => mapping (address => uint256)) private _allowances;
+
+  constructor(address _wandProtocol) Ownable() {
     require(_wandProtocol != address(0), "Zero address detected");
     wandProtocol = _wandProtocol;
   }
 
-  function mint(address to, uint256 amount) public nonReentrant override onlyAssetPool {
-    _mint(to, amount);
+  /* ================= IERC20Metadata ================ */
+
+  function name() public pure returns (string memory) {
+    return 'USB Token';
   }
 
-  function burn(address account, uint256 amount) public nonReentrant override onlyAssetPool {
-    _burn(account, amount);
+  function symbol() public pure returns (string memory) {
+    return 'USB';
   }
 
-  modifier onlyAssetPool() {
-    require(IVaultFactory(IWandProtocol(wandProtocol).vaultFactory()).isAssetPool(_msgSender()), "Caller is not an Vault contract");
+  function decimals() public pure returns (uint8) {
+    return 18;
+  }
+
+  /* ================= IERC20 Views ================ */
+
+  function totalSupply() public view returns (uint256) {
+    return _totalSupply;
+  }
+
+  function balanceOf(address account) public view returns (uint256) {
+    return getBalanceByShares(_shares[account]);
+  }
+
+  function allowance(address owner, address spender) public view returns (uint256) {
+    return _allowances[owner][spender];
+  }
+
+  /* ================= Views ================ */
+
+  function totalShares() public view returns (uint256) {
+    return _totalShares;
+  }
+
+  function sharesOf(address account) public view returns (uint256) {
+    return _shares[account];
+  }
+
+  function getSharesByBalance(uint256 balance) public view returns (uint256) {
+    // Initial mint
+    if (_totalSupply == 0) return balance;
+
+    return balance
+      .mul(_totalShares)
+      .div(_totalSupply);
+  }
+
+  function getBalanceByShares(uint256 sharesAmount) public view returns (uint256) {
+    if (_totalShares == 0) return 0;
+  
+    return sharesAmount
+      .mul(_totalSupply)
+      .div(_totalShares);
+  }
+
+  /* ================= IERC20 Functions ================ */
+
+  function transfer(address to, uint256 amount) external nonReentrant returns (bool) {
+    _transfer(_msgSender(), to, amount);
+    return true;
+  }
+
+  function transferFrom(address from, address to, uint256 amount) external nonReentrant returns (bool) {
+    _spendAllowance(from, _msgSender(), amount);
+    _transfer(from, to, amount);
+    return true;
+  }
+
+  function approve(address spender, uint256 amount) external nonReentrant returns (bool) {
+    _approve(_msgSender(), spender, amount);
+    return true;
+  }
+
+  function increaseAllowance(address spender, uint256 addedValue) external nonReentrant returns (bool) {
+    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
+    return true;
+  }
+
+  function decreaseAllowance(address spender, uint256 subtractedValue) external nonReentrant returns (bool) {
+    uint256 currentAllowance = _allowances[_msgSender()][spender];
+    require(currentAllowance >= subtractedValue, "Allowance below zero");
+    _approve(_msgSender(), spender, currentAllowance.sub(subtractedValue));
+    return true;
+  }
+
+  /* ================= IUSB Functions ================ */
+
+  function mint(address to, uint256 amount) public nonReentrant override onlyVault {
+    require(to != address(0), "Zero address detected");
+    require(amount > 0, 'Amount too small');
+
+    uint256 sharesAmount = getSharesByBalance(amount);
+    _mintShares(to, sharesAmount);
+    _totalSupply = _totalSupply.add(amount);
+
+    _emitTransferEvents(address(0), to, amount, sharesAmount);
+  }
+
+  function burn(address account, uint256 amount) public nonReentrant override onlyVault {
+    require(account != address(0), "Zero address detected");
+    require(amount > 0, 'Amount too small');
+
+    uint256 sharesAmount = getSharesByBalance(amount);
+    _burnShares(account, sharesAmount);
+    _totalSupply = _totalSupply.sub(amount);
+
+    _emitTransferEvents(account, address(0), amount, sharesAmount);
+  }
+
+
+  function transferShares(address to, uint256 sharesAmount) public nonReentrant returns (uint256) {
+    _transferShares(_msgSender(), to, sharesAmount);
+    uint256 tokensAmount = getBalanceByShares(sharesAmount);
+    _emitTransferEvents(_msgSender(), to, tokensAmount, sharesAmount);
+    return tokensAmount;
+  }
+
+  function transferSharesFrom(address sender, address to, uint256 sharesAmount) public nonReentrant returns (uint256) {
+    uint256 tokensAmount = getBalanceByShares(sharesAmount);
+    _spendAllowance(sender, _msgSender(), tokensAmount);
+    _transferShares(sender, to, sharesAmount);
+    _emitTransferEvents(sender, to, tokensAmount, sharesAmount);
+    return tokensAmount;
+  }
+
+  function _transfer(address sender, address to, uint256 amount) internal {
+    uint256 _sharesToTransfer = getSharesByBalance(amount);
+    _transferShares(sender, to, _sharesToTransfer);
+    _emitTransferEvents(sender, to, amount, _sharesToTransfer);
+  }
+
+  function _approve(address owner, address spender, uint256 amount) internal {
+    require(owner != address(0), "Approve from zero address");
+    require(spender != address(0), "Approve to zero address");
+
+    _allowances[owner][spender] = amount;
+    emit Approval(owner, spender, amount);
+  }
+
+  function _spendAllowance(address owner, address spender, uint256 amount) internal {
+    uint256 currentAllowance = _allowances[owner][spender];
+    if (currentAllowance != INFINITE_ALLOWANCE) {
+      require(currentAllowance >= amount, "Allowance exceeded");
+      _approve(owner, spender, currentAllowance - amount);
+    }
+  }
+
+  function _transferShares(address from, address to, uint256 sharesAmount) internal {
+    require(from != address(0), "Transfer from zero address");
+    require(to != address(0), "Transfer to zero address");
+    require(to != address(this), "Transfer to this contract");
+
+    uint256 currentSenderShares = _shares[from];
+    require(sharesAmount <= currentSenderShares, "Balance exceeded");
+
+    _shares[from] = currentSenderShares.sub(sharesAmount);
+    _shares[to] = _shares[to].add(sharesAmount);
+  }
+
+  function _mintShares(address to, uint256 sharesAmount) internal returns (uint256 newTotalShares) {
+    require(to != address(0), "Mint to zero address");
+
+    _totalShares = _totalShares.add(sharesAmount);
+    _shares[to] = _shares[to].add(sharesAmount);
+
+    return _totalShares;
+  }
+
+  function _burnShares(address account, uint256 sharesAmount) internal returns (uint256 newTotalShares) {
+    require(account != address(0), "Burn from zero address");
+
+    require(sharesAmount <= _shares[account], "Balance exceeded");
+
+    _totalShares = _totalShares.sub(sharesAmount);
+    _shares[account] = _shares[account].sub(sharesAmount);
+
+    return _totalShares;
+  }
+
+  function _emitTransferEvents(address from, address to, uint tokenAmount, uint256 sharesAmount) internal {
+    emit Transfer(from, to, tokenAmount);
+    emit TransferShares(from, to, sharesAmount);
+  }
+
+  modifier onlyVault() {
+    require(IVaultFactory(IWandProtocol(wandProtocol).vaultFactory()).isVault(_msgSender()), "Caller is not a Vault contract");
     _;
   }
+
+  /* ================= Events ================ */
+
+  event TransferShares(address indexed from, address indexed to, uint256 sharesValue);
 }

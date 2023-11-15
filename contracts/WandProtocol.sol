@@ -57,16 +57,16 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
 
   /* ========== Initialization Operations ========= */
 
-  function initialize(address _usbToken_, address _assetPoolCalculator_, address _assetPoolFactory_, address _interestPoolFactory_) external nonReentrant onlyOwner {
+  function initialize(address _usbToken_, address _vaultCalculator_, address _vaultFactory_, address _interestPoolFactory_) external nonReentrant onlyOwner {
     require(!initialized, "Already initialized");
     require(_usbToken_ != address(0), "Zero address detected");
-    require(_assetPoolCalculator_ != address(0), "Zero address detected");
-    require(_assetPoolFactory_ != address(0), "Zero address detected");
+    require(_vaultCalculator_ != address(0), "Zero address detected");
+    require(_vaultFactory_ != address(0), "Zero address detected");
     require(_interestPoolFactory_ != address(0), "Zero address detected");
 
     _usbToken = _usbToken_;
-    _vaultCalculator = _assetPoolCalculator_;
-    _vaultFactory = _assetPoolFactory_;
+    _vaultCalculator = _vaultCalculator_;
+    _vaultFactory = _vaultFactory_;
     _interestPoolFactory = _interestPoolFactory_;
 
     initialized = true;
@@ -75,12 +75,12 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
 
   /* ========== Asset Pool Operations ========== */
 
-  function addAssetPool(
+  function addVault(
     address assetToken, address assetPriceFeed, address xToken,
-    bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues
+    bytes32[] memory vaultParams, uint256[] memory vaultParamsValues
   ) external onlyInitialized nonReentrant onlyOwner {
 
-    IVaultFactory(_vaultFactory).addAssetPool(assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues);
+    IVaultFactory(_vaultFactory).addVault(assetToken, assetPriceFeed, xToken, vaultParams, vaultParamsValues);
 
     // Now iterate all interest pools and add the new X token (if not already added)
     IInterestPoolFactory(_interestPoolFactory).addRewardTokenToAllPools(xToken);

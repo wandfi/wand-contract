@@ -37,10 +37,10 @@ describe('Wand Protocol', () => {
     const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
     const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
     const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAART, ethAARS, ethAARC]))
-      .to.emit(vaultFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+      .to.emit(vaultFactory, 'VaultAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
@@ -61,10 +61,10 @@ describe('Wand Protocol', () => {
     const wbtcAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
     const wbtcAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
     const wbtcAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-    await expect(wandProtocol.connect(Alice).addAssetPool(wbtc.address, wbtcPriceFeed.address, wbtcxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(wbtc.address, wbtcPriceFeed.address, wbtcxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [wbtcY, wbtcAART, wbtcAARS, wbtcAARC])
-    ).to.emit(vaultFactory, 'AssetPoolAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
+    ).to.emit(vaultFactory, 'VaultAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
 
     await dumpContracts(wandProtocol.address);
     
@@ -256,10 +256,10 @@ describe('Wand Protocol', () => {
     const ethAART = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
     const ethAARS = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
     const ethAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
-    await expect(wandProtocol.connect(Alice).addAssetPool(ethAddress, ethPriceFeed.address, ethxToken.address,
+    await expect(wandProtocol.connect(Alice).addVault(ethAddress, ethPriceFeed.address, ethxToken.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAART, ethAARS, ethAARC]))
-      .to.emit(vaultFactory, 'AssetPoolAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
+      .to.emit(vaultFactory, 'VaultAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
     await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);

@@ -12,7 +12,7 @@ contract VaultFactory is IVaultFactory {
   address[] internal _assetTokens;
 
   mapping(address => address) internal _assetTokenToPools;
-  mapping(address => address) internal _poolToAssetTokens;
+  mapping(address => address) internal _vaultToAssetTokens;
 
   constructor(address _wandProtocol) {
     require(_wandProtocol != address(0), "Zero address detected");
@@ -26,22 +26,22 @@ contract VaultFactory is IVaultFactory {
     return _assetTokens;
   }
 
-  function addAssetPool(
+  function addVault(
     address assetToken, address assetPriceFeed, address xToken,
-    bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues
+    bytes32[] memory vaultParams, uint256[] memory vaultParamsValues
   ) external onlyProtocol {
     require(assetToken != address(0), "Zero address detected");
     require(assetPriceFeed != address(0), "Zero address detected");
 
     require(_assetTokenToPools[assetToken] == address(0), "Vault already exists");
 
-    address pool = address(new Vault(wandProtocol, assetToken, assetPriceFeed, xToken, assetPoolParams, assetPoolParamsValues));
+    address pool = address(new Vault(wandProtocol, assetToken, assetPriceFeed, xToken, vaultParams, vaultParamsValues));
 
     _assetTokens.push(assetToken);
     _assetTokenToPools[assetToken] = pool;
-    _poolToAssetTokens[pool] = assetToken;
+    _vaultToAssetTokens[pool] = assetToken;
 
-    emit AssetPoolAdded(assetToken, assetPriceFeed, _assetTokenToPools[assetToken]);
+    emit VaultAdded(assetToken, assetPriceFeed, _assetTokenToPools[assetToken]);
   }
 
   /* ========== IVaultFactory ========== */
@@ -51,9 +51,9 @@ contract VaultFactory is IVaultFactory {
     return _assetTokenToPools[assetToken];
   }
 
-  function isAssetPool(address poolAddress) external view returns (bool) {
-    require(poolAddress != address(0), "Zero address detected");
-    return _poolToAssetTokens[poolAddress] != address(0);
+  function isVault(address vaultAddress) external view returns (bool) {
+    require(vaultAddress != address(0), "Zero address detected");
+    return _vaultToAssetTokens[vaultAddress] != address(0);
   }
 
   /* ============== MODIFIERS =============== */
@@ -70,5 +70,5 @@ contract VaultFactory is IVaultFactory {
 
   /* =============== EVENTS ============= */
 
-  event AssetPoolAdded(address indexed assetToken, address assetPriceFeed, address pool);
+  event VaultAdded(address indexed assetToken, address assetPriceFeed, address pool);
 }
