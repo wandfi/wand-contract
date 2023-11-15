@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "../interfaces/IWandProtocol.sol";
 import "../interfaces/IProtocolSettings.sol";
 
-contract AssetX is Ownable, ERC20, ReentrancyGuard {
+contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
   using SafeMath for uint256;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -29,7 +29,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
 
     IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
     feeDecimals = settings.decimals();
-    fee = settings.paramDefaultValue("XTokensTransferFee");
+    fee = settings.paramDefaultValue("LeveragedTokensTransferFee");
   }
 
   /* ================= VIEWS ================ */
@@ -84,7 +84,7 @@ contract AssetX is Ownable, ERC20, ReentrancyGuard {
     require(newFee != fee, "Same transfer fee");
 
     IProtocolSettings settings = IProtocolSettings(IWandProtocol(wandProtocol).settings());
-    require(settings.isValidParam("XTokensTransferFee", newFee), "Invalid fee");
+    require(settings.isValidParam("LeveragedTokensTransferFee", newFee), "Invalid fee");
     
     uint256 prevFee = fee;
     fee = newFee;

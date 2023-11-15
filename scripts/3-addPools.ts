@@ -51,9 +51,9 @@ const wandProtocolAddress = '0xA04b31AEC92CA3DD300B5a612eCd1A23673447eA';
  *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
  * 
  *  - Create AssetPools
- *    - Deploy AssetX (WandProtocol.addVault)
+ *    - Deploy LeveragedToken (WandProtocol.addVault)
  *    - Create Vault
- *    - Set Vault to AssetX
+ *    - Set Vault to LeveragedToken
  *  - Create InterestPools
  *   - Deploy $USB InterestPool
  *   - Notifiy InterestPoolFactory
@@ -66,7 +66,7 @@ async function main() {
   const usbToken = USB__factory.connect(await wandProtocol.usbToken(), provider);
 
   // Create $ETHx token
-  const AssetXFactory = await ethers.getContractFactory('AssetX');
+  const AssetXFactory = await ethers.getContractFactory('LeveragedToken');
   const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
   const ethxToken = AssetX__factory.connect(ETHx.address, provider);
   console.log(`Deployed $ETHx token to ${ethxToken.address}`);

@@ -34,9 +34,9 @@ const treasuryAddress = deployer.address;
  *  - Register USB/VaultCalculator/VaultFactory/InterestPoolFactory to WandProtocol
  * 
  *  - Create AssetPools
- *    - Deploy AssetX (WandProtocol.addVault)
+ *    - Deploy LeveragedToken (WandProtocol.addVault)
  *    - Create Vault
- *    - Set Vault to AssetX
+ *    - Set Vault to LeveragedToken
  *  - Create InterestPools
  *   - Deploy $USB InterestPool
  *   - Notifiy InterestPoolFactory

@@ -49,7 +49,7 @@ contract VaultCalculator {
     return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** assetPool.AARDecimals()).div(assetPool.usbTotalSupply());
   }
 
-  function calculatePairedUSBAmountToRedeemByXTokens(IVault assetPool, uint256 xTokenAmount) public view returns (uint256) {
+  function calculatePairedUSBAmountToRedeemByLeveragedTokens(IVault assetPool, uint256 xTokenAmount) public view returns (uint256) {
     require(xTokenAmount > 0, "Amount must be greater than 0");
 
     uint256 xTokenTotalSupply = IERC20(assetPool.xToken()).totalSupply();
@@ -60,7 +60,7 @@ contract VaultCalculator {
     return xTokenAmount.mul(assetPool.usbTotalSupply()).div(xTokenTotalSupply);
   }
 
-  function calculateUSBToXTokensOut(Constants.AssetPoolState memory S, uint256 Delta_USB) public view returns (uint256) {
+  function calculateUSBToLeveragedTokensOut(Constants.AssetPoolState memory S, uint256 Delta_USB) public view returns (uint256) {
     // uint256 Delta_USB = usbAmount;
     require(Delta_USB > 0, "Amount must be greater than 0");
     require(Delta_USB < S.M_USB_ETH, "Too much $USB amount");
@@ -232,10 +232,10 @@ contract VaultCalculator {
     revert("Should not reach here");
   }
 
-  function calculateMintXTokensOut(IVault assetPool, uint256 assetAmount) public view returns (uint256) {
+  function calculateMintLeveragedTokensOut(IVault assetPool, uint256 assetAmount) public view returns (uint256) {
     uint256 aar = AAR(assetPool);
     require(assetPool.usbTotalSupply() == 0 || IERC20(assetPool.xToken()).totalSupply() == 0 || aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
-    // console.log('calculateMintXTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
+    // console.log('calculateMintLeveragedTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
     // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
 
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = assetPool.getAssetTokenPrice();

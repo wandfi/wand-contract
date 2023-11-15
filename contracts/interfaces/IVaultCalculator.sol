@@ -12,12 +12,12 @@ interface IVaultCalculator {
 
   function r(Constants.AssetPoolState memory S) external view returns (uint256);
 
-  function calculatePairedUSBAmountToRedeemByXTokens(IVault assetPool, uint256 xTokenAmount) external pure returns (uint256);
+  function calculatePairedUSBAmountToRedeemByLeveragedTokens(IVault assetPool, uint256 xTokenAmount) external pure returns (uint256);
 
-  function calculateUSBToXTokensOut(Constants.AssetPoolState memory S, uint256 usbAmount) external pure returns (uint256);
+  function calculateUSBToLeveragedTokensOut(Constants.AssetPoolState memory S, uint256 usbAmount) external pure returns (uint256);
 
   function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) external pure returns (uint256);
 
-  function calculateMintXTokensOut(IVault assetPool, uint256 assetAmount) external pure returns (uint256);
+  function calculateMintLeveragedTokensOut(IVault assetPool, uint256 assetAmount) external pure returns (uint256);
 
 }

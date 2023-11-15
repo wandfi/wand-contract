@@ -26,7 +26,7 @@ describe('Wand Protocol', () => {
     const genesisTime = await time.latest();
 
     // Create $ETHx token
-    const AssetXFactory = await ethers.getContractFactory('AssetX');
+    const AssetXFactory = await ethers.getContractFactory('LeveragedToken');
     expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
     const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
     const ethxToken = AssetX__factory.connect(ETHx.address, provider);
@@ -81,7 +81,7 @@ describe('Wand Protocol', () => {
     let expectedWBTCXAmount = ethers.utils.parseUnits('1', await wbtcxToken.decimals());
     await expect(wbtc.connect(Alice).mint(Dave.address, daveDepositWBTC.mul(2))).not.to.be.reverted;
     await expect(wbtc.connect(Dave).approve(wbtcPool.address, daveDepositWBTC.mul(2))).not.to.be.reverted;
-    await expect(wbtcPool.connect(Dave).mintXTokens(daveDepositWBTC)).not.to.be.reverted;
+    await expect(wbtcPool.connect(Dave).mintLeveragedTokens(daveDepositWBTC)).not.to.be.reverted;
     let expectedUsbAmount = ethers.utils.parseUnits('30000', await usbToken.decimals());
     expect(await wbtcPool.calculateMintUSBOut(daveDepositWBTC)).to.equal(expectedUsbAmount);
     await expect(wbtcPool.connect(Dave).mintUSB(daveDepositWBTC))
@@ -98,11 +98,11 @@ describe('Wand Protocol', () => {
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     await dumpAssetPoolState(ethPool);
     await expect(ethPool.calculateMintUSBOut(depositETHAmount)).to.be.rejectedWith(/AAR Below Safe Threshold/);
-    expect(await ethPool.calculateMintXTokensOut(depositETHAmount)).to.equal(expectedETHxAmount);
-    await expect(ethPool.connect(Caro).mintXTokens(depositETHAmount, {value: depositETHAmount}))
+    expect(await ethPool.calculateMintLeveragedTokensOut(depositETHAmount)).to.equal(expectedETHxAmount);
+    await expect(ethPool.connect(Caro).mintLeveragedTokens(depositETHAmount, {value: depositETHAmount}))
       .to.changeEtherBalances([Caro.address, ethPool.address], [ethers.utils.parseEther('-4'), depositETHAmount])
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Caro.address, expectedETHxAmount)
-      .to.emit(ethPool, 'XTokenMinted').withArgs(Caro.address, depositETHAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
+      .to.emit(ethPool, 'LeveragedTokenMinted').withArgs(Caro.address, depositETHAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
     expectBigNumberEquals(await ethxToken.balanceOf(Caro.address), expectedETHxAmount);
 
     // Day 3. Suppose ETH price is $2000. Alice deposit 2 ETH to mint 4000 $USB
@@ -143,12 +143,12 @@ describe('Wand Protocol', () => {
     const bobDepositETH2 = ethers.utils.parseEther('1');
     const expectedETHxAmount2 = ethers.utils.parseUnits('0.83582089552', await ethxToken.decimals());
     await dumpAssetPoolState(ethPool);
-    expectBigNumberEquals(await ethPool.calculateMintXTokensOut(bobDepositETH2), expectedETHxAmount2);
-    await expect(ethPool.connect(Bob).mintXTokens(bobDepositETH2, {value: bobDepositETH2}))
+    expectBigNumberEquals(await ethPool.calculateMintLeveragedTokensOut(bobDepositETH2), expectedETHxAmount2);
+    await expect(ethPool.connect(Bob).mintLeveragedTokens(bobDepositETH2, {value: bobDepositETH2}))
       .to.changeEtherBalances([Bob.address, ethPool.address], [ethers.utils.parseEther('-1'), bobDepositETH2])
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Bob.address, anyValue)
-      .to.emit(ethPool, 'XTokenMinted').withArgs(Bob.address, bobDepositETH2, anyValue, ethPrice, await ethPriceFeed.decimals());
+      .to.emit(ethPool, 'LeveragedTokenMinted').withArgs(Bob.address, bobDepositETH2, anyValue, ethPrice, await ethPriceFeed.decimals());
     // Interest is generated but not distributed, since no staking in the interest pool yet
     expectBigNumberEquals(await ethxToken.balanceOf(ethPool.address), expectedInterest);
     expectBigNumberEquals(await ethxToken.balanceOf(Bob.address), expectedETHxAmount2);
@@ -214,27 +214,27 @@ describe('Wand Protocol', () => {
     const expectedPairedUSBAmount = ethers.utils.parseUnits('93.018343567', await usbToken.decimals());
     const expectedETHAmount2 = ethers.utils.parseEther('0.14551427929');
     const expectedFee2 = ethers.utils.parseEther('0.00073122753');
-    expectBigNumberEquals(await ethPool.calculatePairedUSBAmountToRedeemByXTokens(bobRedeemETHxAmount), expectedPairedUSBAmount);
+    expectBigNumberEquals(await ethPool.calculatePairedUSBAmountToRedeemByLeveragedTokens(bobRedeemETHxAmount), expectedPairedUSBAmount);
     await expect(ethxToken.connect(Bob).approve(ethPool.address, bobRedeemETHxAmount)).not.to.be.reverted;
     await expect(usbToken.connect(Bob).approve(ethPool.address, expectedPairedUSBAmount.mul(11).div(10))).not.to.be.reverted;
-    await expect(ethPool.connect(Bob).redeemByXTokens(bobRedeemETHxAmount))
+    await expect(ethPool.connect(Bob).redeemByLeveragedTokens(bobRedeemETHxAmount))
       // .to.changeEtherBalances([Bob.address, ethPool.address], [expectedETHAmount2.add(expectedFee2), ethers.utils.parseEther('-0.16607940157')])
       .to.emit(ethxToken, 'Transfer').withArgs(Bob.address, ethers.constants.AddressZero, bobRedeemETHxAmount)
       .to.emit(usbToken, 'Transfer').withArgs(Bob.address, ethers.constants.AddressZero, anyValue)
-      .to.emit(ethPool, 'AssetRedeemedWithXTokens').withArgs(Bob.address, bobRedeemETHxAmount, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals())
-      .to.emit(ethPool, 'AssetRedeemedWithXTokensFeeCollected').withArgs(Bob.address, Ivy.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
+      .to.emit(ethPool, 'AssetRedeemedWithLeveragedTokens').withArgs(Bob.address, bobRedeemETHxAmount, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals())
+      .to.emit(ethPool, 'AssetRedeemedWithLeveragedTokensFeeCollected').withArgs(Bob.address, Ivy.address, bobRedeemETHxAmount, anyValue, anyValue, anyValue, ethPrice4, await ethPriceFeed.decimals());
 
     // Day 9. Alice 100 $USB -> $ETHx
     await dumpAssetPoolState(ethPool);
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 9);
     const aliceUSBSwapAmount = ethers.utils.parseUnits('100', await usbToken.decimals());
-    const calculatedETHxAmount = await ethPool.calculateUSBToXTokensOut(aliceUSBSwapAmount);
+    const calculatedETHxAmount = await ethPool.calculateUSBToLeveragedTokensOut(aliceUSBSwapAmount);
     await expect(usbToken.connect(Alice).approve(ethPool.address, aliceUSBSwapAmount)).not.to.be.reverted;
     // console.log(calculatedETHxAmount);
-    await expect(ethPool.connect(Alice).usbToXTokens(aliceUSBSwapAmount))
+    await expect(ethPool.connect(Alice).usbToLeveragedTokens(aliceUSBSwapAmount))
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, aliceUSBSwapAmount)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
-      .to.emit(ethPool, 'UsbToXTokens').withArgs(Alice.address, aliceUSBSwapAmount, anyValue, ethPrice4, await ethPriceFeed.decimals());
+      .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, aliceUSBSwapAmount, anyValue, ethPrice4, await ethPriceFeed.decimals());
   });
 
   it('Could not Send Ethers to Wand Contracts', async () => {
@@ -245,7 +245,7 @@ describe('Wand Protocol', () => {
     } = await loadFixture(deployContractsFixture);
 
     // Create $ETHx token
-    const AssetXFactory = await ethers.getContractFactory('AssetX');
+    const AssetXFactory = await ethers.getContractFactory('LeveragedToken');
     expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
     const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
     const ethxToken = AssetX__factory.connect(ETHx.address, provider);

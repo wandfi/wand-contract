@@ -30,7 +30,7 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
   /* ================= IERC20Metadata ================ */
 
   function name() public pure returns (string memory) {
-    return 'USB Token';
+    return 'Universal Stable Basis Token';
   }
 
   function symbol() public pure returns (string memory) {

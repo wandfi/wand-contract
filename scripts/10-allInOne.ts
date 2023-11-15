@@ -105,7 +105,7 @@ async function main() {
 
   // Step 3: Create asset pools
   // Create $ETHx token
-  const AssetXFactory = await ethers.getContractFactory('AssetX');
+  const AssetXFactory = await ethers.getContractFactory('LeveragedToken');
   const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
   const ethxToken = AssetX__factory.connect(ETHx.address, provider);
   console.log(`Deployed $ETHx token to ${ethxToken.address}`);

@@ -25,7 +25,7 @@ describe('Interest Pool', () => {
     const genesisTime = await time.latest();
 
     // Create $ETHx token
-    const AssetXFactory = await ethers.getContractFactory('AssetX');
+    const AssetXFactory = await ethers.getContractFactory('LeveragedToken');
     expect(AssetXFactory.bytecode.length / 2).lessThan(maxContractSize);
     const ETHx = await AssetXFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
     const ethxToken = AssetX__factory.connect(ETHx.address, provider);
@@ -88,7 +88,7 @@ describe('Interest Pool', () => {
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS);
     let ethPrice = BigNumber.from(2000).mul(BigNumber.from(10).pow(await ethPriceFeed.decimals()));
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await expect(ethPool.connect(Alice).mintXTokens(ethers.utils.parseEther("100"), {value: ethers.utils.parseEther("100")})).not.to.be.rejected;
+    await expect(ethPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseEther("100"), {value: ethers.utils.parseEther("100")})).not.to.be.rejected;
     await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     await dumpAssetPoolState(ethPool);
 
@@ -134,7 +134,7 @@ describe('Interest Pool', () => {
     await expect(wbtcPriceFeed.connect(Alice).mockPrice(wbtcPrice)).not.to.be.reverted;
     await expect(wbtc.connect(Alice).mint(Alice.address, ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.reverted;
     await expect(wbtc.connect(Alice).approve(wbtcPool.address, ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.reverted;
-    await expect(wbtcPool.connect(Alice).mintXTokens(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
+    await expect(wbtcPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
     // await expect(wbtcPool.connect(Alice).mintUSB(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
     await dumpAssetPoolState(wbtcPool);
 
@@ -169,7 +169,7 @@ describe('Interest Pool', () => {
     // For $WBTC asset pool, Bob mint $USB, and interest starts to be generated
     await expect(wbtc.connect(Alice).mint(Alice.address, ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.reverted;
     await expect(wbtc.connect(Alice).approve(wbtcPool.address, ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.reverted;
-    // await expect(wbtcPool.connect(Alice).mintXTokens(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
+    // await expect(wbtcPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
     await expect(wbtcPool.connect(Alice).mintUSB(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
     await dumpAssetPoolState(wbtcPool);
 

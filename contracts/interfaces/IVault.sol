@@ -25,11 +25,11 @@ interface IVault {
 
   function calculateMintUSBOut(uint256 assetAmount) external view returns (uint256);
   
-  function calculateMintXTokensOut(uint256 assetAmount) external view returns (uint256);
+  function calculateMintLeveragedTokensOut(uint256 assetAmount) external view returns (uint256);
 
-  function calculatePairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) external view returns (uint256);
+  function calculatePairedUSBAmountToRedeemByLeveragedTokens(uint256 xTokenAmount) external view returns (uint256);
 
-  function calculateUSBToXTokensOut(uint256 usbAmount) external returns (uint256);
+  function calculateUSBToLeveragedTokensOut(uint256 usbAmount) external returns (uint256);
 
   function calculateInterest() external view returns (uint256, uint256);
 }

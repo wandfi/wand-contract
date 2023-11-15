@@ -51,7 +51,7 @@ async function main() {
 
   // // deposit 0.01 ETH to mint $ETHx
   // const ethAmount = ethers.utils.parseEther('0.01');
-  // trans = await ethPool.connect(deployer).mintXTokens(ethAmount, {value: ethAmount});
+  // trans = await ethPool.connect(deployer).mintLeveragedTokens(ethAmount, {value: ethAmount});
   // await trans.wait();
   // console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $ETHx`);
   // await dumpAssetPoolState(ethPool);

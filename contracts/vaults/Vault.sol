@@ -153,17 +153,17 @@ contract Vault is IVault, Context, ReentrancyGuard {
     );
   }
 
-  function calculatePairedUSBAmountToRedeemByXTokens(uint256 xTokenAmount) public view returns (uint256) {
-    return IVaultCalculator(vaultCalculator).calculatePairedUSBAmountToRedeemByXTokens(IVault(this), xTokenAmount);
+  function calculatePairedUSBAmountToRedeemByLeveragedTokens(uint256 xTokenAmount) public view returns (uint256) {
+    return IVaultCalculator(vaultCalculator).calculatePairedUSBAmountToRedeemByLeveragedTokens(IVault(this), xTokenAmount);
   }
 
-  function calculateUSBToXTokensOut(uint256 usbAmount) public view returns (uint256) {
+  function calculateUSBToLeveragedTokensOut(uint256 usbAmount) public view returns (uint256) {
     uint256 aar = AAR();
     require(aar > 10 ** AARDecimals(), "AAR Below 100%");
     require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
     Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IVaultCalculator(vaultCalculator).calculateUSBToXTokensOut(S, usbAmount);
+    return IVaultCalculator(vaultCalculator).calculateUSBToLeveragedTokensOut(S, usbAmount);
   }
 
   function calculateMintUSBOut(uint256 assetAmount) public view returns (uint256) {
@@ -171,16 +171,16 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return IVaultCalculator(vaultCalculator).calculateMintUSBOut(S, assetAmount);
   }
 
-  function calculateMintXTokensOut(uint256 assetAmount) public view returns (uint256) {
-    return _calculateMintXTokensOut(assetAmount);
+  function calculateMintLeveragedTokensOut(uint256 assetAmount) public view returns (uint256) {
+    return _calculateMintLeveragedTokensOut(assetAmount);
   }
 
   function calculateRedemptionOutByUSB(uint256 usbAmount) public view returns (uint256, uint256) {
     return _calculateRedemptionOutByUSB(usbAmount);
   }
 
-  function calculateRedemptionOutByXTokens(uint256 xTokenAmount) public view returns (uint256, uint256, uint256) {
-    uint256 pairedUSBAmount = calculatePairedUSBAmountToRedeemByXTokens(xTokenAmount);
+  function calculateRedemptionOutByLeveragedTokens(uint256 xTokenAmount) public view returns (uint256, uint256, uint256) {
+    uint256 pairedUSBAmount = calculatePairedUSBAmountToRedeemByLeveragedTokens(xTokenAmount);
 
     // Δeth = Δethx * M_ETH / M_ETHx * (1 -C2)
     uint256 C2 = _assetPoolParamValue("C2");
@@ -233,15 +233,15 @@ contract Vault is IVault, Context, ReentrancyGuard {
    * @notice Mint X tokens using asset token
    * @param assetAmount: Amount of asset token used to mint
    */
-  function mintXTokens(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
-    uint256 xTokenAmount = _calculateMintXTokensOut(assetAmount);
+  function mintLeveragedTokens(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
+    uint256 xTokenAmount = _calculateMintLeveragedTokensOut(assetAmount);
 
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
     IAssetX(xToken).mint(_msgSender(), xTokenAmount);
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit XTokenMinted(_msgSender(), assetAmount, xTokenAmount, assetTokenPrice, assetTokenPriceDecimals);
+    emit LeveragedTokenMinted(_msgSender(), assetAmount, xTokenAmount, assetTokenPrice, assetTokenPriceDecimals);
   }
 
   /**
@@ -272,8 +272,8 @@ contract Vault is IVault, Context, ReentrancyGuard {
    * @notice Redeem asset tokens with X tokens
    * @param xTokenAmount: Amount of X tokens used to redeem for asset tokens
    */
-  function redeemByXTokens(uint256 xTokenAmount) external nonReentrant doCheckAAR doSettleInterest {
-    (uint256 pairedUSBAmount, uint256 assetAmount, uint256 fee) = calculateRedemptionOutByXTokens(xTokenAmount);
+  function redeemByLeveragedTokens(uint256 xTokenAmount) external nonReentrant doCheckAAR doSettleInterest {
+    (uint256 pairedUSBAmount, uint256 assetAmount, uint256 fee) = calculateRedemptionOutByLeveragedTokens(xTokenAmount);
 
     _usbTotalSupply = _usbTotalSupply.sub(pairedUSBAmount);
     _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
@@ -283,26 +283,26 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
     TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit AssetRedeemedWithXTokens(_msgSender(), xTokenAmount, pairedUSBAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
+    emit AssetRedeemedWithLeveragedTokens(_msgSender(), xTokenAmount, pairedUSBAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
 
     if (fee > 0) {
       _assetTotalAmount = _assetTotalAmount.sub(fee);
       address treasury = settings.treasury();
       TokensTransfer.transferTokens(assetToken, address(this), treasury, fee);
-      emit AssetRedeemedWithXTokensFeeCollected(_msgSender(), treasury, xTokenAmount, fee, pairedUSBAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
+      emit AssetRedeemedWithLeveragedTokensFeeCollected(_msgSender(), treasury, xTokenAmount, fee, pairedUSBAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
     }
   }
 
-  function usbToXTokens(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {  
+  function usbToLeveragedTokens(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {  
     require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough $USB balance");
-    uint256 xTokenOut = calculateUSBToXTokensOut(usbAmount);
+    uint256 xTokenOut = calculateUSBToLeveragedTokensOut(usbAmount);
 
     _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
     IUSB(usbToken).burn(_msgSender(), usbAmount);
     IAssetX(xToken).mint(_msgSender(), xTokenOut);
 
     (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit UsbToXTokens(_msgSender(), usbAmount, xTokenOut, assetTokenPrice, assetTokenPriceDecimals);
+    emit UsbToLeveragedTokens(_msgSender(), usbAmount, xTokenOut, assetTokenPrice, assetTokenPriceDecimals);
   }
 
   function checkAAR() external nonReentrant doCheckAAR {
@@ -387,7 +387,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return S;
   }
 
-  function _calculateMintXTokensOut(uint256 assetAmount) internal view returns (uint256) {
+  function _calculateMintLeveragedTokensOut(uint256 assetAmount) internal view returns (uint256) {
     require(assetAmount > 0, "Amount must be greater than 0");
     if (IERC20(xToken).totalSupply() == 0) {
       return assetAmount;
@@ -397,7 +397,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(_usbTotalSupply == 0 || aar > 10 ** AARDecimals(), "AAR Below 100%");
     require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
 
-    return IVaultCalculator(vaultCalculator).calculateMintXTokensOut(IVault(this), assetAmount);
+    return IVaultCalculator(vaultCalculator).calculateMintLeveragedTokensOut(IVault(this), assetAmount);
   }
 
   function _calculateRedemptionOutByUSB(uint256 usbAmount) internal view returns (uint256, uint256) {
@@ -488,12 +488,12 @@ contract Vault is IVault, Context, ReentrancyGuard {
   event UpdateParamValue(bytes32 indexed param, uint256 value);
   
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event XTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event LeveragedTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithUSBFeeCollected(address indexed user, address indexed feeTo, uint256 usbTokenAmount, uint256 feeAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event AssetRedeemedWithXTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event AssetRedeemedWithXTokensFeeCollected(address indexed user, address indexed feeTo, uint256 xTokenAmount, uint256 fee, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event UsbToXTokens(address indexed user, uint256 usbAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithLeveragedTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithLeveragedTokensFeeCollected(address indexed user, address indexed feeTo, uint256 xTokenAmount, uint256 fee, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event UsbToLeveragedTokens(address indexed user, uint256 usbAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
 
   event InterestSettlement(uint256 interestAmount, bool distributed);
 }
