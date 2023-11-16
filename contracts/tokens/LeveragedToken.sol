@@ -15,7 +15,7 @@ contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   address public immutable wandProtocol;
-  address public assetPool;
+  address public vault;
 
   uint256 public fee;
   uint256 public feeDecimals;
@@ -72,11 +72,11 @@ contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function mint(address to, uint256 amount) public nonReentrant onlyAssetPool {
+  function mint(address to, uint256 amount) public nonReentrant onlyVault {
     _mint(to, amount);
   }
 
-  function burn(address account, uint256 amount) public nonReentrant onlyAssetPool {
+  function burn(address account, uint256 amount) public nonReentrant onlyVault {
     _burn(account, amount);
   }
 
@@ -99,12 +99,12 @@ contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
   }
 
   function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
-    require(assetPool == address(0), "Vault already set");
+    require(vault == address(0), "Vault already set");
     require(_assetPool != address(0), "Zero address detected");
 
-    address prevAssetPool = assetPool;
-    assetPool = _assetPool;
-    emit SetAssetPool(prevAssetPool, assetPool);
+    address prevAssetPool = vault;
+    vault = _assetPool;
+    emit SetAssetPool(prevAssetPool, vault);
 
     _setWhitelistAddress(_assetPool, true);
   }
@@ -145,14 +145,14 @@ contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
 
   /* ============== MODIFIERS =============== */
 
-  modifier onlyAssetPool() {
-    require(assetPool != address(0) && assetPool == _msgSender(), "Caller is not Vault");
+  modifier onlyVault() {
+    require(vault != address(0) && vault == _msgSender(), "Caller is not Vault");
     _;
   }
 
   /* =============== EVENTS ============= */
 
-  event SetAssetPool(address indexed prevAssetPool, address indexed assetPool);
+  event SetAssetPool(address indexed prevAssetPool, address indexed vault);
   event UpdatedFee(uint256 prevFee, uint256 newFee);
   event UpdateWhitelistAddress(address account, bool whitelisted);
   event TransferFeeCollected(address indexed from, address indexed to, uint256 value);

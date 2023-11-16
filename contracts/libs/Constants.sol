@@ -9,8 +9,16 @@ library Constants {
 
   uint256 public constant PROTOCOL_DECIMALS = 10;
 
-  struct AssetPoolState {
+  enum VaultPhase {
+    Empty,
+    Stability,
+    AdjustmentBelowAARS,
+    AdjustmentAboveAARU
+  }
+
+  struct VaultState {
     uint256 M_ETH;
+    uint256 P_ETH_i;
     uint256 P_ETH;
     uint256 P_ETH_DECIMALS;
     uint256 M_USB_ETH;
@@ -18,6 +26,7 @@ library Constants {
     uint256 aar;
     uint256 AART;
     uint256 AARS;
+    uint256 AARU;
     uint256 AARC;
     uint256 AARDecimals;
     uint256 RateR;

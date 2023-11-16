@@ -184,7 +184,7 @@ export async function dumpAssetPoolState(assetPool: Vault) {
   const assetSymbol = (await assetPool.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
   const assetPriceFeed = PriceFeedMock__factory.connect(await assetPool.assetTokenPriceFeed(), provider);
   const usbToken = USB__factory.connect(await assetPool.usbToken(), provider);
-  const ethxToken = USB__factory.connect(await assetPool.xToken(), provider);
+  const ethxToken = USB__factory.connect(await assetPool.leveragedToken(), provider);
 
   const aar = await assetPool.AAR();
   const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await assetPool.AARDecimals());
@@ -220,12 +220,12 @@ export async function dumpContracts(wandProtocolAddress: string) {
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
     const assetPoolAddress = await vaultFactory.getVaultAddress(assetToken);
     const assetPool = Vault__factory.connect(assetPoolAddress, provider);
-    const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
+    const leveragedToken = ERC20__factory.connect(await assetPool.leveragedToken(), provider);
     console.log(`  $${assetSymbol} Pool`);
     console.log(`    Asset Token: ${assetToken}`);
     console.log(`    Asset Pool: ${assetPoolAddress}`);
     console.log(`    Asset Price Feed: ${await assetPool.assetTokenPriceFeed()}`);
-    console.log(`    $${await xToken.symbol()} Token: ${xToken.address}`);
+    console.log(`    $${await leveragedToken.symbol()} Token: ${leveragedToken.address}`);
   }
 
   const interestPoolFactory = InterestPoolFactory__factory.connect(await wandProtocol.interestPoolFactory(), provider);

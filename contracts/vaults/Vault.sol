@@ -16,7 +16,7 @@ import "../interfaces/IInterestPoolFactory.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IUSB.sol";
-import "../interfaces/IAssetX.sol";
+import "../interfaces/ILeveragedToken.sol";
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 
@@ -31,14 +31,19 @@ contract Vault is IVault, Context, ReentrancyGuard {
   address public immutable assetToken;
   address public immutable assetTokenPriceFeed;
   address public immutable usbToken;
-  address public immutable xToken;
+  address public immutable leveragedToken;
 
   uint256 internal immutable settingsDecimals;
-  EnumerableSet.Bytes32Set internal _assetPoolParamsSet;
-  mapping(bytes32 => uint256) internal _assetPoolParams;
+  EnumerableSet.Bytes32Set internal _vaultParamsSet;
+  mapping(bytes32 => uint256) internal _vaultParams;
 
   uint256 internal _assetTotalAmount;
-  uint256 internal _usbTotalSupply;
+  // uint256 internal _usbTotalSupply;
+  uint256 internal _usbTotalShares;
+
+  Constants.VaultPhase internal _currentVaultPhase;
+  Constants.VaultPhase internal _lastCheckedVaultPhase;
+  uint256 internal _stableAssetPrice;
 
   uint256 internal _lastInterestSettlementTime;
   uint256 internal _undistributedInterest;
@@ -50,11 +55,11 @@ contract Vault is IVault, Context, ReentrancyGuard {
     address _wandProtocol,
     address _assetToken,
     address _assetTokenPriceFeed,
-    address _xToken,
+    address _leveragedToken,
     bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues
   )  {
     require(
-      _wandProtocol != address(0) && _assetToken != address(0) && _assetTokenPriceFeed != address(0) && _xToken != address(0), 
+      _wandProtocol != address(0) && _assetToken != address(0) && _assetTokenPriceFeed != address(0) && _leveragedToken != address(0), 
       "Zero address detected"
     );
     require(assetPoolParams.length == assetPoolParamsValues.length, "Invalid params length");
@@ -64,7 +69,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
     assetToken = _assetToken;
     assetTokenPriceFeed = _assetTokenPriceFeed;
-    xToken = _xToken;
+    leveragedToken = _leveragedToken;
     vaultCalculator = wandProtocol.vaultCalculator();
     usbToken = wandProtocol.usbToken();
 
@@ -78,11 +83,12 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   /* ================= VIEWS ================ */
 
-  /**
-   * @notice Total amount of $USB tokens minted (burned subtracted) by this pool
-   */
   function usbTotalSupply() public view returns (uint256) {
-    return _usbTotalSupply;
+    return IUSB(usbToken).getBalanceByShares(_usbTotalShares);
+  }
+
+  function usbTotalShares() public view returns (uint256) {
+    return _usbTotalShares;
   }
 
   function getAssetTotalAmount() public view returns (uint256) {
@@ -101,7 +107,26 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function getParamValue(bytes32 param) public view returns (uint256) {
-    return _assetPoolParamValue(param);
+    return _vaultParamValue(param);
+  }
+
+  function getVaultPhase() public view returns (Constants.VaultPhase) {
+    if (_assetTotalAmount == 0) {
+      return Constants.VaultPhase.Empty;
+    }
+
+    uint256 aar = AAR();
+    uint256 AARS = _vaultParamValue("AARS");
+    uint256 AARU = _vaultParamValue("AARU");
+    if (aar < AARS) {
+      return Constants.VaultPhase.AdjustmentBelowAARS;
+    }
+    else if (aar > AARU) {
+      return Constants.VaultPhase.AdjustmentAboveAARU;
+    }
+    else {
+      return Constants.VaultPhase.Stability;
+    }
   }
 
   /**
@@ -116,193 +141,107 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return Constants.PROTOCOL_DECIMALS;
   }
 
-  function AARBelowSafeLineTime() public view returns (uint256) {
-    return _aarBelowSafeLineTime;
+  function calcMintBothAtStabilityPhase(uint256 assetAmount) public view returns (uint256, uint256) {
+    Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(vaultPhase == Constants.VaultPhase.Empty || vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
+
+    (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtStabilityPhase(assetAmount);
+    return (usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function AARBelowCircuitBreakerLineTime() public view returns (uint256) {
-    return _aarBelowCircuitBreakerLineTime;
+  function calcMintBothAtAdjustmentPhase(uint256 assetAmount) public view returns (uint256, uint256) {
+    Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
+
+    (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtAdjustmentPhase(assetAmount);
+    return (usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function r() public view returns (uint256) {
-    Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IVaultCalculator(vaultCalculator).r(S);
+  function calcMintUSBAboveAARU(uint256 assetAmount) public view returns (uint256) {
+    Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+
+    (, uint256 usbOutAmount) = _calcMintUSBAboveAARU(assetAmount);
+    return usbOutAmount;
   }
 
-  function R2() public view returns (uint256) {
-    uint256 aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
-    uint256 AART = _assetPoolParamValue("AART");
-    uint256 AARS = _assetPoolParamValue("AARS");
-    uint256 BasisR2 = _assetPoolParamValue("BasisR2");
-    if (aar >= AART) {
-      return 0;
-    }
-    else if (aar < AARS) {
-      return 10 ** settingsDecimals;
-    }
-    return BasisR2.mul(AART.sub(aar)).div(10 ** AARDecimals());
-  }
+  function calcMintLeveragedTokenBelowAARS(uint256 assetAmount) public view returns (uint256) {
+    Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
-  function paused() public view returns (bool) {
-    uint256 aar = AAR();
-    uint256 AARC = _assetPoolParamValue("AARC");
-    uint256 CircuitBreakPeriod = _assetPoolParamValue("CircuitBreakPeriod");
-    return (aar < AARC) && (
-      _aarBelowCircuitBreakerLineTime != 0 &&
-      block.timestamp.sub(_aarBelowCircuitBreakerLineTime) < CircuitBreakPeriod
-    );
-  }
-
-  function calculatePairedUSBAmountToRedeemByLeveragedTokens(uint256 xTokenAmount) public view returns (uint256) {
-    return IVaultCalculator(vaultCalculator).calculatePairedUSBAmountToRedeemByLeveragedTokens(IVault(this), xTokenAmount);
-  }
-
-  function calculateUSBToLeveragedTokensOut(uint256 usbAmount) public view returns (uint256) {
-    uint256 aar = AAR();
-    require(aar > 10 ** AARDecimals(), "AAR Below 100%");
-    require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
-
-    Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IVaultCalculator(vaultCalculator).calculateUSBToLeveragedTokensOut(S, usbAmount);
-  }
-
-  function calculateMintUSBOut(uint256 assetAmount) public view returns (uint256) {
-    Constants.AssetPoolState memory S = _getAssetPoolState();
-    return IVaultCalculator(vaultCalculator).calculateMintUSBOut(S, assetAmount);
-  }
-
-  function calculateMintLeveragedTokensOut(uint256 assetAmount) public view returns (uint256) {
-    return _calculateMintLeveragedTokensOut(assetAmount);
-  }
-
-  function calculateRedemptionOutByUSB(uint256 usbAmount) public view returns (uint256, uint256) {
-    return _calculateRedemptionOutByUSB(usbAmount);
-  }
-
-  function calculateRedemptionOutByLeveragedTokens(uint256 xTokenAmount) public view returns (uint256, uint256, uint256) {
-    uint256 pairedUSBAmount = calculatePairedUSBAmountToRedeemByLeveragedTokens(xTokenAmount);
-
-    // Δeth = Δethx * M_ETH / M_ETHx * (1 -C2)
-    uint256 C2 = _assetPoolParamValue("C2");
-    uint256 total = xTokenAmount.mul(_assetTotalAmount).div(IAssetX(xToken).totalSupply());
-    uint256 fee = total.mul(C2).div(10 ** settingsDecimals);
-    uint256 assetAmount = total.sub(fee);
-
-    return (pairedUSBAmount, assetAmount, fee);
-  }
-
-  function calculateInterest() public view returns (uint256, uint256) {
-    uint256 newInterestAmount = 0;
-    uint256 totalInterestAmount = newInterestAmount.add(_undistributedInterest);
-
-    if (_lastInterestSettlementTime == 0) {
-      return (newInterestAmount, totalInterestAmount);
-    }
-
-    // ∆ethx = (t / 365 days) * Y * M_ETHx
-    uint256 timeElapsed = block.timestamp.sub(_lastInterestSettlementTime);
-    uint256 xTokenTotalAmount = IAssetX(xToken).totalSupply();
-    uint256 Y = _assetPoolParamValue("Y");
-    newInterestAmount = timeElapsed.mul(Y).mul(xTokenTotalAmount).div(365 days).div(10 ** settingsDecimals);
-    totalInterestAmount = newInterestAmount.add(_undistributedInterest);
-
-    return (newInterestAmount, totalInterestAmount);
+    (, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokenBelowAARS(assetAmount);
+    return leveragedTokenOutAmount;
   }
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   /**
-   * @notice Mint $USB tokens using asset token
-   * @param assetAmount: Amount of asset token used to mint
+   * @notice At stable phase, mint $USB and leveraged tokens using asset token
+   * @param assetAmount Amount of asset token used to mint
    */
-  function mintUSB(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
-    Constants.AssetPoolState memory S = _getAssetPoolState();
-    uint256 usbOutAmount = IVaultCalculator(vaultCalculator).calculateMintUSBOut(S, assetAmount);
+  function mintBothAtStabilityPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
+    require(assetAmount > 0, "Amount must be greater than 0");
+    require(_currentVaultPhase == Constants.VaultPhase.Empty || _currentVaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
+
+    (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtStabilityPhase(assetAmount);
+    uint256 usbSharesOutAmount = IUSB(usbToken).getSharesByBalance(usbOutAmount);
 
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    _usbTotalSupply = _usbTotalSupply.add(usbOutAmount);
-
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-    IUSB(usbToken).mint(_msgSender(), usbOutAmount);
-   
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, assetTokenPrice, assetTokenPriceDecimals);
+
+    uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
+    _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
+    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
+    emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
   }
 
-  /**
-   * @notice Mint X tokens using asset token
-   * @param assetAmount: Amount of asset token used to mint
-   */
-  function mintLeveragedTokens(uint256 assetAmount) external payable nonReentrant doCheckAAR doSettleInterest {
-    uint256 xTokenAmount = _calculateMintLeveragedTokensOut(assetAmount);
+  function mintBothAtAdjustmentPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
+    require(assetAmount > 0, "Amount must be greater than 0");
+    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
+
+    (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtAdjustmentPhase(assetAmount);
+    uint256 usbSharesOutAmount = IUSB(usbToken).getSharesByBalance(usbOutAmount);
 
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-    IAssetX(xToken).mint(_msgSender(), xTokenAmount);
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit LeveragedTokenMinted(_msgSender(), assetAmount, xTokenAmount, assetTokenPrice, assetTokenPriceDecimals);
+
+    uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
+    _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
+    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
+    emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
   }
 
-  /**
-   * @notice Redeem asset tokens with $USB
-   * @param usbAmount: Amount of $USB tokens used to redeem for asset tokens
-   */
-  function redeemByUSB(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {
-    (uint256 assetAmount, uint256 fee) = _calculateRedemptionOutByUSB(usbAmount);
+  function mintUSBAboveAARU(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
+    require(assetAmount > 0, "Amount must be greater than 0");
+    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
-    _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
-    _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
+    (Constants.VaultState memory S, uint256 usbOutAmount) = _calcMintUSBAboveAARU(assetAmount);
+    uint256 usbSharesOutAmount = IUSB(usbToken).getSharesByBalance(usbOutAmount);
 
-    IUSB(usbToken).burn(_msgSender(), usbAmount);
-    
-    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit AssetRedeemedWithUSB(_msgSender(), usbAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
+    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
 
-    if (fee > 0) {
-      _assetTotalAmount = _assetTotalAmount.sub(fee);
-      address treasury = settings.treasury();
-      TokensTransfer.transferTokens(assetToken, address(this), treasury, fee);
-      emit AssetRedeemedWithUSBFeeCollected(_msgSender(), treasury, usbAmount, fee, assetTokenPrice, assetTokenPriceDecimals);
-    }
+    uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
+    _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
+
+    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
   }
 
-  /**
-   * @notice Redeem asset tokens with X tokens
-   * @param xTokenAmount: Amount of X tokens used to redeem for asset tokens
-   */
-  function redeemByLeveragedTokens(uint256 xTokenAmount) external nonReentrant doCheckAAR doSettleInterest {
-    (uint256 pairedUSBAmount, uint256 assetAmount, uint256 fee) = calculateRedemptionOutByLeveragedTokens(xTokenAmount);
+  function mintLeveragedTokenBelowAARS(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
+    require(assetAmount > 0, "Amount must be greater than 0");
+    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
-    _usbTotalSupply = _usbTotalSupply.sub(pairedUSBAmount);
-    _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
+    (Constants.VaultState memory S, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokenBelowAARS(assetAmount);
 
-    IUSB(usbToken).burn(_msgSender(), pairedUSBAmount);
-    IAssetX(xToken).burn(_msgSender(), xTokenAmount);
+    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
 
-    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit AssetRedeemedWithLeveragedTokens(_msgSender(), xTokenAmount, pairedUSBAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
-
-    if (fee > 0) {
-      _assetTotalAmount = _assetTotalAmount.sub(fee);
-      address treasury = settings.treasury();
-      TokensTransfer.transferTokens(assetToken, address(this), treasury, fee);
-      emit AssetRedeemedWithLeveragedTokensFeeCollected(_msgSender(), treasury, xTokenAmount, fee, pairedUSBAmount, assetAmount, assetTokenPrice, assetTokenPriceDecimals);
-    }
-  }
-
-  function usbToLeveragedTokens(uint256 usbAmount) external nonReentrant doCheckAAR doSettleInterest {  
-    require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough $USB balance");
-    uint256 xTokenOut = calculateUSBToLeveragedTokensOut(usbAmount);
-
-    _usbTotalSupply = _usbTotalSupply.sub(usbAmount);
-    IUSB(usbToken).burn(_msgSender(), usbAmount);
-    IAssetX(xToken).mint(_msgSender(), xTokenOut);
-
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-    emit UsbToLeveragedTokens(_msgSender(), usbAmount, xTokenOut, assetTokenPrice, assetTokenPriceDecimals);
+    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
+    emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
   }
 
   function checkAAR() external nonReentrant doCheckAAR {
@@ -324,16 +263,16 @@ contract Vault is IVault, Context, ReentrancyGuard {
   function _updateParam(bytes32 param, uint256 value) internal {
     require(settings.isValidParam(param, value), "Invalid param or value");
 
-    _assetPoolParamsSet.add(param);
-    _assetPoolParams[param] = value;
+    _vaultParamsSet.add(param);
+    _vaultParams[param] = value;
     emit UpdateParamValue(param, value);
   }
 
-  function _assetPoolParamValue(bytes32 param) internal view returns (uint256) {
+  function _vaultParamValue(bytes32 param) internal view returns (uint256) {
     require(param.length > 0, "Empty param name");
 
-    if (_assetPoolParamsSet.contains(param)) {
-      return _assetPoolParams[param];
+    if (_vaultParamsSet.contains(param)) {
+      return _vaultParams[param];
     }
     return settings.paramDefaultValue(param);
   }
@@ -341,8 +280,8 @@ contract Vault is IVault, Context, ReentrancyGuard {
   function _AAR() internal returns (uint256) {
     uint256 aar = AAR();
 
-    uint256 AARS = _assetPoolParamValue("AARS");
-    uint256 AARC = _assetPoolParamValue("AARC");
+    uint256 AARS = _vaultParamValue("AARS");
+    uint256 AARC = _vaultParamValue("AARC");
     // console.log('_AAR, _aarBelowSafeLineTime: %s, aar: %s, AARC: %s', _aarBelowSafeLineTime, aar, AARC);
     if (_aarBelowSafeLineTime == 0) {
       if (aar < AARS) {
@@ -366,103 +305,68 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return aar;
   }
 
-  function _getAssetPoolState() internal view returns (Constants.AssetPoolState memory) {
-    Constants.AssetPoolState memory S;
+  function _getVaultState() internal view returns (Constants.VaultState memory) {
+    Constants.VaultState memory S;
+    S.P_ETH_i = _stableAssetPrice;
     S.M_ETH = _assetTotalAmount;
     (S.P_ETH, ) = IPriceFeed(assetTokenPriceFeed).latestPrice();
     S.P_ETH_DECIMALS = IPriceFeed(assetTokenPriceFeed).decimals();
-    S.M_USB_ETH = _usbTotalSupply;
-    S.M_ETHx = IERC20(xToken).totalSupply();
+    S.M_USB_ETH = usbTotalSupply();
+    S.M_ETHx = IERC20(leveragedToken).totalSupply();
     S.aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
-    S.AART = _assetPoolParamValue("AART");
-    S.AARS = _assetPoolParamValue("AARS");
-    S.AARC = _assetPoolParamValue("AARC");
+    S.AART = _vaultParamValue("AART");
+    S.AARS = _vaultParamValue("AARS");
+    S.AARU = _vaultParamValue("AARU");
+    S.AARC = _vaultParamValue("AARC");
     S.AARDecimals = AARDecimals();
-    S.RateR = _assetPoolParamValue("RateR");
-    S.BasisR = _assetPoolParamValue("BasisR");
-    S.BasisR2 = _assetPoolParamValue("BasisR2");
+    S.RateR = _vaultParamValue("RateR");
+    S.BasisR = _vaultParamValue("BasisR");
+    S.BasisR2 = _vaultParamValue("BasisR2");
     S.aarBelowSafeLineTime = _aarBelowSafeLineTime;
     S.settingsDecimals = settingsDecimals;
 
     return S;
   }
 
-  function _calculateMintLeveragedTokensOut(uint256 assetAmount) internal view returns (uint256) {
-    require(assetAmount > 0, "Amount must be greater than 0");
-    if (IERC20(xToken).totalSupply() == 0) {
-      return assetAmount;
-    }
+  function _calcMintBothAtStabilityPhase(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256, uint256) {
+    Constants.VaultState memory S = _getVaultState();
 
-    uint256 aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
-    require(_usbTotalSupply == 0 || aar > 10 ** AARDecimals(), "AAR Below 100%");
-    require(!paused(), "AAR Below Circuit Breaker AAR Threshold");
-
-    return IVaultCalculator(vaultCalculator).calculateMintLeveragedTokensOut(IVault(this), assetAmount);
+    // ΔUSB = ΔETH * P_ETH_i * 1 / AART_eth
+    // ΔETHx = ΔETH * (1 - 1 / AART_eth) = ΔETH * (AART_eth - 1) / AART_eth
+    uint256 usbOutAmount = assetAmount.mul(S.P_ETH_i).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.AART);
+    uint256 leveragedTokenOutAmount = assetAmount.mul(
+      (S.AART).sub(10 ** S.AARDecimals)
+    ).div(S.AART);
+    return (S, usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function _calculateRedemptionOutByUSB(uint256 usbAmount) internal view returns (uint256, uint256) {
-    require(usbAmount > 0, "Amount must be greater than 0");
-    require(usbAmount <= _usbTotalSupply, "Too large $USB amount");
-    require(IUSB(usbToken).balanceOf(_msgSender()) >= usbAmount, "Not enough $USB balance");
+  function _calcMintBothAtAdjustmentPhase(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256, uint256) {
+    Constants.VaultState memory S = _getVaultState();
 
-    uint256 assetAmount = 0;
-
-    uint256 aar = AAR();
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = getAssetTokenPrice();
-
-    // if AAR >= 100%,  Δeth = (Δusb / P_ETH) * (1 -C1)
-    uint256 fee = 0;
-    if (aar >= 10 ** AARDecimals()) {
-      uint256 total = usbAmount.mul(10 ** assetTokenPriceDecimals).div(assetTokenPrice);
-      // C1 only takes effect when AAR >= [2 * (AART - 100%) + 100%]
-      uint256 AART = _assetPoolParamValue("AART");
-      uint256 C1 = _assetPoolParamValue("C1");
-      if (aar >= AART.sub(10 ** AARDecimals()).mul(2).add(10 ** AARDecimals())) {
-        fee = total.mul(C1).div(10 ** settingsDecimals);
-      }
-      assetAmount = total.sub(fee);
-    }
-    // else if AAR < 100%, Δeth = (Δusb * M_ETH) / Musb-eth
-    else {
-      uint256 assetTotalAmount = _assetTotalAmount;
-      assetAmount = usbAmount.mul(assetTotalAmount).div(_usbTotalSupply);
-    }
-
-    return (assetAmount, fee);
+    // ΔUSB = ΔETH * P_ETH * 1 / AAR
+    // ΔETHx = ΔETH * P_ETH * M_ETHx / (AAR * Musb-eth)
+    uint256 usbOutAmount = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.aar);
+    uint256 leveragedTokenOutAmount = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS)
+      .mul(S.M_ETHx).mul(10 ** S.AARDecimals).div(S.aar).div(S.M_USB_ETH);
+    return (S, usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function _settleInterest() internal {
-    (uint256 newInterestAmount, uint256 totalInterestAmount) = calculateInterest();
-    if (newInterestAmount > 0) {
-      IAssetX(xToken).mint(address(this), newInterestAmount);
-    }
-    // console.log('_settleInterest, new interest: %s, total: %s', newInterestAmount, totalInterestAmount);
+  function _calcMintUSBAboveAARU(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = _getVaultState();
 
-    if (totalInterestAmount > 0) {
-      IInterestPoolFactory interestPoolFactory = IInterestPoolFactory(wandProtocol.interestPoolFactory());
-      IAssetX(xToken).approve(address(interestPoolFactory), totalInterestAmount);
-      bool distributed = interestPoolFactory.distributeInterestRewards(xToken, totalInterestAmount);
-      emit InterestSettlement(totalInterestAmount, distributed);
-
-      if (distributed) {
-        _undistributedInterest = 0;
-      }
-      else {
-        _undistributedInterest = totalInterestAmount;
-      }
-    }
+    // ΔUSB = ΔETH * P_ETH
+    uint256 usbOutAmount = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
+    return (S, usbOutAmount);
   }
 
-  /**
-   * @notice Interest generation starts when both $USB and X tokens are minted
-   */
-  function _startOrPauseInterestGeneration() internal {
-    if (_usbTotalSupply > 0 && IAssetX(xToken).totalSupply() > 0) {
-      _lastInterestSettlementTime = block.timestamp;
-    }
-    else {
-      _lastInterestSettlementTime = 0;
-    }
+  function _calcMintLeveragedTokenBelowAARS(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = _getVaultState();
+
+    // ΔETHx = ΔETH * P_ETH * M_ETHx / (M_ETH * P_ETH - Musb-eth)
+    uint256 leveragedTokenOutAmount = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(S.M_ETHx).div(
+      S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH)
+    );
+    return (S, leveragedTokenOutAmount);
   }
 
   /* ============== MODIFIERS =============== */
@@ -472,12 +376,27 @@ contract Vault is IVault, Context, ReentrancyGuard {
     _;
   }
 
-  modifier doSettleInterest() {
-    _settleInterest();
+  modifier doUpdateVaultPhase() {
+    _currentVaultPhase = getVaultPhase();
+    if (_lastCheckedVaultPhase == Constants.VaultPhase.Stability && _currentVaultPhase == Constants.VaultPhase.Stability) {
+      // noop
+    }
+    else {
+      (uint256 price, ) = IPriceFeed(assetTokenPriceFeed).latestPrice();
+      _stableAssetPrice = price;
+    }
+
     _;
-    _startOrPauseInterestGeneration();
+    _lastCheckedVaultPhase = _currentVaultPhase;
   }
 
+  modifier doSettleInterest() {
+    // _settleInterest();
+    // _;
+    // _startOrPauseInterestGeneration();
+  }
+
+  // TODO: delete
   modifier doCheckAAR() {
     _;
     _AAR(); // update _aarBelowSafeLineTime and _aarBelowCircuitBreakerLineTime
@@ -487,7 +406,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   event UpdateParamValue(bytes32 indexed param, uint256 value);
   
-  event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 usbSharesAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event LeveragedTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event AssetRedeemedWithUSBFeeCollected(address indexed user, address indexed feeTo, uint256 usbTokenAmount, uint256 feeAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);

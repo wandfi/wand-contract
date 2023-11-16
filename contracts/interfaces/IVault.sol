@@ -14,7 +14,7 @@ interface IVault {
 
   function getAssetTokenPrice() external view returns (uint256, uint256);
 
-  function xToken() external view returns (address);
+  function leveragedToken() external view returns (address);
 
   /**
    * @notice Current adequency ratio of the pool, with decimals specified via AARDecimals()

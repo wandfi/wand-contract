@@ -88,7 +88,7 @@ async function dumpAssetPoolState(assetPool: Vault) {
   const assetSymbol = (await assetPool.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
   const assetPriceFeed = PriceFeedMock__factory.connect(await assetPool.assetTokenPriceFeed(), provider);
   const usbToken = USB__factory.connect(await assetPool.usbToken(), provider);
-  const ethxToken = USB__factory.connect(await assetPool.xToken(), provider);
+  const ethxToken = USB__factory.connect(await assetPool.leveragedToken(), provider);
 
   const aar = await assetPool.AAR();
   const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await assetPool.AARDecimals());

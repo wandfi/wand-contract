@@ -76,14 +76,14 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   /* ========== Asset Pool Operations ========== */
 
   function addVault(
-    address assetToken, address assetPriceFeed, address xToken,
+    address assetToken, address assetPriceFeed, address leveragedToken,
     bytes32[] memory vaultParams, uint256[] memory vaultParamsValues
   ) external onlyInitialized nonReentrant onlyOwner {
 
-    IVaultFactory(_vaultFactory).addVault(assetToken, assetPriceFeed, xToken, vaultParams, vaultParamsValues);
+    IVaultFactory(_vaultFactory).addVault(assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues);
 
     // Now iterate all interest pools and add the new X token (if not already added)
-    IInterestPoolFactory(_interestPoolFactory).addRewardTokenToAllPools(xToken);
+    IInterestPoolFactory(_interestPoolFactory).addRewardTokenToAllPools(leveragedToken);
   }
 
   /* ========== Interest Pool Operations ========== */

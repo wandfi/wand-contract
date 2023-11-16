@@ -27,7 +27,7 @@ contract VaultFactory is IVaultFactory {
   }
 
   function addVault(
-    address assetToken, address assetPriceFeed, address xToken,
+    address assetToken, address assetPriceFeed, address leveragedToken,
     bytes32[] memory vaultParams, uint256[] memory vaultParamsValues
   ) external onlyProtocol {
     require(assetToken != address(0), "Zero address detected");
@@ -35,7 +35,7 @@ contract VaultFactory is IVaultFactory {
 
     require(_assetTokenToPools[assetToken] == address(0), "Vault already exists");
 
-    address pool = address(new Vault(wandProtocol, assetToken, assetPriceFeed, xToken, vaultParams, vaultParamsValues));
+    address pool = address(new Vault(wandProtocol, assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues));
 
     _assetTokens.push(assetToken);
     _assetTokenToPools[assetToken] = pool;

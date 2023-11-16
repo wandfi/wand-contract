@@ -276,12 +276,12 @@ async function main() {
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
     const assetPoolAddress = await vaultFactory.getVaultAddress(assetToken);
     const assetPool = Vault__factory.connect(assetPoolAddress, provider);
-    const xToken = ERC20__factory.connect(await assetPool.xToken(), provider);
+    const leveragedToken = ERC20__factory.connect(await assetPool.leveragedToken(), provider);
     console.log(`  $${assetSymbol} Pool: ${assetPoolAddress}`);
     console.log(`    Asset Token: ${assetToken}`);
     // console.log(`    Asset Pool: ${assetPoolAddress}`);
     console.log(`    Asset Price Oracle: ${await assetPool.assetTokenPriceFeed()}`);
-    console.log(`    $${await xToken.symbol()} Token: ${xToken.address}`);
+    console.log(`    $${await leveragedToken.symbol()} Token: ${leveragedToken.address}`);
   }
 
   const stakingTokens = await interestPoolFactory.stakingTokens();

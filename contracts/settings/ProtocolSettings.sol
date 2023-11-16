@@ -43,10 +43,12 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     _upsertParamConfig("CircuitBreakPeriod", 1 hours, 1 minutes, 1 days);
     // X Tokens transfer fee. Default to 0.08%, [0, 100%]
     _upsertParamConfig("LeveragedTokensTransferFee", 8 * 10 ** 6, 0, 10 ** 10);
-    // Target AAR. Default 200%, [100%, 1000%]
-    _upsertParamConfig("AART", 2 * 10 ** 10, 10 ** 10, 10 ** 11);
-    // Safe AAR. Default 150%, [100%, 1000%]
-    _upsertParamConfig("AARS", 15 * 10 ** 9, 10 ** 10, 10 ** 11);
+    // Target AAR. Default 150%, [100%, 1000%]
+    _upsertParamConfig("AART", 15 * 10 ** 9, 10 ** 10, 10 ** 11);
+    // Safe AAR. Default 130%, [100%, 1000%]
+    _upsertParamConfig("AARS", 13 * 10 ** 9, 10 ** 10, 10 ** 11);
+    // Upper AAR. Default 200%, [100%, 1000%]
+    _upsertParamConfig("AARU", 2 * 10 ** 10, 10 ** 10, 10 ** 11);
     // Circuit Breaker AAR. Default 110%, [100%, 1000%]
     _upsertParamConfig("AARC", 11 * 10 ** 9, 10 ** 10, 10 ** 11);
   }

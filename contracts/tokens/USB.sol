@@ -74,7 +74,7 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
       .div(_totalSupply);
   }
 
-  function getBalanceByShares(uint256 sharesAmount) public view returns (uint256) {
+  function getBalanceByShares(uint256 sharesAmount) public view override returns (uint256) {
     if (_totalShares == 0) return 0;
   
     return sharesAmount
@@ -114,7 +114,7 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
 
   /* ================= IUSB Functions ================ */
 
-  function mint(address to, uint256 amount) public nonReentrant override onlyVault {
+  function mint(address to, uint256 amount) public nonReentrant override onlyVault returns (uint256) {
     require(to != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
@@ -123,6 +123,8 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
     _totalSupply = _totalSupply.add(amount);
 
     _emitTransferEvents(address(0), to, amount, sharesAmount);
+
+    return sharesAmount;
   }
 
   function burn(address account, uint256 amount) public nonReentrant override onlyVault {

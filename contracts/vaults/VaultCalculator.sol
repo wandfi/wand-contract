@@ -32,40 +32,50 @@ contract VaultCalculator {
     usbToken = _usbToken;
   }
 
-  function AAR(IVault assetPool) public view returns (uint256) {
-    if (assetPool.usbTotalSupply() == 0 && IERC20(assetPool.xToken()).totalSupply() == 0) {
+  function AAR(IVault vault) public view returns (uint256) {
+    // if (vault.usbTotalSupply() == 0 && IERC20(vault.leveragedToken()).totalSupply() == 0) {
+    //   return 0;
+    // }
+    // else if (vault.usbTotalSupply() == 0 && IERC20(vault.leveragedToken()).totalSupply() > 0) {
+    //   return type(uint256).max;
+    // }
+
+    if (vault.getAssetTotalAmount() == 0) {
       return 0;
     }
-    else if (assetPool.usbTotalSupply() == 0 && IERC20(assetPool.xToken()).totalSupply() > 0) {
+
+    if (vault.usbTotalSupply() == 0) {
       return type(uint256).max;
     }
 
-    uint256 assetTotalAmount = assetPool.getAssetTotalAmount();
-    if (assetTotalAmount == 0) {
-      return 0;
-    }
+    // uint256 assetTotalAmount = vault.getAssetTotalAmount();
 
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = assetPool.getAssetTokenPrice();
-    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** assetPool.AARDecimals()).div(assetPool.usbTotalSupply());
+
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = vault.getAssetTokenPrice();
+    return vault.getAssetTotalAmount().mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** vault.AARDecimals()).div(vault.usbTotalSupply());
   }
 
-  function calculatePairedUSBAmountToRedeemByLeveragedTokens(IVault assetPool, uint256 xTokenAmount) public view returns (uint256) {
-    require(xTokenAmount > 0, "Amount must be greater than 0");
+  // function calculateStabilityPhaseMintOut(IVault vault, uint256 assetAmount) public view returns (uint256, uint256) {
 
-    uint256 xTokenTotalSupply = IERC20(assetPool.xToken()).totalSupply();
+  // }
+
+  function calculatePairedUSBAmountToRedeemByLeveragedTokens(IVault vault, uint256 leveragedTokenAmount) public view returns (uint256) {
+    require(leveragedTokenAmount > 0, "Amount must be greater than 0");
+
+    uint256 xTokenTotalSupply = IERC20(vault.leveragedToken()).totalSupply();
     require(xTokenTotalSupply > 0, "No x tokens minted yet");
-    require(xTokenAmount <= xTokenTotalSupply, "Amount must be less than total supply");
+    require(leveragedTokenAmount <= xTokenTotalSupply, "Amount must be less than total supply");
 
     // Δusb = Δethx * Musb-eth / M_ETHx
-    return xTokenAmount.mul(assetPool.usbTotalSupply()).div(xTokenTotalSupply);
+    return leveragedTokenAmount.mul(vault.usbTotalSupply()).div(xTokenTotalSupply);
   }
 
-  function calculateUSBToLeveragedTokensOut(Constants.AssetPoolState memory S, uint256 Delta_USB) public view returns (uint256) {
+  function calculateUSBToLeveragedTokensOut(Constants.VaultState memory S, uint256 Delta_USB) public view returns (uint256) {
     // uint256 Delta_USB = usbAmount;
     require(Delta_USB > 0, "Amount must be greater than 0");
     require(Delta_USB < S.M_USB_ETH, "Too much $USB amount");
 
-    // require(S.aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
+    // require(S.aar >= vault.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= vault.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
     
     // AAR'eth = (M_ETH * P_ETH / (Musb-eth - Δusb)) * 100%
     S.aar_ = S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.M_USB_ETH.sub(Delta_USB));
@@ -157,9 +167,9 @@ contract VaultCalculator {
   }
 
   // 𝑟 = 0 𝑖𝑓 𝐴𝐴𝑅 ≥ 2
-  // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2;
-  // 𝑟 = assetPool.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅S) + assetPool.RateR() × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
-  function r(Constants.AssetPoolState memory S) public view returns (uint256) {
+  // 𝑟 = vault.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅) 𝑖𝑓 1.5 <= 𝐴𝐴𝑅 < 2;
+  // 𝑟 = vault.BasisR() × (𝐴𝐴𝑅𝑇 − 𝐴𝐴𝑅S) + vault.RateR() × 𝑡(h𝑟𝑠) 𝑖𝑓 𝐴𝐴𝑅 < 1.5;
+  function r(Constants.VaultState memory S) public view returns (uint256) {
     if (S.aar < S.AARS) {
       Terms memory T;
       T.T1 = S.AART.sub(S.AARS).mul(S.BasisR).div(10 ** S.settingsDecimals);
@@ -172,7 +182,7 @@ contract VaultCalculator {
     return 0;
   }
 
-  function calculateMintUSBOut(Constants.AssetPoolState memory S, uint256 assetAmount) public pure returns (uint256) {
+  function calculateMintUSBOut(Constants.VaultState memory S, uint256 assetAmount) public pure returns (uint256) {
     require(assetAmount > 0, "Amount must be greater than 0");
 
     require(S.aar >= S.AARS, "AAR Below Safe Threshold");
@@ -232,30 +242,30 @@ contract VaultCalculator {
     revert("Should not reach here");
   }
 
-  function calculateMintLeveragedTokensOut(IVault assetPool, uint256 assetAmount) public view returns (uint256) {
-    uint256 aar = AAR(assetPool);
-    require(assetPool.usbTotalSupply() == 0 || IERC20(assetPool.xToken()).totalSupply() == 0 || aar > 10 ** assetPool.AARDecimals(), "AAR Below 100%");
+  function calculateMintLeveragedTokensOut(IVault vault, uint256 assetAmount) public view returns (uint256) {
+    uint256 aar = AAR(vault);
+    require(vault.usbTotalSupply() == 0 || IERC20(vault.leveragedToken()).totalSupply() == 0 || aar > 10 ** vault.AARDecimals(), "AAR Below 100%");
     // console.log('calculateMintLeveragedTokensOut, _aarBelowCircuitBreakerLineTime: %s, now: %s', _aarBelowCircuitBreakerLineTime, block.timestamp);
-    // require(aar >= assetPool.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= assetPool.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
+    // require(aar >= vault.AARC() || (block.timestamp.sub(_aarBelowCircuitBreakerLineTime) >= vault.CircuitBreakPeriod()), "AAR Below Circuit Breaker AAR Threshold");
 
-    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = assetPool.getAssetTokenPrice();
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = vault.getAssetTokenPrice();
 
     // Initial mint: Δethx = Δeth
-    uint256 xTokenAmount = assetAmount;
+    uint256 leveragedTokenAmount = assetAmount;
 
     // Otherwise: Δethx = (Δeth * P_ETH * M_ETHx) / (M_ETH * P_ETH - Musb-eth)
-    if (IERC20(assetPool.xToken()).totalSupply() > 0) {
-      uint256 assetTotalAmount = assetPool.getAssetTotalAmount();
+    if (IERC20(vault.leveragedToken()).totalSupply() > 0) {
+      uint256 assetTotalAmount = vault.getAssetTotalAmount();
 
-      uint256 xTokenTotalAmount = IERC20(assetPool.xToken()).totalSupply();
+      uint256 xTokenTotalAmount = IERC20(vault.leveragedToken()).totalSupply();
 
       Terms memory T;
       T.T1 = assetAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(xTokenTotalAmount); // (Δeth * P_ETH * M_ETHx)
-      T.T2 = assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(assetPool.usbTotalSupply()); // (M_ETH * P_ETH - Musb-eth)
-      xTokenAmount = T.T1.div(T.T2);
+      T.T2 = assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).sub(vault.usbTotalSupply()); // (M_ETH * P_ETH - Musb-eth)
+      leveragedTokenAmount = T.T1.div(T.T2);
     }
 
-    return xTokenAmount;
+    return leveragedTokenAmount;
   }
 
 }
