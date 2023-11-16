@@ -38,7 +38,6 @@ contract Vault is IVault, Context, ReentrancyGuard {
   mapping(bytes32 => uint256) internal _vaultParams;
 
   uint256 internal _assetTotalAmount;
-  // uint256 internal _usbTotalSupply;
   uint256 internal _usbTotalShares;
 
   Constants.VaultPhase internal _currentVaultPhase;
@@ -184,17 +183,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(_currentVaultPhase == Constants.VaultPhase.Empty || _currentVaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtStabilityPhase(assetAmount);
-    uint256 usbSharesOutAmount = IUSB(usbToken).getSharesByBalance(usbOutAmount);
-
-    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-
-    uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
-    _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
-    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
-
-    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
-    emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
   function mintBothAtAdjustmentPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
@@ -202,17 +191,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtAdjustmentPhase(assetAmount);
-    uint256 usbSharesOutAmount = IUSB(usbToken).getSharesByBalance(usbOutAmount);
-
-    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-
-    uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
-    _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
-    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
-
-    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
-    emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
   function mintUSBAboveAARU(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
@@ -220,15 +199,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount) = _calcMintUSBAboveAARU(assetAmount);
-    uint256 usbSharesOutAmount = IUSB(usbToken).getSharesByBalance(usbOutAmount);
-
-    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-
-    uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
-    _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
-
-    emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    _doMint(assetAmount, S, usbOutAmount, 0);
   }
 
   function mintLeveragedTokenBelowAARS(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
@@ -236,12 +207,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
     (Constants.VaultState memory S, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokenBelowAARS(assetAmount);
-
-    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
-
-    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
-    emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    _doMint(assetAmount, S, 0, leveragedTokenOutAmount);
   }
 
   function checkAAR() external nonReentrant doCheckAAR {
@@ -369,6 +335,22 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return (S, leveragedTokenOutAmount);
   }
 
+  function _doMint(uint256 assetAmount, Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) internal {
+    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
+
+    if (usbOutAmount > 0) {
+      uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
+      _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
+      emit USBMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    }
+
+    if (leveragedTokenOutAmount > 0) {
+      ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
+      emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    }
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyOwner() {
@@ -392,7 +374,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   modifier doSettleInterest() {
     // _settleInterest();
-    // _;
+    _;
     // _startOrPauseInterestGeneration();
   }
 
