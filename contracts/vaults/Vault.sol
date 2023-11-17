@@ -140,23 +140,23 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return Constants.PROTOCOL_DECIMALS;
   }
 
-  function calcMintBothAtStabilityPhase(uint256 assetAmount) public view returns (uint256, uint256) {
+  function calcMintPairsAtStabilityPhase(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256, uint256)  {
     Constants.VaultPhase vaultPhase = getVaultPhase();
     require(vaultPhase == Constants.VaultPhase.Empty || vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
 
-    (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtStabilityPhase(assetAmount);
+    (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtStabilityPhase(assetAmount);
     return (usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function calcMintBothAtAdjustmentPhase(uint256 assetAmount) public view returns (uint256, uint256) {
+  function calcMintPairsAtAdjustmentPhase(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256, uint256) {
     Constants.VaultPhase vaultPhase = getVaultPhase();
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
 
-    (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtAdjustmentPhase(assetAmount);
+    (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtAdjustmentPhase(assetAmount);
     return (usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function calcMintUSBAboveAARU(uint256 assetAmount) public view returns (uint256) {
+  function calcMintUSBAboveAARU(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256) {
     Constants.VaultPhase vaultPhase = getVaultPhase();
     require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
@@ -164,50 +164,135 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return usbOutAmount;
   }
 
-  function calcMintLeveragedTokenBelowAARS(uint256 assetAmount) public view returns (uint256) {
+  function calcMintLeveragedTokensBelowAARS(uint256 assetAmount) noneZeroValue(assetAmount) public view returns (uint256) {
     Constants.VaultPhase vaultPhase = getVaultPhase();
     require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
-    (, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokenBelowAARS(assetAmount);
+    (, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokensBelowAARS(assetAmount);
     return leveragedTokenOutAmount;
   }
 
-  /* ========== MUTATIVE FUNCTIONS ========== */
+  function calcPairdLeveragedTokenAmount(uint256 usbAmount) public view noneZeroValue(usbAmount) returns (uint256) {
+    Constants.VaultState memory S = _getVaultState();
 
-  /**
-   * @notice At stable phase, mint $USB and leveraged tokens using asset token
-   * @param assetAmount Amount of asset token used to mint
-   */
-  function mintBothAtStabilityPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
-    require(assetAmount > 0, "Amount must be greater than 0");
+    // ΔUSB = ΔETHx * Musb-eth / M_ETHx
+    // ΔETHx = ΔUSB * M_ETHx / Musb-eth
+    uint256 leveragedTokenOutAmount = usbAmount.mul(S.M_ETHx).div(S.M_USB_ETH);
+    return leveragedTokenOutAmount;
+  }
+
+  function calcPairedUSBAmount(uint256 leveragedTokenAmount) public view noneZeroValue(leveragedTokenAmount) returns (uint256) {
+    Constants.VaultState memory S = _getVaultState();
+
+    // ΔUSB = ΔETHx * Musb-eth / M_ETHx
+    // ΔETHx = ΔUSB * M_ETHx / Musb-eth
+    uint256 usbOutAmount = leveragedTokenAmount.mul(S.M_USB_ETH).div(S.M_ETHx);
+    return usbOutAmount;
+  }
+
+  function calcPairedRedeemAssetAmount(uint256 leveragedTokenAmount) public view noneZeroValue(leveragedTokenAmount) returns (uint256) {
+    (, uint256 assetAmount) = _calcPairedRedeemAssetAmount(leveragedTokenAmount);
+    return assetAmount;
+  }
+
+  function calcRedeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) public view noneZeroValue(leveragedTokenAmount) returns (uint256) {
+    Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+
+    (, uint256 assetAmount) = _calcRedeemByLeveragedTokenAboveAARU(leveragedTokenAmount);
+    return assetAmount;
+  }
+
+  function calcRedeemByUSBBelowAARS(uint256 usbAmount) public view noneZeroValue(usbAmount) returns (uint256) {
+    Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+
+    (, uint256 assetAmount) = _calcRedeemByUSBBelowAARS(usbAmount);
+    return assetAmount;
+  }
+
+  /* ========== Mint FUNCTIONS ========== */
+
+  function mintPairsAtStabilityPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
     require(_currentVaultPhase == Constants.VaultPhase.Empty || _currentVaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
 
-    (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtStabilityPhase(assetAmount);
+    (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtStabilityPhase(assetAmount);
     _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function mintBothAtAdjustmentPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
-    require(assetAmount > 0, "Amount must be greater than 0");
+  function mintPairsAtAdjustmentPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
 
-    (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintBothAtAdjustmentPhase(assetAmount);
+    (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtAdjustmentPhase(assetAmount);
     _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function mintUSBAboveAARU(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
-    require(assetAmount > 0, "Amount must be greater than 0");
+  function mintUSBAboveAARU(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount) = _calcMintUSBAboveAARU(assetAmount);
     _doMint(assetAmount, S, usbOutAmount, 0);
   }
 
-  function mintLeveragedTokenBelowAARS(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase {
-    require(assetAmount > 0, "Amount must be greater than 0");
+  function mintLeveragedTokensBelowAARS(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
-    (Constants.VaultState memory S, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokenBelowAARS(assetAmount);
+    (Constants.VaultState memory S, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokensBelowAARS(assetAmount);
     _doMint(assetAmount, S, 0, leveragedTokenOutAmount);
+  }
+
+   /* ========== Redeem FUNCTIONS ========== */
+
+  function redeemByPairsWithExpectedUSBAmount(uint256 usbAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(usbAmount) {
+    require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+
+    uint256 pairdLeveragedTokenAmount = calcPairdLeveragedTokenAmount(usbAmount);
+    require(pairdLeveragedTokenAmount <= ILeveragedToken(leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
+
+    (Constants.VaultState memory S, uint256 assetOutAmount) = _calcPairedRedeemAssetAmount(pairdLeveragedTokenAmount);
+    _doRedeem(assetOutAmount, S, usbAmount, pairdLeveragedTokenAmount);
+
+    emit AssetRedeemedWithPairs(_msgSender(), usbAmount, pairdLeveragedTokenAmount, assetOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    // TODO: fee
+  }
+
+  function redeemByPairsWithExpectedLeveragedTokenAmount(uint256 leveragedTokenAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(leveragedTokenAmount) {
+    require(leveragedTokenAmount <= ILeveragedToken(leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
+
+    uint256 pairedUSBAmount = calcPairedUSBAmount(leveragedTokenAmount);
+    require(pairedUSBAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+
+    (Constants.VaultState memory S, uint256 assetOutAmount) = _calcPairedRedeemAssetAmount(leveragedTokenAmount);
+    _doRedeem(assetOutAmount, S, pairedUSBAmount, leveragedTokenAmount);
+
+    emit AssetRedeemedWithPairs(_msgSender(), pairedUSBAmount, leveragedTokenAmount, assetOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    // TODO: fee
+  }
+
+  function redeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(leveragedTokenAmount) {
+    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+    require(leveragedTokenAmount <= ILeveragedToken(leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
+
+    (Constants.VaultState memory S, uint256 assetOutAmount) = _calcRedeemByLeveragedTokenAboveAARU(leveragedTokenAmount);
+    _doRedeem(assetOutAmount, S, 0, leveragedTokenAmount);
+
+    emit AssetRedeemedWithLeveragedToken(_msgSender(), leveragedTokenAmount, assetOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    // TODO: fee
+  }
+
+  function redeemByUSBBelowAARS(uint256 usbAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(usbAmount) {
+    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+    require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+
+    (Constants.VaultState memory S, uint256 assetOutAmount) = _calcRedeemByUSBBelowAARS(usbAmount);
+    _doRedeem(assetOutAmount, S, usbAmount, 0);
+    
+    emit AssetRedeemedWithUSB(_msgSender(), usbAmount, assetOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    // TODO: fee
   }
 
   function checkAAR() external nonReentrant doCheckAAR {
@@ -294,7 +379,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return S;
   }
 
-  function _calcMintBothAtStabilityPhase(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256, uint256) {
+  function _calcMintPairsAtStabilityPhase(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256, uint256) {
     Constants.VaultState memory S = _getVaultState();
 
     // ΔUSB = ΔETH * P_ETH_i * 1 / AART_eth
@@ -306,7 +391,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return (S, usbOutAmount, leveragedTokenOutAmount);
   }
 
-  function _calcMintBothAtAdjustmentPhase(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256, uint256) {
+  function _calcMintPairsAtAdjustmentPhase(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256, uint256) {
     Constants.VaultState memory S = _getVaultState();
 
     // ΔUSB = ΔETH * P_ETH * 1 / AAR
@@ -325,7 +410,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return (S, usbOutAmount);
   }
 
-  function _calcMintLeveragedTokenBelowAARS(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256) {
+  function _calcMintLeveragedTokensBelowAARS(uint256 assetAmount) internal view returns (Constants.VaultState memory, uint256) {
     Constants.VaultState memory S = _getVaultState();
 
     // ΔETHx = ΔETH * P_ETH * M_ETHx / (M_ETH * P_ETH - Musb-eth)
@@ -333,6 +418,39 @@ contract Vault is IVault, Context, ReentrancyGuard {
       S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH)
     );
     return (S, leveragedTokenOutAmount);
+  }
+
+  function _calcPairedRedeemAssetAmount(uint256 leveragedTokenAmount) internal view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = _getVaultState();
+
+    // ΔETH = ΔETHx * M_ETH / M_ETHx
+    uint256 assetOutAmount = leveragedTokenAmount.mul(S.M_ETH).div(S.M_ETHx);
+    return (S, assetOutAmount);
+  }
+
+  function _calcRedeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) internal view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = _getVaultState();
+
+    // ΔETH = ΔETHx * (M_ETH * P_ETH - Musb-eth) / (M_ETHx * P_ETH)
+    uint256 assetOutAmount = leveragedTokenAmount.mul(
+      S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH)
+    ).div(S.M_ETHx.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS));
+    return (S, assetOutAmount);
+  }
+
+  function _calcRedeemByUSBBelowAARS(uint256 usbAmount) internal view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = _getVaultState();
+
+    if (S.aar < (10 ** S.AARDecimals)) {
+      // ΔETH = ΔUSB * M_ETHx / Musb-eth
+      uint256 assetOutAmount = usbAmount.mul(S.M_ETHx).div(S.M_USB_ETH);
+      return (S, assetOutAmount);
+    }
+    else {
+      // ΔETH = ΔUSB / P_ETH
+      uint256 assetOutAmount = usbAmount.mul(10 ** S.P_ETH_DECIMALS).div(S.P_ETH);
+      return (S, assetOutAmount);
+    }
   }
 
   function _doMint(uint256 assetAmount, Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) internal {
@@ -351,10 +469,38 @@ contract Vault is IVault, Context, ReentrancyGuard {
     }
   }
 
+  function _doRedeem(uint256 assetAmount, Constants.VaultState memory S, uint256 usbAmount, uint256 leveragedTokenAmount) internal {
+    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
+
+    require(assetAmount <= _assetTotalAmount, "Not enough asset balance");
+    _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
+    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
+
+    if (usbAmount > 0) {
+      uint256 usbBurnShares = IUSB(usbToken).burn(_msgSender(), usbAmount);
+      _usbTotalShares = _usbTotalShares.sub(usbBurnShares);
+    }
+
+    if (leveragedTokenAmount > 0) {
+      ILeveragedToken(leveragedToken).burn(_msgSender(), leveragedTokenAmount);
+    }
+  }
+
   /* ============== MODIFIERS =============== */
 
   modifier onlyOwner() {
     require(_msgSender() == wandProtocol.protocolOwner(), "Caller is not owner");
+    _;
+  }
+
+  modifier noneZeroValue(uint256 value) {
+    require(value > 0, "Value must be greater than 0");
+    _;
+  }
+
+  modifier noneZeroAddress(address addr) {
+    require(addr != address(0), "Zero address detected");
     _;
   }
 
@@ -390,11 +536,13 @@ contract Vault is IVault, Context, ReentrancyGuard {
   
   event USBMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 usbSharesAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event LeveragedTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event AssetRedeemedWithUSBFeeCollected(address indexed user, address indexed feeTo, uint256 usbTokenAmount, uint256 feeAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event AssetRedeemedWithLeveragedTokens(address indexed user, uint256 xTokenAmount, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event AssetRedeemedWithLeveragedTokensFeeCollected(address indexed user, address indexed feeTo, uint256 xTokenAmount, uint256 fee, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event UsbToLeveragedTokens(address indexed user, uint256 usbAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  // event AssetRedeemedWithUSB(address indexed user, uint256 usbTokenAmount, uint256 assetTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  // event AssetRedeemedWithUSBFeeCollected(address indexed user, address indexed feeTo, uint256 usbTokenAmount, uint256 feeAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithPairs(address indexed user, uint256 usbAmount, uint256 leveragedTokenAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithUSB(address indexed user, uint256 usbAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event AssetRedeemedWithLeveragedToken(address indexed user, uint256 leveragedTokenAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  // event AssetRedeemedWithPairsFeeCollected(address indexed user, address indexed feeTo, uint256 xTokenAmount, uint256 fee, uint256 pairedUSBAmount, uint256 assetAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  // event UsbToLeveragedTokens(address indexed user, uint256 usbAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
 
   event InterestSettlement(uint256 interestAmount, bool distributed);
 }

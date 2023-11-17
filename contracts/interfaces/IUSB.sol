@@ -11,6 +11,6 @@ interface IUSB is IERC20 {
 
   function mint(address to, uint256 amount) external returns (uint256);
 
-  function burn(address account, uint256 amount) external;
+  function burn(address account, uint256 amount) external returns (uint256);
 
 }

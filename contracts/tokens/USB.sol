@@ -127,7 +127,7 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
     return sharesAmount;
   }
 
-  function burn(address account, uint256 amount) public nonReentrant override onlyVault {
+  function burn(address account, uint256 amount) public nonReentrant override onlyVault returns (uint256) {
     require(account != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
@@ -136,6 +136,8 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
     _totalSupply = _totalSupply.sub(amount);
 
     _emitTransferEvents(account, address(0), amount, sharesAmount);
+
+    return sharesAmount;
   }
 
 
