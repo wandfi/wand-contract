@@ -33,12 +33,16 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     _upsertParamConfig("C2", 5 * 10 ** 7, 0, 10 ** 9);
     // Yield rate. Default to 3.5%, [0, 50%]
     _upsertParamConfig("Y", 35 * 10 ** 7, 0, 5 * 10 ** 9);
+
     // Basis of r. Default to 0.1, [0, 1]
-    _upsertParamConfig("BasisR", 10 ** 9, 0, 10 ** 10);
+    // _upsertParamConfig("BasisR", 10 ** 9, 0, 10 ** 10);
+    
     // Rate of r change per hour. Default to 0.001, [0, 1]
     _upsertParamConfig("RateR", 10 ** 7, 0, 10 ** 10);
+
     // Basis of R2. Default to 0.06, [0, 1]
-    _upsertParamConfig("BasisR2", 6 * 10 ** 8, 0, 10 ** 10);
+    // _upsertParamConfig("BasisR2", 6 * 10 ** 8, 0, 10 ** 10);
+
     // Circuit breaker period. Default to 1 hour, [1 minute, 1 day]
     _upsertParamConfig("CircuitBreakPeriod", 1 hours, 1 minutes, 1 days);
     // X Tokens transfer fee. Default to 0.08%, [0, 100%]
