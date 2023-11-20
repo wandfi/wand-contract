@@ -78,7 +78,7 @@ describe('Asset Pool', () => {
     // Asset Pool State: M_ETH = 3, M_USB = 3000, M_ETHx = 2, AAR: 3 * 3000 / 3000 = 300%
     // await dumpAssetPoolState(ethPool);
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('3', await ethPool.AARDecimals()));
-    expect(await ethPool.getAssetTotalAmount()).to.equal(ethers.utils.parseEther('3'));
+    expect(await ethPool.assetTotalAmount()).to.equal(ethers.utils.parseEther('3'));
     expect(await ethPool.usbTotalSupply()).to.equal(ethers.utils.parseUnits('3000', await usbToken.decimals()));
     expect(await usbToken.totalSupply()).to.equal(ethers.utils.parseUnits('3000', await usbToken.decimals()));
     expect(await ethxToken.totalSupply()).to.equal(ethers.utils.parseUnits('2', await ethxToken.decimals()));
@@ -98,7 +98,7 @@ describe('Asset Pool', () => {
     // Asset Pool State: M_ETH = 6, M_USB = 3000, M_ETHx = 6, AAR: 6 * 2000 / 3000 = 400%
     // await dumpAssetPoolState(ethPool);
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('4', await ethPool.AARDecimals()));
-    expect(await ethPool.getAssetTotalAmount()).to.equal(ethers.utils.parseEther('6'));
+    expect(await ethPool.assetTotalAmount()).to.equal(ethers.utils.parseEther('6'));
     expect(await ethPool.usbTotalSupply()).to.equal(ethers.utils.parseUnits('3000', await usbToken.decimals()));
     expect(await usbToken.totalSupply()).to.equal(ethers.utils.parseUnits('3000', await usbToken.decimals()));
     expect(await ethxToken.totalSupply()).to.equal(ethers.utils.parseUnits('6', await ethxToken.decimals()));

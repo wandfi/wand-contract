@@ -28,10 +28,10 @@ contract Vault is IVault, Context, ReentrancyGuard {
   IWandProtocol public immutable wandProtocol;
   IProtocolSettings public immutable settings;
   address public immutable vaultCalculator;
-  address public immutable assetToken;
+  address public immutable _assetToken;
   address public immutable assetTokenPriceFeed;
   address public immutable usbToken;
-  address public immutable leveragedToken;
+  address public immutable _leveragedToken;
 
   uint256 internal immutable settingsDecimals;
   EnumerableSet.Bytes32Set internal _vaultParamsSet;
@@ -52,13 +52,13 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   constructor(
     address _wandProtocol,
-    address _assetToken,
+    address _assetToken_,
     address _assetTokenPriceFeed,
-    address _leveragedToken,
+    address _leveragedToken_,
     bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues
   )  {
     require(
-      _wandProtocol != address(0) && _assetToken != address(0) && _assetTokenPriceFeed != address(0) && _leveragedToken != address(0), 
+      _wandProtocol != address(0) && _assetToken_ != address(0) && _assetTokenPriceFeed != address(0) && _leveragedToken_ != address(0), 
       "Zero address detected"
     );
     require(assetPoolParams.length == assetPoolParamsValues.length, "Invalid params length");
@@ -66,9 +66,9 @@ contract Vault is IVault, Context, ReentrancyGuard {
     wandProtocol = IWandProtocol(_wandProtocol);
     require(msg.sender == wandProtocol.vaultFactory(), "Vault should only be created by factory contract");
 
-    assetToken = _assetToken;
+    _assetToken = _assetToken_;
     assetTokenPriceFeed = _assetTokenPriceFeed;
-    leveragedToken = _leveragedToken;
+    _leveragedToken = _leveragedToken_;
     vaultCalculator = wandProtocol.vaultCalculator();
     usbToken = wandProtocol.usbToken();
 
@@ -90,19 +90,23 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return _usbTotalShares;
   }
 
-  function getAssetTotalAmount() public view returns (uint256) {
+  function assetTotalAmount() public view returns (uint256) {
     return _assetTotalAmount;
   }
 
-  function getAssetToken() public view returns (address) {
-    return assetToken;
+  function assetToken() public view returns (address) {
+    return _assetToken;
   }
 
-  function getAssetTokenPrice() public view returns (uint256, uint256) {
+  function assetTokenPrice() public view returns (uint256, uint256) {
     (uint256 price, ) = IPriceFeed(assetTokenPriceFeed).latestPrice();
     uint256 priceDecimals = IPriceFeed(assetTokenPriceFeed).decimals();
 
     return (price, priceDecimals);
+  }
+
+  function leveragedToken() public view returns (address) {
+    return _leveragedToken;
   }
 
   function getParamValue(bytes32 param) public view returns (uint256) {
@@ -150,7 +154,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   function calcMintPairsAtAdjustmentPhase(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256, uint256) {
     Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
+    require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
 
     (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtAdjustmentPhase(assetAmount);
     return (usbOutAmount, leveragedTokenOutAmount);
@@ -255,7 +259,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(usbAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough USB balance");
 
     uint256 pairdLeveragedTokenAmount = calcPairdLeveragedTokenAmount(usbAmount);
-    require(pairdLeveragedTokenAmount <= ILeveragedToken(leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
+    require(pairdLeveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = _calcPairedRedeemAssetAmount(pairdLeveragedTokenAmount);
     _doRedeem(assetOutAmount, S, usbAmount, pairdLeveragedTokenAmount);
@@ -266,7 +270,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function redeemByPairsWithExpectedLeveragedTokenAmount(uint256 leveragedTokenAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(leveragedTokenAmount) {
-    require(leveragedTokenAmount <= ILeveragedToken(leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
+    require(leveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
 
     uint256 pairedUSBAmount = calcPairedUsbAmount(leveragedTokenAmount);
     require(pairedUSBAmount <= IUSB(usbToken).balanceOf(_msgSender()), "Not enough USB balance");
@@ -281,7 +285,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   function redeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(leveragedTokenAmount) {
     require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
-    require(leveragedTokenAmount <= ILeveragedToken(leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
+    require(leveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = _calcRedeemByLeveragedTokenAboveAARU(leveragedTokenAmount);
     _doRedeem(assetOutAmount, S, 0, leveragedTokenAmount);
@@ -315,7 +319,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     _usbTotalShares = _usbTotalShares.sub(usbSharesAmount);
     emit UsbBurned(_msgSender(), usbAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
 
-    ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenAmount);
+    ILeveragedToken(_leveragedToken).mint(_msgSender(), leveragedTokenAmount);
     emit LeveragedTokenMinted(_msgSender(), usbAmount, leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
 
     emit UsbToLeveragedTokens(_msgSender(), usbAmount, leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
@@ -399,7 +403,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     (S.P_ETH, ) = IPriceFeed(assetTokenPriceFeed).latestPrice();
     S.P_ETH_DECIMALS = IPriceFeed(assetTokenPriceFeed).decimals();
     S.M_USB_ETH = usbTotalSupply();
-    S.M_ETHx = IERC20(leveragedToken).totalSupply();
+    S.M_ETHx = IERC20(_leveragedToken).totalSupply();
     S.aar = IVaultCalculator(vaultCalculator).AAR(IVault(this));
     S.AART = _vaultParamValue("AART");
     S.AARS = _vaultParamValue("AARS");
@@ -432,8 +436,10 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
     // ΔUSB = ΔETH * P_ETH * 1 / AAR
     // ΔETHx = ΔETH * P_ETH * M_ETHx / (AAR * Musb-eth)
-    uint256 usbOutAmount = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).mul(10 ** S.AARDecimals).div(S.aar);
-    uint256 leveragedTokenOutAmount = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS)
+    Constants.Terms memory T;
+    T.T1 = assetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
+    uint256 usbOutAmount = T.T1.mul(10 ** S.AARDecimals).div(S.aar);
+    uint256 leveragedTokenOutAmount = T.T1
       .mul(S.M_ETHx).mul(10 ** S.AARDecimals).div(S.aar).div(S.M_USB_ETH);
     return (S, usbOutAmount, leveragedTokenOutAmount);
   }
@@ -501,7 +507,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   function _doMint(uint256 assetAmount, Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) internal {
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
+    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(this), assetAmount);
 
     if (usbOutAmount > 0) {
       uint256 usbSharesAmount = IUSB(usbToken).mint(_msgSender(), usbOutAmount);
@@ -510,18 +516,18 @@ contract Vault is IVault, Context, ReentrancyGuard {
     }
 
     if (leveragedTokenOutAmount > 0) {
-      ILeveragedToken(leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
+      ILeveragedToken(_leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
       emit LeveragedTokenMinted(_msgSender(), assetAmount, leveragedTokenOutAmount, S.P_ETH, S.P_ETH_DECIMALS);
     }
   }
 
   function _doRedeem(uint256 assetAmount, Constants.VaultState memory S, uint256 usbAmount, uint256 leveragedTokenAmount) internal {
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), assetAmount);
+    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(this), assetAmount);
 
     require(assetAmount <= _assetTotalAmount, "Not enough asset balance");
     _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
-    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), assetAmount);
+    TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), assetAmount);
 
     if (usbAmount > 0) {
       uint256 usbBurnShares = IUSB(usbToken).burn(_msgSender(), usbAmount);
@@ -530,7 +536,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     }
 
     if (leveragedTokenAmount > 0) {
-      ILeveragedToken(leveragedToken).burn(_msgSender(), leveragedTokenAmount);
+      ILeveragedToken(_leveragedToken).burn(_msgSender(), leveragedTokenAmount);
       emit LeveragedTokenBurned(_msgSender(), leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
     }
   }

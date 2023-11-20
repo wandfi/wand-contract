@@ -2,19 +2,22 @@
 pragma solidity ^0.8.18;
 
 interface IVault {
-
   /**
    * @notice Total amount of $USB tokens minted (burned subtracted) by this pool
    */
   function usbTotalSupply() external view returns (uint256);
 
-  function getAssetTotalAmount() external view returns (uint256);
+  function usbTotalShares() external view returns (uint256);
 
-  function getAssetToken() external view returns (address);
+  function assetTotalAmount() external view returns (uint256);
 
-  function getAssetTokenPrice() external view returns (uint256, uint256);
+  function assetToken() external view returns (address);
+
+  function assetTokenPrice() external view returns (uint256, uint256);
 
   function leveragedToken() external view returns (address);
+
+  function getParamValue(bytes32 param) external view returns (uint256);
 
   /**
    * @notice Current adequency ratio of the pool, with decimals specified via AARDecimals()
@@ -23,13 +26,13 @@ interface IVault {
 
   function AARDecimals() external view returns (uint256);
 
-  function calculateMintUSBOut(uint256 assetAmount) external view returns (uint256);
-  
-  function calculateMintLeveragedTokensOut(uint256 assetAmount) external view returns (uint256);
+  function calcMintPairsAtStabilityPhase(uint256 assetAmount) external view returns (uint256, uint256);
 
-  function calculatePairedUSBAmountToRedeemByLeveragedTokens(uint256 xTokenAmount) external view returns (uint256);
+  function calcMintPairsAtAdjustmentPhase(uint256 assetAmount) external view returns (uint256, uint256);
 
-  function calculateUSBToLeveragedTokensOut(uint256 usbAmount) external returns (uint256);
+  function calcMintUsbAboveAARU(uint256 assetAmount) external view returns (uint256);
 
-  function calculateInterest() external view returns (uint256, uint256);
+  function calcMintLeveragedTokensBelowAARS(uint256 assetAmount) external view returns (uint256);
+
+  function calcPairdLeveragedTokenAmount(uint256 usbAmount) external view returns (uint256);
 }
