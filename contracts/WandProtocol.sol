@@ -8,7 +8,6 @@ import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
 import "./interfaces/IVaultFactory.sol";
 import "./interfaces/IVault.sol";
-import "./interfaces/IInterestPoolFactory.sol";
 import "./interfaces/IWandProtocol.sol";
 import "./settings/ProtocolSettings.sol";
 
@@ -19,8 +18,6 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
 
   address internal _usbToken;
   address internal _vaultFactory;
-  address internal _interestPoolFactory;
-  address internal _vaultCalculator;
 
   bool public initialized;
 
@@ -43,31 +40,19 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
     return _usbToken;
   }
 
-  function vaultCalculator() public view override returns (address) {
-    return _vaultCalculator;
-  }
-
   function vaultFactory() public view override returns (address) {
     return _vaultFactory;
   }
 
-  function interestPoolFactory() public view override returns (address) {
-    return _interestPoolFactory;
-  }
-
   /* ========== Initialization Operations ========= */
 
-  function initialize(address _usbToken_, address _vaultCalculator_, address _vaultFactory_, address _interestPoolFactory_) external nonReentrant onlyOwner {
+  function initialize(address _usbToken_, address _vaultFactory_) external nonReentrant onlyOwner {
     require(!initialized, "Already initialized");
     require(_usbToken_ != address(0), "Zero address detected");
-    require(_vaultCalculator_ != address(0), "Zero address detected");
     require(_vaultFactory_ != address(0), "Zero address detected");
-    require(_interestPoolFactory_ != address(0), "Zero address detected");
 
     _usbToken = _usbToken_;
-    _vaultCalculator = _vaultCalculator_;
     _vaultFactory = _vaultFactory_;
-    _interestPoolFactory = _interestPoolFactory_;
 
     initialized = true;
     emit Initialized();
@@ -81,15 +66,6 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   ) external onlyInitialized nonReentrant onlyOwner {
 
     IVaultFactory(_vaultFactory).addVault(assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues);
-
-    // Now iterate all interest pools and add the new X token (if not already added)
-    IInterestPoolFactory(_interestPoolFactory).addRewardTokenToAllPools(leveragedToken);
-  }
-
-  /* ========== Interest Pool Operations ========== */
-
-  function addRewardTokenToInterestPool(address stakingToken, address rewardToken) public onlyInitialized nonReentrant onlyOwner {
-    IInterestPoolFactory(_interestPoolFactory).addRewardToken(stakingToken, rewardToken);
   }
 
   /* ============== MODIFIERS =============== */

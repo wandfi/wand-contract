@@ -51,17 +51,22 @@ library Constants {
     uint256 r;
   }
 
-  enum InterestPoolStakingTokenType {
-    Usb,
-    UniswapV2PairLp,
-    CurvePlainPoolLp
+  enum PtyPoolType {
+    RedeemByUsbBelowAARS,
+    MintUsbAboveAARU
   }
 
-  struct InterestPoolStakingTokenInfo {
-    address stakingToken;
-    InterestPoolStakingTokenType stakingTokenType;
-    // Needed if staking token is Uniswap V2 or Curve PlainPool LP token
-    address swapPool;
-    uint256 swapPoolCoinsCount;
-  }
+  // enum InterestPoolStakingTokenType {
+  //   Usb,
+  //   UniswapV2PairLp,
+  //   CurvePlainPoolLp
+  // }
+
+  // struct InterestPoolStakingTokenInfo {
+  //   address stakingToken;
+  //   InterestPoolStakingTokenType stakingTokenType;
+  //   // Needed if staking token is Uniswap V2 or Curve PlainPool LP token
+  //   address swapPool;
+  //   uint256 swapPoolCoinsCount;
+  // }
 }
