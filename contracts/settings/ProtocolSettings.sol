@@ -37,7 +37,7 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     _upsertParamConfig("RateR", 10 ** 7, 0, 10 ** 10);
     // Circuit breaker period. Default to 1 hour, [1 minute, 1 day]
     _upsertParamConfig("CircuitBreakPeriod", 1 hours, 1 minutes, 1 days);
-    // X Tokens transfer fee. Default to 0.08%, [0, 100%]
+    // Leveraged Tokens transfer fee. Default to 0.08%, [0, 100%]
     _upsertParamConfig("LeveragedTokensTransferFee", 8 * 10 ** 6, 0, 10 ** 10);
     // Target AAR. Default 150%, [100%, 1000%]
     _upsertParamConfig("AART", 15 * 10 ** 9, 10 ** 10, 10 ** 11);
@@ -47,6 +47,10 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     _upsertParamConfig("AARU", 2 * 10 ** 10, 10 ** 10, 10 ** 11);
     // Circuit Breaker AAR. Default 110%, [100%, 1000%]
     _upsertParamConfig("AARC", 11 * 10 ** 9, 10 ** 10, 10 ** 11);
+    // Price Trigger Yield pool, min $USB dust amount. Default 5 $USB, [0, 1000]
+    _upsertParamConfig("PtyPoolMinUsbAmount", 5 * 10 ** 10, 0, 1000 * 10 ** 10);
+    // Price Trigger Yield pool, min asset dust amount. Default 0.001, [0, 1000]
+    _upsertParamConfig("PtyPoolMinAssetAmount", 10 ** 7, 0, 1000 * 10 ** 10);
   }
 
   /* ============== VIEWS =============== */

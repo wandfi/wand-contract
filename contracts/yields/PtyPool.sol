@@ -19,8 +19,8 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   /* ========== STATE VARIABLES ========== */
   
-  IVault public immutable vault;
   Constants.PtyPoolType public immutable poolType;
+  IVault internal immutable _vault;
 
   address internal _stakingToken;
   address internal _targetToken;
@@ -44,32 +44,22 @@ contract PtyPool is Ownable, ReentrancyGuard {
   mapping(address => uint256) internal _userTargetTokenSharesPerSharePaid;
   mapping(address => uint256) internal _userTargetTokenShares;
 
-  // address public immutable rewardsToken;
-
-  // uint256 public rewardPerToken;
-
-  // mapping(address => uint256) public userRewardPerTokenPaid;
-  // mapping(address => uint256) public userRewards;
-
-  // uint256 internal _totalSupply;
-  // mapping(address => uint256) private _balances;
-
   /* ========== CONSTRUCTOR ========== */
 
   constructor(
-    address _vault,
+    address _vault_,
     Constants.PtyPoolType _poolType,
     address _stakingYieldsToken_,
     address _matchingYieldsToken_
   ) Ownable() {
-    vault = IVault(_vault);
+    _vault = IVault(_vault_);
     poolType = _poolType;
     if (poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS) {
-      _stakingToken = vault.usbToken();
-      _targetToken = vault.assetToken();
+      _stakingToken = _vault.usbToken();
+      _targetToken = _vault.assetToken();
     } else if (poolType == Constants.PtyPoolType.MintUsbAboveAARU) {
-      _stakingToken = vault.assetToken();
-      _targetToken = vault.usbToken();
+      _stakingToken = _vault.assetToken();
+      _targetToken = _vault.usbToken();
     } else {
       revert("Unsupported PtyPoolType");
     }
@@ -79,6 +69,10 @@ contract PtyPool is Ownable, ReentrancyGuard {
   }
 
   /* ========== VIEWS ========== */
+
+  function vault() public view returns (address) {
+    return address(_vault);
+  }
 
   function stakingToken() public view returns (address) {
     return _stakingToken;
@@ -201,7 +195,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function addStakingYields(uint256 yieldsAmount) external updateStakingYields(address(0)) onlyOwner {
+  function addStakingYields(uint256 yieldsAmount) external nonReentrant updateStakingYields(address(0)) onlyVault {
     require(yieldsAmount > 0, "Too small yields amount");
     require(_totalStakingShares > 0, "No user stakes");
 
@@ -210,7 +204,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     emit StakingYieldsAdded(yieldsAmount);
   }
 
-  function addMatchingYields(uint256 yieldsAmount) external updateMatchingYields(address(0)) onlyOwner {
+  function addMatchingYields(uint256 yieldsAmount) external nonReentrant updateMatchingYields(address(0)) onlyVault {
     require(yieldsAmount > 0, "Too small yields amount");
     require(_totalStakingShares > 0, "No user stakes");
 
@@ -218,11 +212,30 @@ contract PtyPool is Ownable, ReentrancyGuard {
     emit MatchingYieldsAdded(yieldsAmount);
   }
 
-  function triggerMatch() external onlyOwner {
+  function notifyMatchedBelowAARS(uint256 assetAmountAdded) external nonReentrant onlyVault {
+    require(poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS, "Invalid pool type");
+    require(_vault.getVaultPhase() == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+
+    _targetTokensPerShare = _targetTokensPerShare.add(assetAmountAdded.mul(1e18).div(_totalStakingShares));
+    emit MatchedTokensAdded(assetAmountAdded);
+
+    _matchingYieldsPerShare = _matchingYieldsPerShare.add(_accruedMatchingYields.mul(1e18).div(_totalStakingShares));
+    _accruedMatchingYields = 0;
+  }
+
+  function notifyMatchedAboveAARU(uint256 usbAmountAdded) external nonReentrant onlyVault {
+    require(poolType == Constants.PtyPoolType.MintUsbAboveAARU, "Invalid pool type");
+    require(_vault.getVaultPhase() == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
   }
 
+
   /* ========== MODIFIERS ========== */
+
+  modifier onlyVault() {
+    require(_msgSender() == address(_vault), "Caller is not _vault");
+    _;
+  }
 
   modifier updateStakingYields(address account) {
     if (account != address(0)) {
@@ -255,6 +268,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   event StakingYieldsAdded(uint256 yields);
   event MatchingYieldsAdded(uint256 yields);
+  event MatchedTokensAdded(uint256 amount);
 
   event StakingYieldsPaid(address indexed user, uint256 yields);
   event MatchingYieldsPaid(address indexed user, uint256 yields);

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "../libs/Constants.sol";
+
 interface IVault {
 
   function usbToken() external view returns (address);
@@ -18,6 +20,8 @@ interface IVault {
   function leveragedToken() external view returns (address);
 
   function getParamValue(bytes32 param) external view returns (uint256);
+
+  function getVaultPhase() external view returns (Constants.VaultPhase);
 
   function AAR() external view returns (uint256);
 

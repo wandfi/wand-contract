@@ -11,7 +11,7 @@ contract VaultFactory is IVaultFactory {
 
   address[] internal _assetTokens;
 
-  mapping(address => address) internal _assetTokenToPools;
+  mapping(address => address) internal _assetTokenToVaults;
   mapping(address => address) internal _vaultToAssetTokens;
 
   constructor(address _wandProtocol) {
@@ -33,22 +33,22 @@ contract VaultFactory is IVaultFactory {
     require(assetToken != address(0), "Zero address detected");
     require(assetPriceFeed != address(0), "Zero address detected");
 
-    require(_assetTokenToPools[assetToken] == address(0), "Vault already exists");
+    require(_assetTokenToVaults[assetToken] == address(0), "Vault already exists");
 
     address pool = address(new Vault(wandProtocol, assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues));
 
     _assetTokens.push(assetToken);
-    _assetTokenToPools[assetToken] = pool;
+    _assetTokenToVaults[assetToken] = pool;
     _vaultToAssetTokens[pool] = assetToken;
 
-    emit VaultAdded(assetToken, assetPriceFeed, _assetTokenToPools[assetToken]);
+    emit VaultAdded(assetToken, assetPriceFeed, _assetTokenToVaults[assetToken]);
   }
 
   /* ========== IVaultFactory ========== */
 
   function getVaultAddress(address assetToken) external view override returns (address) {
-    require(_assetTokenToPools[assetToken] != address(0), "Invalid asset token");
-    return _assetTokenToPools[assetToken];
+    require(_assetTokenToVaults[assetToken] != address(0), "Invalid asset token");
+    return _assetTokenToVaults[assetToken];
   }
 
   function isVault(address vaultAddress) external view returns (bool) {
@@ -64,7 +64,7 @@ contract VaultFactory is IVaultFactory {
   }
 
   modifier onlyValidAssetToken(address assetToken) {
-    require(_assetTokenToPools[assetToken] != address(0), "Invalid asset token");
+    require(_assetTokenToVaults[assetToken] != address(0), "Invalid asset token");
     _;
   }
 

@@ -10,11 +10,12 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../interfaces/IWandProtocol.sol";
-import "../interfaces/IVault.sol";
+import "../interfaces/ILeveragedToken.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IProtocolSettings.sol";
+import "../interfaces/IPtyPool.sol";
 import "../interfaces/IUSB.sol";
-import "../interfaces/ILeveragedToken.sol";
+import "../interfaces/IVault.sol";
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 
@@ -25,6 +26,8 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   IWandProtocol public immutable wandProtocol;
   IProtocolSettings public immutable settings;
+  IPtyPool public ptyPoolBelowAARS;
+  IPtyPool public ptyPoolAboveAARU;
 
   address internal immutable _assetToken;
   address internal immutable _assetTokenPriceFeed;
@@ -38,8 +41,10 @@ contract Vault is IVault, Context, ReentrancyGuard {
   uint256 internal _assetTotalAmount;
   uint256 internal _usbTotalShares;
 
-  Constants.VaultPhase internal _currentVaultPhase;
-  Constants.VaultPhase internal _lastCheckedVaultPhase;
+  // Constants.VaultPhase internal _previousVaultPhase;
+  // Constants.VaultPhase internal _vaultPhase;
+  Constants.VaultPhase internal _vaultPhase;
+
   uint256 internal _stableAssetPrice;
 
   uint256 internal _lastInterestSettlementTime;
@@ -75,6 +80,10 @@ contract Vault is IVault, Context, ReentrancyGuard {
     for (uint256 i = 0; i < assetPoolParams.length; i++) {
       _updateParam(assetPoolParams[i], assetPoolParamsValues[i]);
     }
+
+    // _vaultPhase = Constants.VaultPhase.Empty;
+    // _previousVaultPhase = Constants.VaultPhase.Empty;
+    _vaultPhase = Constants.VaultPhase.Empty;
   }
 
   /* ================= VIEWS ================ */
@@ -115,22 +124,24 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function getVaultPhase() public view returns (Constants.VaultPhase) {
-    if (_assetTotalAmount == 0) {
-      return Constants.VaultPhase.Empty;
-    }
+    return _vaultPhase;
 
-    uint256 aar = AAR();
-    uint256 AARS = _vaultParamValue("AARS");
-    uint256 AARU = _vaultParamValue("AARU");
-    if (aar < AARS) {
-      return Constants.VaultPhase.AdjustmentBelowAARS;
-    }
-    else if (aar > AARU) {
-      return Constants.VaultPhase.AdjustmentAboveAARU;
-    }
-    else {
-      return Constants.VaultPhase.Stability;
-    }
+    // if (_assetTotalAmount == 0) {
+    //   return Constants.VaultPhase.Empty;
+    // }
+
+    // uint256 aar = AAR();
+    // uint256 AARS = _vaultParamValue("AARS");
+    // uint256 AARU = _vaultParamValue("AARU");
+    // if (aar < AARS) {
+    //   return Constants.VaultPhase.AdjustmentBelowAARS;
+    // }
+    // else if (aar > AARU) {
+    //   return Constants.VaultPhase.AdjustmentAboveAARU;
+    // }
+    // else {
+    //   return Constants.VaultPhase.Stability;
+    // }
   }
 
   /**
@@ -153,32 +164,32 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function calcMintPairsAtStabilityPhase(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256, uint256)  {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.Empty || vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.Empty || _vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
 
     (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtStabilityPhase(assetAmount);
     return (usbOutAmount, leveragedTokenOutAmount);
   }
 
   function calcMintPairsAtAdjustmentPhase(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256, uint256) {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
 
     (, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtAdjustmentPhase(assetAmount);
     return (usbOutAmount, leveragedTokenOutAmount);
   }
 
   function calcMintUsbAboveAARU(uint256 assetAmount) public view noneZeroValue(assetAmount) returns (uint256) {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
     (, uint256 usbOutAmount) = _calcMintUsbAboveAARU(assetAmount);
     return usbOutAmount;
   }
 
   function calcMintLeveragedTokensBelowAARS(uint256 assetAmount) noneZeroValue(assetAmount) public view returns (uint256) {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
     (, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokensBelowAARS(assetAmount);
     return leveragedTokenOutAmount;
@@ -208,24 +219,24 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function calcRedeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) public view noneZeroValue(leveragedTokenAmount) returns (uint256) {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
     (, uint256 assetAmount) = _calcRedeemByLeveragedTokenAboveAARU(leveragedTokenAmount);
     return assetAmount;
   }
 
   function calcRedeemByUsbBelowAARS(uint256 usbAmount) public view noneZeroValue(usbAmount) returns (uint256) {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
     (, uint256 assetAmount) = _calcRedeemByUsbBelowAARS(usbAmount);
     return assetAmount;
   }
 
   function calcUsbToLeveragedTokens(uint256 usbAmount) public view noneZeroValue(usbAmount) returns (uint256) {
-    Constants.VaultPhase vaultPhase = getVaultPhase();
-    require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
+    // Constants.VaultPhase vaultPhase = getVaultPhase();
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || _vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
 
     (, uint256 leveragedTokenAmount) = _calcUsbToLeveragedTokens(usbAmount);
     return leveragedTokenAmount;
@@ -234,28 +245,28 @@ contract Vault is IVault, Context, ReentrancyGuard {
   /* ========== Mint FUNCTIONS ========== */
 
   function mintPairsAtStabilityPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
-    require(_currentVaultPhase == Constants.VaultPhase.Empty || _currentVaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
+    require(_vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtStabilityPhase(assetAmount);
     _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
   function mintPairsAtAdjustmentPhase(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = _calcMintPairsAtAdjustmentPhase(assetAmount);
     _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
   function mintUSBAboveAARU(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
     (Constants.VaultState memory S, uint256 usbOutAmount) = _calcMintUsbAboveAARU(assetAmount);
     _doMint(assetAmount, S, usbOutAmount, 0);
   }
 
   function mintLeveragedTokensBelowAARS(uint256 assetAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(assetAmount) {
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
     (Constants.VaultState memory S, uint256 leveragedTokenOutAmount) = _calcMintLeveragedTokensBelowAARS(assetAmount);
     _doMint(assetAmount, S, 0, leveragedTokenOutAmount);
@@ -292,7 +303,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function redeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(leveragedTokenAmount) {
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
     require(leveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = _calcRedeemByLeveragedTokenAboveAARU(leveragedTokenAmount);
@@ -304,7 +315,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function redeemByUsbBelowAARS(uint256 usbAmount) external payable nonReentrant doUpdateVaultPhase noneZeroValue(usbAmount) {
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
     require(usbAmount <= IUSB(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = _calcRedeemByUsbBelowAARS(usbAmount);
@@ -317,9 +328,9 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   /* ========== Other FUNCTIONS ========== */
 
-  function usbToLeveragedTokens(uint256 usbAmount) external nonReentrant noneZeroValue(usbAmount) doUpdateVaultPhase doCheckAAR {  
+  function usbToLeveragedTokens(uint256 usbAmount) external nonReentrant noneZeroValue(usbAmount) doUpdateVaultPhase {  
     require(usbAmount <= IUSB(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
-    require(_currentVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || _currentVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
+    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || _vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
 
     (Constants.VaultState memory S, uint256 leveragedTokenAmount) = _calcUsbToLeveragedTokens(usbAmount);
     
@@ -333,11 +344,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     emit UsbToLeveragedTokens(_msgSender(), usbAmount, leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
   }
 
-  function checkAAR() external nonReentrant doCheckAAR {
-    // Nothing to do here
-  }
-
-  function settleInterest() external nonReentrant doCheckAAR doSettleInterest {
+  function settleInterest() external nonReentrant doSettleInterest {
     // Nothing to do here
   }
 
@@ -345,6 +352,17 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   function updateParamValue(bytes32 param, uint256 value) external nonReentrant onlyOwner {
     _updateParam(param, value);
+  }
+
+  function setPtyPools(address _ptyPoolBelowAARS, address _ptyPoolAboveAARU) external nonReentrant onlyOwner {
+    require(_ptyPoolBelowAARS != address(0) && _ptyPoolAboveAARU != address(0), "Zero address detected");
+    require(ptyPoolBelowAARS == IPtyPool(address(0)), "PtyPoolBelowAARS already set");
+    require(ptyPoolAboveAARU == IPtyPool(address(0)), "PtyPoolAboveAARU already set");
+    require(ptyPoolBelowAARS.vault() == address(this), "Invalid ptyPoolBelowAARS vault to set");
+    require(ptyPoolAboveAARU.vault() == address(this), "Invalid ptyPoolAboveAARU vault to set");
+    
+    ptyPoolBelowAARS = IPtyPool(_ptyPoolBelowAARS);
+    ptyPoolAboveAARU = IPtyPool(_ptyPoolAboveAARU);
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
@@ -364,35 +382,6 @@ contract Vault is IVault, Context, ReentrancyGuard {
       return _vaultParams[param];
     }
     return settings.paramDefaultValue(param);
-  }
-
-  function _AAR() internal returns (uint256) {
-    uint256 aar = AAR();
-
-    uint256 AART = _vaultParamValue("AART");
-    uint256 AARS = _vaultParamValue("AARS");
-    uint256 AARC = _vaultParamValue("AARC");
-    // console.log('_AAR, _aarBelowSafeLineTime: %s, aar: %s, AARC: %s', _aarBelowSafeLineTime, aar, AARC);
-    if (_aarBelowSafeLineTime == 0) {
-      if (aar < AARS) {
-        _aarBelowSafeLineTime = block.timestamp;
-      }
-    } else if (aar >= AART) {
-      _aarBelowSafeLineTime = 0;
-    }
-    // console.log('_AAR after, _aarBelowSafeLineTime: %s', _aarBelowSafeLineTime);
-
-    // console.log('_AAR, _aarBelowCircuitBreakerLineTime: %s, aar: %s, AARC: %s', _aarBelowCircuitBreakerLineTime, aar, AARC);
-    if (_aarBelowCircuitBreakerLineTime == 0) {
-      if (aar < AARC) {
-        _aarBelowCircuitBreakerLineTime = block.timestamp;
-      }
-    } else if (aar >= AARC) {
-      _aarBelowCircuitBreakerLineTime = 0;
-    }
-    // console.log('_AAR after, _aarBelowCircuitBreakerLineTime: %s', _aarBelowCircuitBreakerLineTime);
-
-    return aar;
   }
 
   // 𝑟 = vault.RateR() × 𝑡(h𝑟𝑠), since aar drop below 1.3;
@@ -530,9 +519,6 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function _doRedeem(uint256 assetAmount, Constants.VaultState memory S, uint256 usbAmount, uint256 leveragedTokenAmount) internal {
-    _assetTotalAmount = _assetTotalAmount.add(assetAmount);
-    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(this), assetAmount);
-
     require(assetAmount <= _assetTotalAmount, "Not enough asset balance");
     _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), assetAmount);
@@ -547,6 +533,41 @@ contract Vault is IVault, Context, ReentrancyGuard {
       ILeveragedToken(_leveragedToken).burn(_msgSender(), leveragedTokenAmount);
       emit LeveragedTokenBurned(_msgSender(), leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
     }
+  }
+
+  function _ptyPoolMatchBelowAARS() internal {
+    Constants.VaultState memory S = _getVaultState();
+
+    // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
+    // uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
+    //   S.M_ETH.mul(S.P_ETH)
+    // ).div(
+    //   S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
+    // ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
+
+    // ΔUSB = (Musb-eth * AART - M_ETH * P_ETH) / (AART - 1)
+    uint256 deltaUsbAmount = S.M_USB_ETH.mul(S.AART).sub(
+      S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).div(10 ** S.P_ETH_DECIMALS)
+    ).div(S.AART.sub(10 ** S.AARDecimals)).div(10 ** S.AARDecimals);
+
+    uint256 minUsbAmount = _vaultParamValue("PtyPoolMinUsbAmount");
+    uint256 ptyPoolUsbBalance = IERC20(_usbToken).balanceOf(address(ptyPoolBelowAARS));
+    if (deltaUsbAmount >= ptyPoolUsbBalance || deltaUsbAmount + minUsbAmount >= ptyPoolUsbBalance) {
+      deltaUsbAmount = ptyPoolUsbBalance;
+    }
+
+    // do redeem for the PtyPool
+    uint256 deltaAssetAmount = deltaUsbAmount.mul(10 ** S.P_ETH_DECIMALS).div(S.P_ETH);
+    _assetTotalAmount = _assetTotalAmount.sub(deltaAssetAmount);
+    TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), deltaAssetAmount);
+    uint256 usbBurnShares = IUSB(_usbToken).burn(address(ptyPoolBelowAARS), deltaUsbAmount);
+    _usbTotalShares = _usbTotalShares.sub(usbBurnShares);
+    emit UsbBurned(address(ptyPoolBelowAARS), deltaUsbAmount, usbBurnShares, S.P_ETH, S.P_ETH_DECIMALS);
+    ptyPoolBelowAARS.notifyMatchedBelowAARS(deltaAssetAmount);
+  }
+
+  function _ptyPoolMatchAboveAARU() internal {
+
   }
 
   /* ============== MODIFIERS =============== */
@@ -567,28 +588,92 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   modifier doUpdateVaultPhase() {
-    _currentVaultPhase = getVaultPhase();
-    if (_lastCheckedVaultPhase == Constants.VaultPhase.Stability && _currentVaultPhase == Constants.VaultPhase.Stability) {
-      // noop
+    // _vaultPhase = getVaultPhase();
+    // // Initial Empty => Empty
+    // if (_previousVaultPhase == Constants.VaultPhase.Empty && _vaultPhase == Constants.VaultPhase.Empty) {
+    //   (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+    // }
+    // // Empty/AboveAARU/BelowAARS => Stable
+    // else if (_previousVaultPhase != Constants.VaultPhase.Stability && _vaultPhase == Constants.VaultPhase.Stability) {
+    //   (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+    // }
+    // else {
+    //   // Clear to prevent incautious usage
+    //   _stableAssetPrice = 0;
+    // }
+
+    // Constants.VaultPhase nextVaultPhase = getVaultPhase();
+    // if (_vaultPhase != Constants.VaultPhase.AdjustmentBelowAARS && nextVaultPhase == Constants.VaultPhase.AdjustmentBelowAARS) {
+    //   require(ptyPoolBelowAARS != IPtyPool(address(0)), "PtyPoolBelowAARS not set");
+    //   if (ptyPoolBelowAARS.totalStakingBalance() > 0) {
+    //     _ptyPoolMatchBelowAARS();
+    //     _previousVaultPhase = nextVaultPhase;
+    //   }
+    // }
+    // else if (_vaultPhase != Constants.VaultPhase.AdjustmentAboveAARU && nextVaultPhase == Constants.VaultPhase.AdjustmentAboveAARU) {
+    //   require(ptyPoolAboveAARU != IPtyPool(address(0)), "PtyPoolAboveAARU not set");
+    //   if (ptyPoolAboveAARU.totalStakingBalance() > 0) {
+    //     _ptyPoolMatchAboveAARU();
+    //     _previousVaultPhase = nextVaultPhase;
+    //   }
+    // }
+
+    uint256 previousAAR = AAR();
+    if (_vaultPhase == Constants.VaultPhase.Empty) {
+      (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
     }
-    else {
-      (uint256 price, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
-      _stableAssetPrice = price;
-    }
+    _vaultPhase = Constants.VaultPhase.Stability;
+    Constants.VaultPhase previousPhase = _vaultPhase;
 
     _;
-    _lastCheckedVaultPhase = _currentVaultPhase;
+
+    uint256 afterAAR = AAR();
+    uint256 AART = _vaultParamValue("AART");
+    uint256 AARS = _vaultParamValue("AARS");
+    uint256 AARU = _vaultParamValue("AARU");
+    if (previousPhase == Constants.VaultPhase.Stability) {
+      if (afterAAR > AARU) {
+        _vaultPhase = Constants.VaultPhase.AdjustmentAboveAARU;
+      }
+      else if (afterAAR < AARS) {
+        _vaultPhase = Constants.VaultPhase.AdjustmentBelowAARS;
+        _aarBelowSafeLineTime = block.timestamp;
+      }
+    }
+    else if (previousPhase == Constants.VaultPhase.AdjustmentBelowAARS) {
+      if (afterAAR > AART) {
+        _vaultPhase = Constants.VaultPhase.Stability;
+        (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+        _aarBelowSafeLineTime = 0;
+      }
+    }
+    else if (previousPhase == Constants.VaultPhase.AdjustmentAboveAARU) {
+      if (afterAAR < AART) {
+        _vaultPhase = Constants.VaultPhase.Stability;
+        (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+      }
+    }
+
+    if (afterAAR < AARS) {
+      require(ptyPoolBelowAARS != IPtyPool(address(0)), "PtyPoolBelowAARS not set");
+      if (ptyPoolBelowAARS.totalStakingBalance() > 0) {
+        _ptyPoolMatchBelowAARS();
+      }
+    }
+    else if (afterAAR > AARU) {
+      require(ptyPoolAboveAARU != IPtyPool(address(0)), "PtyPoolAboveAARU not set");
+      if (ptyPoolAboveAARU.totalStakingBalance() > 0) {
+        _ptyPoolMatchAboveAARU();
+      }
+    }
+
+    // _previousVaultPhase = _vaultPhase;
   }
 
   modifier doSettleInterest() {
     // _settleInterest();
     _;
     // _startOrPauseInterestGeneration();
-  }
-
-  modifier doCheckAAR() {
-    _AAR(); // update _aarBelowSafeLineTime and _aarBelowCircuitBreakerLineTime
-    _;
   }
 
   /* =============== EVENTS ============= */
