@@ -13,6 +13,6 @@ interface IPtyPool {
 
   function notifyMatchedBelowAARS(uint256 assetAmountAdded) external;
 
-  function notifyMatchedAboveAARU(uint256 usbAmountAdded) external;
+  function notifyMatchedAboveAARU(uint256 assetAmountMatched, uint256 usbSharesReceived) external;
 
 }

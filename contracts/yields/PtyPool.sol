@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
+import "../interfaces/IUSB.sol";
 import "../interfaces/IVault.sol";
 
 contract PtyPool is Ownable, ReentrancyGuard {
@@ -37,6 +38,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   uint256 internal _accruedMatchingYields;
   uint256 internal _matchingYieldsPerShare;
+  // For MintUsbAboveAARU pools, matching yields is paid in USB shares (since it's rebasable token)
   mapping(address => uint256) internal _userMatchingYieldsPerSharePaid;
   mapping(address => uint256) internal _userMatchingYields;
   
@@ -172,7 +174,11 @@ contract PtyPool is Ownable, ReentrancyGuard {
     uint256 userYields = _userMatchingYields[_msgSender()];
     if (userYields > 0) {
       _userMatchingYields[_msgSender()] = 0;
-      TokensTransfer.transferTokens(_matchingYieldsToken, address(this), _msgSender(), userYields);
+      if (poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS) {
+        TokensTransfer.transferTokens(_matchingYieldsToken, address(this), _msgSender(), userYields);
+      } else if (poolType == Constants.PtyPoolType.MintUsbAboveAARU) {
+        IUSB(_matchingYieldsToken).transferShares(_msgSender(), userYields);
+      }
       emit MatchingYieldsPaid(_msgSender(), userYields);
     }
   }
@@ -219,14 +225,25 @@ contract PtyPool is Ownable, ReentrancyGuard {
     _targetTokensPerShare = _targetTokensPerShare.add(assetAmountAdded.mul(1e18).div(_totalStakingShares));
     emit MatchedTokensAdded(assetAmountAdded);
 
-    _matchingYieldsPerShare = _matchingYieldsPerShare.add(_accruedMatchingYields.mul(1e18).div(_totalStakingShares));
-    _accruedMatchingYields = 0;
+    if (_accruedMatchingYields > 0) {
+      _matchingYieldsPerShare = _matchingYieldsPerShare.add(_accruedMatchingYields.mul(1e18).div(_totalStakingShares));
+      _accruedMatchingYields = 0;
+    }
   }
 
-  function notifyMatchedAboveAARU(uint256 usbAmountAdded) external nonReentrant onlyVault {
+  function notifyMatchedAboveAARU(uint256 assetAmountMatched, uint256 usbSharesReceived) external nonReentrant onlyVault {
     require(poolType == Constants.PtyPoolType.MintUsbAboveAARU, "Invalid pool type");
     require(_vault.getVaultPhase() == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
+    TokensTransfer.transferTokens(_stakingToken, address(this), _msgSender(), assetAmountMatched);
+
+    _targetTokensPerShare = _targetTokensPerShare.add(usbSharesReceived.mul(1e18).div(_totalStakingShares));
+    emit MatchedTokensAdded(usbSharesReceived);
+
+    if (_accruedMatchingYields > 0) {
+      _matchingYieldsPerShare = _matchingYieldsPerShare.add(_accruedMatchingYields.mul(1e18).div(_totalStakingShares));
+      _accruedMatchingYields = 0;
+    }
   }
 
 

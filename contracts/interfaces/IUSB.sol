@@ -13,4 +13,7 @@ interface IUSB is IERC20 {
 
   function burn(address account, uint256 amount) external returns (uint256);
 
+  function transferShares(address to, uint256 sharesAmount) external returns (uint256);
+
+  function rebase(uint256 addedSupply) external;
 }

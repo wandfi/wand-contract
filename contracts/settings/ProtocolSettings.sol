@@ -27,12 +27,12 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
   constructor(address _treasury_) Ownable() {
     _treasury = _treasury_;
 
-    // Redemption fee rate with $USB. Default to 0.1%. [0, 10%]
-    _upsertParamConfig("C1", 1 * 10 ** 7, 0, 10 ** 9);
-    // Redemption fee rate with X tokens paired with $USB. Default to 0.5%. [0, 10%]
-    _upsertParamConfig("C2", 5 * 10 ** 7, 0, 10 ** 9);
-    // Yield rate. Default to 3.5%, [0, 50%]
-    _upsertParamConfig("Y", 35 * 10 ** 7, 0, 5 * 10 ** 9);
+    // Redemption fee rate. Default to 0.5%. [0, 10%]
+    _upsertParamConfig("C", 5 * 10 ** 7, 0, 10 ** 9);
+    // Treasury fee rate. Default to 50%. [0, 100%]
+    _upsertParamConfig("TreasuryFeeRate", 5 * 10 ** 9, 0, 10 ** 10);
+    // Yield rate. Default to 2%, [0, 50%]
+    _upsertParamConfig("Y", 2 * 10 ** 8, 0, 5 * 10 ** 9);
     // Rate of r change per hour. Default to 0.001, [0, 1]
     _upsertParamConfig("RateR", 10 ** 7, 0, 10 ** 10);
     // Circuit breaker period. Default to 1 hour, [1 minute, 1 day]
@@ -77,20 +77,12 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
   }
 
   function paramConfig(bytes32 param) public view returns(ParamConfig memory) {
-    // if (!_paramsSet.contains(param)) {
-    //   console.log('paramConfig, invalid param: %s', string(abi.encodePacked(param)));
-    // }
-
     require(param.length > 0, "Empty param name");
     require(_paramsSet.contains(param), "Invalid param name");
     return _paramConfigs[param];
   }
 
   function paramDefaultValue(bytes32 param) public view returns (uint256) {
-    // if (!_paramsSet.contains(param)) {
-    //   console.log('paramDefaultValue, invalid param: %s', string(abi.encodePacked(param)));
-    // }
-
     require(param.length > 0, "Empty param name");
     require(_paramsSet.contains(param), "Invalid param name");
     return paramConfig(param).defaultValue;
