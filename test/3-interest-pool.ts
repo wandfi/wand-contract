@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpAssetPoolState, deployUniswapUsbEthPool, deployCurveUsbUsdtPool, expectBigNumberEquals } from './utils';
+import { ONE_DAY_IN_SECS, maxContractSize, nativeTokenAddress, deployContractsFixture, dumpVaultState, deployUniswapUsbEthPool, deployCurveUsbUsdtPool, expectBigNumberEquals } from './utils';
 import { 
   Vault__factory,
   AssetX__factory,
@@ -41,8 +41,8 @@ describe('Interest Pool', () => {
       ])
     ).not.to.be.reverted;
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
-    await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    await expect(ethxToken.connect(Bob).setVault(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
+    await expect(ethxToken.connect(Alice).setVault(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Create $WBTC asset pool
@@ -56,7 +56,7 @@ describe('Interest Pool', () => {
       ])
     ).to.emit(vaultFactory, 'VaultAdded').withArgs(wbtc.address, wbtcPriceFeed.address, anyValue);
     const wbtcPoolAddress = await vaultFactory.getVaultAddress(wbtc.address);
-    await expect(wbtcxToken.connect(Alice).setAssetPool(wbtcPoolAddress)).not.to.be.reverted;
+    await expect(wbtcxToken.connect(Alice).setVault(wbtcPoolAddress)).not.to.be.reverted;
     const wbtcPool = Vault__factory.connect(wbtcPoolAddress, provider);
 
     // Deploy $USB InterestPool
@@ -90,7 +90,7 @@ describe('Interest Pool', () => {
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     await expect(ethPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseEther("100"), {value: ethers.utils.parseEther("100")})).not.to.be.rejected;
     await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     // Day 2. No interest distributed, since no $USB staking yet
     // ETH Pool State: M_ETH = 101, M_USB = 2000, M_USB_ETH = 2000, M_ETHx = 100
@@ -106,7 +106,7 @@ describe('Interest Pool', () => {
     await expect(ethPool.connect(Alice).settleInterest())
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
       .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, false);
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     // For $WBTC asset pool, no interest is generated, since no $USB or $WBTCx minted
     interestInfo = await wbtcPool.calculateInterest();
@@ -127,7 +127,7 @@ describe('Interest Pool', () => {
     await expect(ethPool.connect(Bob).settleInterest())
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
       .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, false);
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     // For $WBTC asset pool, Alice mint 1 $WBTCx
     let wbtcPrice = BigNumber.from(30000).mul(BigNumber.from(10).pow(await wbtcPriceFeed.decimals()));
@@ -136,7 +136,7 @@ describe('Interest Pool', () => {
     await expect(wbtc.connect(Alice).approve(wbtcPool.address, ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.reverted;
     await expect(wbtcPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
     // await expect(wbtcPool.connect(Alice).mintUSB(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
-    await dumpAssetPoolState(wbtcPool);
+    await dumpVaultState(wbtcPool);
 
 
     // Day 4. Alice stake 100 $USB, and get all the interest
@@ -160,7 +160,7 @@ describe('Interest Pool', () => {
     await expect(ethPool.connect(Alice).settleInterest())
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
       .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     expectBigNumberEquals(expectedTotalInterest, await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
     expect(await usbInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address)).to.equal(0);
@@ -171,7 +171,7 @@ describe('Interest Pool', () => {
     await expect(wbtc.connect(Alice).approve(wbtcPool.address, ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.reverted;
     // await expect(wbtcPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
     await expect(wbtcPool.connect(Alice).mintUSB(ethers.utils.parseUnits('1', await wbtc.decimals()))).not.to.be.rejected;
-    await dumpAssetPoolState(wbtcPool);
+    await dumpVaultState(wbtcPool);
 
     // Day 5. Bob stakes 50 $USB right before interest settlement, and get 1/3 of the new interest
     // ETH Pool State: M_ETHx = 100.030002768572219906
@@ -197,7 +197,7 @@ describe('Interest Pool', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
       .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, usbInterestPool.address, anyValue)
       .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     expectBigNumberEquals(ethers.utils.parseUnits('0.03667166688', await ethxToken.decimals()), await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));
     expectBigNumberEquals(ethers.utils.parseUnits('0.00333433342', await ethxToken.decimals()), await usbInterestPool.stakingRewardsEarned(ethxToken.address, Bob.address));
@@ -248,7 +248,7 @@ describe('Interest Pool', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, ethPool.address, anyValue)
       .to.emit(ethxToken, 'Transfer').withArgs(ethPool.address, usbInterestPool.address, anyValue)
       .to.emit(ethPool, 'InterestSettlement').withArgs(anyValue, true);
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     let expectedBobRewards = ethers.utils.parseUnits('0.00333433342', await ethxToken.decimals()).add(expectedNewInterest.div(2));
     expectBigNumberEquals(expectedNewInterest.div(2), await usbInterestPool.stakingRewardsEarned(ethxToken.address, Alice.address));

@@ -61,7 +61,7 @@ const config: HardhatUserConfig = {
           // https://hardhat.org/hardhat-network/#solidity-optimizer-support
           optimizer: {
             enabled: true,
-            runs: 590,
+            runs: 300,
           },
         },
       },
@@ -107,7 +107,7 @@ config.networks = {
     chainId: 1337,
     gas: 'auto',
     gasPrice: 'auto',
-    allowUnlimitedContractSize: true
+    allowUnlimitedContractSize: false
   },
 };
 

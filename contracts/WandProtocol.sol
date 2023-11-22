@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
-import "./interfaces/IVaultFactory.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/IVaultFactory.sol";
 import "./interfaces/IWandProtocol.sol";
 import "./settings/ProtocolSettings.sol";
 

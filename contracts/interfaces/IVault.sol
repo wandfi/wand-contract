@@ -21,7 +21,7 @@ interface IVault {
 
   function getParamValue(bytes32 param) external view returns (uint256);
 
-  function getVaultPhase() external view returns (Constants.VaultPhase);
+  function vaultPhase() external view returns (Constants.VaultPhase);
 
   function AAR() external view returns (uint256);
 

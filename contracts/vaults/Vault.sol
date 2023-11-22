@@ -103,6 +103,10 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return _assetToken;
   }
 
+  function assetTokenPriceFeed() public view returns (address) {
+    return _assetTokenPriceFeed;
+  }
+
   function assetTokenPrice() public view returns (uint256, uint256) {
     (uint256 price, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
     uint256 priceDecimals = IPriceFeed(_assetTokenPriceFeed).decimals();
@@ -118,7 +122,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return _vaultParamValue(param);
   }
 
-  function getVaultPhase() public view returns (Constants.VaultPhase) {
+  function vaultPhase() public view returns (Constants.VaultPhase) {
     return _vaultPhase;
   }
 
@@ -482,19 +486,18 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
     _assetTotalAmount = _assetTotalAmount.sub(assetAmount);
 
-    uint256 C = _vaultParamValue("C");
-    uint256 treasuryFeeRate = _vaultParamValue("TreasuryFeeRate");
-    uint256 totalFees = assetAmount.mul(C).div(10 ** S.settingsDecimals);
-    uint256 feesToTreasury = totalFees.mul(treasuryFeeRate).div(10 ** S.settingsDecimals);
+    uint256 totalFees = assetAmount.mul(_vaultParamValue("C")).div(10 ** S.settingsDecimals);
+    uint256 feesToTreasury = totalFees.mul(_vaultParamValue("TreasuryFeeRate")).div(10 ** S.settingsDecimals);
     uint256 feesToPtyPoolBelowAARS = totalFees.sub(feesToTreasury).div(2);
     uint256 feesToPtyPoolAboveAARU = totalFees.sub(feesToTreasury).sub(feesToPtyPoolBelowAARS);
 
     uint256 netRedeemAmount = assetAmount.sub(totalFees);
-    TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), assetAmount.sub(totalFees));
+    TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), netRedeemAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), settings.treasury(), feesToTreasury);
 
     TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), feesToPtyPoolBelowAARS);
     ptyPoolBelowAARS.addMatchingYields(feesToPtyPoolBelowAARS);
+
     TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolAboveAARU), feesToPtyPoolAboveAARU);
     ptyPoolAboveAARU.addStakingYields(feesToPtyPoolAboveAARU);
 

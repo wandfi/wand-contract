@@ -220,7 +220,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   function notifyMatchedBelowAARS(uint256 assetAmountAdded) external nonReentrant onlyVault {
     require(poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS, "Invalid pool type");
-    require(_vault.getVaultPhase() == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
+    require(_vault.vaultPhase() == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
     _targetTokensPerShare = _targetTokensPerShare.add(assetAmountAdded.mul(1e18).div(_totalStakingShares));
     emit MatchedTokensAdded(assetAmountAdded);
@@ -233,7 +233,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   function notifyMatchedAboveAARU(uint256 assetAmountMatched, uint256 usbSharesReceived) external nonReentrant onlyVault {
     require(poolType == Constants.PtyPoolType.MintUsbAboveAARU, "Invalid pool type");
-    require(_vault.getVaultPhase() == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
+    require(_vault.vaultPhase() == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
     TokensTransfer.transferTokens(_stakingToken, address(this), _msgSender(), assetAmountMatched);
 

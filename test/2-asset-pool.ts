@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { nativeTokenAddress, maxContractSize, deployContractsFixture, dumpAssetPoolState, expectBigNumberEquals } from './utils';
+import { nativeTokenAddress, maxContractSize, deployContractsFixture, dumpVaultState, expectBigNumberEquals } from './utils';
 import { 
   Vault__factory,
   AssetX__factory,
@@ -37,7 +37,7 @@ describe('Asset Pool', () => {
       [ethY, ethAART, ethAARS, ethAARC]))
       .to.emit(vaultFactory, 'VaultAdded').withArgs(ethAddress, ethPriceFeed.address, anyValue);
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    await expect(ethxToken.connect(Alice).setVault(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Initial AAR should be 0
@@ -64,7 +64,7 @@ describe('Asset Pool', () => {
     
     // Asset Pool State: M_ETH = 2, M_USB = 0, M_ETHx = 2, P_ETH = $3000
     // Alice deposit 1 ETH to mint $USB, expected output is: 1 * 3000 = 3000
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     ethPrice = ethers.utils.parseUnits('3000', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     ethDepositAmount = ethers.utils.parseEther('1');
@@ -76,7 +76,7 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'USBMinted').withArgs(Alice.address, ethDepositAmount, expectedUSBAmount, ethPrice, await ethPriceFeed.decimals());
     
     // Asset Pool State: M_ETH = 3, M_USB = 3000, M_ETHx = 2, AAR: 3 * 3000 / 3000 = 300%
-    // await dumpAssetPoolState(ethPool);
+    // await dumpVaultState(ethPool);
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('3', await ethPool.AARDecimals()));
     expect(await ethPool.assetTotalAmount()).to.equal(ethers.utils.parseEther('3'));
     expect(await ethPool.usbTotalSupply()).to.equal(ethers.utils.parseUnits('3000', await usbToken.decimals()));
@@ -96,7 +96,7 @@ describe('Asset Pool', () => {
       .to.emit(ethPool, 'LeveragedTokenMinted').withArgs(Bob.address, ethDepositAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
     
     // Asset Pool State: M_ETH = 6, M_USB = 3000, M_ETHx = 6, AAR: 6 * 2000 / 3000 = 400%
-    // await dumpAssetPoolState(ethPool);
+    // await dumpVaultState(ethPool);
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('4', await ethPool.AARDecimals()));
     expect(await ethPool.assetTotalAmount()).to.equal(ethers.utils.parseEther('6'));
     expect(await ethPool.usbTotalSupply()).to.equal(ethers.utils.parseUnits('3000', await usbToken.decimals()));
@@ -114,7 +114,7 @@ describe('Asset Pool', () => {
 
     // Asset Pool State: M_ETH = 6, M_USB = 3000, M_ETHx = 6, AAR: 6 * 700 / 3000 = 140%
     // Caro deposite 3 ETH to mint $ETHx, expected output is: 3 * 700 * 6 / (6 * 700 - 3000) = 10.5
-    // await dumpAssetPoolState(ethPool);
+    // await dumpVaultState(ethPool);
     ethDepositAmount = ethers.utils.parseEther('3');
     expectedETHxAmount = ethers.utils.parseUnits('10.5', await ethxToken.decimals());
     expect(await ethPool.calculateMintLeveragedTokensOut(ethDepositAmount)).to.equal(expectedETHxAmount);
@@ -126,7 +126,7 @@ describe('Asset Pool', () => {
     // Asset Pool State: M_ETH = 9, M_USB = 3000, M_ETHx = 16.5
     // P_ETH = $300, AAR: 9 * 300 / 3000 = 90%,
     // Expected behavior: $USB mint is paused, $ETHx mint is paused for 1 hour
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     ethPrice = ethers.utils.parseUnits('300', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     expect(await ethPool.AAR()).to.equal(ethers.utils.parseUnits('0.9', await ethPool.AARDecimals()));
@@ -145,7 +145,7 @@ describe('Asset Pool', () => {
     await expect(ethPool.connect(Alice).checkAAR()).not.to.be.reverted;
     const ONE_HOUR_IN_SECS = 60 * 60;
     expect(await ethPool.getParamValue(ethers.utils.formatBytes32String('CircuitBreakPeriod'))).to.equal(ONE_HOUR_IN_SECS);
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     await time.increase(ONE_HOUR_IN_SECS);
     expectedETHxAmount = ethers.utils.parseUnits('38.5', await ethxToken.decimals());
     expect(await ethPool.calculateMintLeveragedTokensOut(ethDepositAmount)).to.equal(expectedETHxAmount);
@@ -153,7 +153,7 @@ describe('Asset Pool', () => {
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-1'), ethDepositAmount])
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedETHxAmount)
       .to.emit(ethPool, 'LeveragedTokenMinted').withArgs(Alice.address, ethDepositAmount, expectedETHxAmount, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     // Update M_ETH = 10, P_ETH = 350, M_USB = 3000, AAR: 10 * 350 / 3000 = 116.67%, C1 does not take effect
     // Alice redeem 3000 $USB, expected out:
@@ -206,7 +206,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, redeemedUSBAmount)
       .to.emit(ethPool, 'AssetRedeemedWithUSB').withArgs(Alice.address, redeemedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
       .to.emit(ethPool, 'AssetRedeemedWithUSBFeeCollected').withArgs(Alice.address, Ivy.address, redeemedUSBAmount, expectedFeeAmount, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     // Asset Pool State: M_ETH = 9.9, M_USB = 2880, M_ETHx = 55, P_ETH = 1200, AAR: 9.9 * 1200 / 2880 = 4.125%
     // Update C2 to 1%
@@ -230,7 +230,7 @@ describe('Asset Pool', () => {
       .to.emit(ethxToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, redeemedETHxAmount)
       .to.emit(ethPool, 'AssetRedeemedWithLeveragedTokens').withArgs(Alice.address, redeemedETHxAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals())
       .to.emit(ethPool, 'AssetRedeemedWithLeveragedTokensFeeCollected').withArgs(Alice.address, Ivy.address, redeemedETHxAmount, expectedFeeAmount, expectedPairedUSBAmount, expectedETHAmount, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     
     // TODO: 
     //================== Special case: AAR drop below AARC for the first time, AAR' > AARC ==================
@@ -262,7 +262,7 @@ describe('Asset Pool', () => {
       ])
     ).not.to.be.reverted;
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    await expect(ethxToken.connect(Alice).setVault(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Set eth price to 2000; mint $USB and $ETHx
@@ -282,7 +282,7 @@ describe('Asset Pool', () => {
     //  - ΔETH = 100 * 1 * (1 + 0) / (2 * 3800 - 2000) = 0.01785714285
     ethPrice = ethers.utils.parseUnits('3800', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     let usbAmountToSwap = ethers.utils.parseUnits('100', await usbToken.decimals());
     let expectedETHxAmount = ethers.utils.parseUnits('0.01785714285', await ethxToken.decimals());
     expectBigNumberEquals(await ethPool.calculateUSBToLeveragedTokensOut(usbAmountToSwap), expectedETHxAmount);
@@ -290,7 +290,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: AAR' < AARS ==================
 
@@ -314,7 +314,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑆 ==================
 
@@ -333,7 +333,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑇 ==================
 
@@ -352,7 +352,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅' ≥ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑆 ==================
 
@@ -375,7 +375,7 @@ describe('Asset Pool', () => {
     //    + (2 * 1000 / 1.5 - 2 * 1000 / 2)
     //    * 2.441224392726698966 / (2 * 1000 - 1400) * (1 + (2 - 1.5) * 0.1 / 2)
     //    + (500 - 1400 + 2 * 1000 / 2) * 2.441224392726698966 / (2 * 1000 - 1400) = 2.08209315984
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     usbAmountToSwap = ethers.utils.parseUnits('500', await usbToken.decimals());
     expectedETHxAmount = ethers.utils.parseUnits('2.08209315984', await ethxToken.decimals());
     expectBigNumberEquals(await ethPool.calculateUSBToLeveragedTokensOut(usbAmountToSwap), expectedETHxAmount);
@@ -383,7 +383,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅' ≥ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑇==================
 
@@ -409,7 +409,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Special case: AAR drop below AARC for the first time, AAR' > AARC ==================
 
@@ -433,7 +433,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     expect(await ethPool.AARBelowSafeLineTime()).to.greaterThan(0);
     expect(await ethPool.AARBelowCircuitBreakerLineTime()).to.equal(0);
 
@@ -457,7 +457,7 @@ describe('Asset Pool', () => {
       .to.emit(usbToken, 'Transfer').withArgs(Alice.address, ethers.constants.AddressZero, usbAmountToSwap)
       .to.emit(ethxToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, anyValue)
       .to.emit(ethPool, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmountToSwap, anyValue, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     expect(await ethPool.AARBelowSafeLineTime()).to.greaterThan(0);
     expect(await ethPool.AARBelowCircuitBreakerLineTime()).to.greaterThan(0);
 
@@ -498,13 +498,13 @@ describe('Asset Pool', () => {
       ])
     ).not.to.be.reverted;
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
+    await expect(ethxToken.connect(Alice).setVault(ethPoolAddress)).not.to.be.reverted;
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Set eth price to 2000; mint $USB and $ETHx
     let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     await expect(ethPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
     
@@ -520,7 +520,7 @@ describe('Asset Pool', () => {
     //  - Δusb = 0.3 * 3800 = 1140
     ethPrice = ethers.utils.parseUnits('3800', await ethPriceFeed.decimals());
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
     let ethAmountToDeposit = ethers.utils.parseEther('0.3');
     let expectedUSBAmount = ethers.utils.parseUnits('1140', await usbToken.decimals());
     expectBigNumberEquals(await ethPool.calculateMintUSBOut(ethAmountToDeposit), expectedUSBAmount);
@@ -528,7 +528,7 @@ describe('Asset Pool', () => {
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-0.3'), ethAmountToDeposit])
       .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedUSBAmount)
       .to.emit(ethPool, 'USBMinted').withArgs(Alice.address, ethAmountToDeposit, expectedUSBAmount, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅 ≥ 𝐴𝐴𝑅𝑇 ==================
 
@@ -550,7 +550,7 @@ describe('Asset Pool', () => {
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-1'), ethAmountToDeposit])
       .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedUSBAmount)
       .to.emit(ethPool, 'USBMinted').withArgs(Alice.address, ethAmountToDeposit, expectedUSBAmount, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑇 𝑎𝑛𝑑 𝐴𝐴𝑅𝑆 ≤ 𝐴𝐴𝑅 ≤ 𝐴𝐴𝑅𝑇 ==================
 
@@ -568,7 +568,7 @@ describe('Asset Pool', () => {
       .to.changeEtherBalances([Alice.address, ethPool.address], [ethers.utils.parseEther('-1'), ethAmountToDeposit])
       .to.emit(usbToken, 'Transfer').withArgs(ethers.constants.AddressZero, Alice.address, expectedUSBAmount)
       .to.emit(ethPool, 'USBMinted').withArgs(Alice.address, ethAmountToDeposit, expectedUSBAmount, ethPrice, await ethPriceFeed.decimals());
-    await dumpAssetPoolState(ethPool);
+    await dumpVaultState(ethPool);
 
     //================== Case: 𝐴𝐴𝑅' ≤ 𝐴𝐴𝑅𝑆 ==================
 

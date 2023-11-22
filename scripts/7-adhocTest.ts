@@ -34,15 +34,15 @@ async function main() {
   const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
   // deposit 0.01 ETH to mint $USB
-  await dumpAssetPoolState(ethPool);
+  await dumpVaultState(ethPool);
   const ethAmount = ethers.utils.parseEther('0.01');
   let trans = await ethPool.connect(deployer).mintUSB(ethAmount, {value: ethAmount});
   await trans.wait();
   console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $USB`);
-  await dumpAssetPoolState(ethPool);
+  await dumpVaultState(ethPool);
 }
 
-async function dumpAssetPoolState(assetPool: Vault) {
+async function dumpVaultState(assetPool: Vault) {
   const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
 

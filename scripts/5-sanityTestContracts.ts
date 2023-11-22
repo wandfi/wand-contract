@@ -54,14 +54,14 @@ async function main() {
   // trans = await ethPool.connect(deployer).mintLeveragedTokens(ethAmount, {value: ethAmount});
   // await trans.wait();
   // console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $ETHx`);
-  // await dumpAssetPoolState(ethPool);
+  // await dumpVaultState(ethPool);
 
   // // deposit 0.01 ETH to mint $USB
-  // await dumpAssetPoolState(ethPool);
+  // await dumpVaultState(ethPool);
   // trans = await ethPool.connect(deployer).mintUSB(ethAmount, {value: ethAmount});
   // await trans.wait();
   // console.log(`Deposited ${ethers.utils.formatEther(ethAmount)} ETH to mint $USB`);
-  // await dumpAssetPoolState(ethPool);
+  // await dumpVaultState(ethPool);
 
   // // deposit 0.01 $WBTC to mint $USB
   // const wbtc = ERC20Mock__factory.connect(await wbtcPool.assetToken(), provider);
@@ -73,14 +73,14 @@ async function main() {
   // await trans.wait();
   // console.log(`Approved ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC`);
 
-  // dumpAssetPoolState(wbtcPool);
+  // dumpVaultState(wbtcPool);
   // trans = await wbtcPool.connect(deployer).mintUSB(wbtcAmount);
   // await trans.wait();
   // console.log(`Deposited ${ethers.utils.formatUnits(wbtcAmount, await wbtc.decimals())} $WBTC to mint $USB`);
-  // dumpAssetPoolState(wbtcPool);
+  // dumpVaultState(wbtcPool);
 }
 
-async function dumpAssetPoolState(assetPool: Vault) {
+async function dumpVaultState(assetPool: Vault) {
   const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
 

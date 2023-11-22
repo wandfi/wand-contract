@@ -161,6 +161,8 @@ contract USB is IUSB, Ownable, ReentrancyGuard {
     return tokensAmount;
   }
 
+  /* ================= INTERNAL Functions ================ */
+
   function _transfer(address sender, address to, uint256 amount) internal {
     uint256 _sharesToTransfer = getSharesByBalance(amount);
     _transferShares(sender, to, _sharesToTransfer);

@@ -88,7 +88,7 @@ async function main() {
   const ethPool = Vault__factory.connect(ethPoolAddress, provider);
   console.log(`Deployed $ETH asset pool to ${ethPoolAddress}`);
 
-  trans = await ethxToken.connect(deployer).setAssetPool(ethPoolAddress);
+  trans = await ethxToken.connect(deployer).setVault(ethPoolAddress);
   await trans.wait();
   console.log(`Connected $ETH asset pool to $ETHx token`);
 
@@ -119,7 +119,7 @@ async function main() {
   const wbtcPoolAddress = await vaultFactory.getVaultAddress(wbtcAddress);
   console.log(`Deployed $WBTC asset pool to ${wbtcPoolAddress}`);
 
-  trans = await wbtcxToken.connect(deployer).setAssetPool(wbtcPoolAddress);
+  trans = await wbtcxToken.connect(deployer).setVault(wbtcPoolAddress);
   await trans.wait();
   console.log(`Connected $WBTCx asset pool to $WBTCx token`);
 
@@ -141,7 +141,7 @@ async function main() {
   const stethPoolAddress = await vaultFactory.getVaultAddress(stethAddress);
   console.log(`Deployed $stETH asset pool to ${stethPoolAddress}`);
 
-  trans = await stethxToken.connect(deployer).setAssetPool(stethPoolAddress);
+  trans = await stethxToken.connect(deployer).setVault(stethPoolAddress);
   await trans.wait();
   console.log(`Connected $stETHx asset pool to $stETHx token`);
 

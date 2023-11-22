@@ -36,9 +36,9 @@ describe('Wand Protocol', () => {
       ])
     ).not.to.be.reverted;
     const ethPoolAddress = await vaultFactory.getVaultAddress(ethAddress);
-    await expect(ethxToken.connect(Bob).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).not.to.be.reverted;
-    await expect(ethxToken.connect(Alice).setAssetPool(ethPoolAddress)).to.be.rejectedWith(/Vault already set/);
+    await expect(ethxToken.connect(Bob).setVault(ethPoolAddress)).to.be.rejectedWith(/Ownable: caller is not the owner/);
+    await expect(ethxToken.connect(Alice).setVault(ethPoolAddress)).not.to.be.reverted;
+    await expect(ethxToken.connect(Alice).setVault(ethPoolAddress)).to.be.rejectedWith(/Vault already set/);
     const ethPool = Vault__factory.connect(ethPoolAddress, provider);
 
     // Set ETH price to $2000, Alice deposit 100 ETH to mint 100 $ETHx, and 1 ETH to mint 2000 $USB
@@ -46,7 +46,7 @@ describe('Wand Protocol', () => {
     await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
     await expect(ethPool.connect(Alice).mintLeveragedTokens(ethers.utils.parseEther("100"), {value: ethers.utils.parseEther("100")})).not.to.be.rejected;
     await expect(ethPool.connect(Alice).mintUSB(ethers.utils.parseEther("1"), {value: ethers.utils.parseEther("1")})).not.to.be.rejected;
-    // await dumpAssetPoolState(ethPool);
+    // await dumpVaultState(ethPool);
 
     // $ETHx could only be minted or burned by the asset pool, not even the owner
     await expect(ethxToken.connect(Alice).mint(Alice.address, 100)).to.be.revertedWith(/Caller is not Vault/);

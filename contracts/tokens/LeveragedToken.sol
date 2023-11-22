@@ -98,15 +98,15 @@ contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
     _setWhitelistAddress(account, whitelisted);
   }
 
-  function setAssetPool(address _assetPool) external nonReentrant onlyOwner {
+  function setVault(address _vault) external nonReentrant onlyOwner {
     require(vault == address(0), "Vault already set");
-    require(_assetPool != address(0), "Zero address detected");
+    require(_vault != address(0), "Zero address detected");
 
     address prevAssetPool = vault;
-    vault = _assetPool;
+    vault = _vault;
     emit SetAssetPool(prevAssetPool, vault);
 
-    _setWhitelistAddress(_assetPool, true);
+    _setWhitelistAddress(_vault, true);
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
