@@ -19,8 +19,8 @@ describe('Proto Interest Pool', () => {
     const { Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
 
     const ERC20MockFactory = await ethers.getContractFactory('ERC20Mock');
-    const USB = await ERC20MockFactory.deploy("USB Token", "USB");
-    const usb = ERC20Mock__factory.connect(USB.address, provider);
+    const Usb = await ERC20MockFactory.deploy("USB Token", "Usb");
+    const usb = ERC20Mock__factory.connect(Usb.address, provider);
 
     const ETHx = await ERC20MockFactory.deploy("ETHx Token", "ETHx");
     const ethx = ERC20Mock__factory.connect(ETHx.address, provider);

@@ -79,9 +79,9 @@ async function main() {
   const wandProtocol = WandProtocol__factory.connect(WandProtocol.address, provider);
   console.log(`Deployed WandProtocol to ${wandProtocol.address}`);
 
-  const USBFactory = await ethers.getContractFactory('USB');
-  const USB = await USBFactory.deploy(wandProtocol.address, "USB Token", "USB");
-  const usbToken = USB__factory.connect(USB.address, provider);
+  const USBFactory = await ethers.getContractFactory('Usb');
+  const Usb = await USBFactory.deploy(wandProtocol.address, "USB Token", "Usb");
+  const usbToken = USB__factory.connect(Usb.address, provider);
   console.log(`Deployed $USB token to ${usbToken.address}`);
 
   const AssetPoolFactoryFactory = await ethers.getContractFactory('VaultFactory');

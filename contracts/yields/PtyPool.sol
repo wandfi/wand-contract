@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
-import "../interfaces/IUSB.sol";
+import "../interfaces/IUsb.sol";
 import "../interfaces/IVault.sol";
 
 contract PtyPool is Ownable, ReentrancyGuard {
@@ -177,7 +177,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
       if (poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS) {
         TokensTransfer.transferTokens(_matchingYieldsToken, address(this), _msgSender(), userYields);
       } else if (poolType == Constants.PtyPoolType.MintUsbAboveAARU) {
-        IUSB(_matchingYieldsToken).transferShares(_msgSender(), userYields);
+        IUsb(_matchingYieldsToken).transferShares(_msgSender(), userYields);
       }
       emit MatchingYieldsPaid(_msgSender(), userYields);
     }

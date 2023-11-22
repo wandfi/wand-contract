@@ -77,10 +77,10 @@ export async function deployContractsFixture() {
   const WandProtocol = await WandProtocolFactory.deploy(settings.address);
   const wandProtocol = WandProtocol__factory.connect(WandProtocol.address, provider);
 
-  const USBFactory = await ethers.getContractFactory('USB');
+  const USBFactory = await ethers.getContractFactory('Usb');
   expect(USBFactory.bytecode.length / 2).lessThan(maxContractSize);
-  const USB = await USBFactory.deploy(wandProtocol.address);
-  const usbToken = USB__factory.connect(USB.address, provider);
+  const Usb = await USBFactory.deploy(wandProtocol.address);
+  const usbToken = USB__factory.connect(Usb.address, provider);
 
   const VaultFactoryFactory = await ethers.getContractFactory('VaultFactory');
   expect(VaultFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);

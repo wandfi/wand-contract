@@ -16,7 +16,7 @@ import "../interfaces/ILeveragedToken.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPtyPool.sol";
-import "../interfaces/IUSB.sol";
+import "../interfaces/IUsb.sol";
 import "../interfaces/IVault.sol";
 
 contract Vault is IVault, Context, ReentrancyGuard {
@@ -88,7 +88,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function usbTotalSupply() public view returns (uint256) {
-    return IUSB(_usbToken).getBalanceByShares(_usbTotalShares);
+    return IUsb(_usbToken).getBalanceByShares(_usbTotalShares);
   }
 
   function usbTotalShares() public view returns (uint256) {
@@ -250,7 +250,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
    /* ========== Redeem FUNCTIONS ========== */
 
   function redeemByPairsWithExpectedUSBAmount(uint256 usbAmount) external payable nonReentrant noneZeroValue(usbAmount) onUserAction(true) {
-    require(usbAmount <= IUSB(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+    require(usbAmount <= IUsb(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
 
     uint256 pairdLeveragedTokenAmount = calcPairdLeveragedTokenAmount(usbAmount);
     require(pairdLeveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
@@ -265,7 +265,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(leveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
 
     uint256 pairedUSBAmount = calcPairedUsbAmount(leveragedTokenAmount);
-    require(pairedUSBAmount <= IUSB(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+    require(pairedUSBAmount <= IUsb(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = _calcPairedRedeemAssetAmount(leveragedTokenAmount);
     uint256 netRedeemAmount = _doRedeem(assetOutAmount, S, pairedUSBAmount, leveragedTokenAmount);
@@ -285,7 +285,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   function redeemByUsbBelowAARS(uint256 usbAmount) external payable nonReentrant noneZeroValue(usbAmount) onUserAction(true) {
     require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
-    require(usbAmount <= IUSB(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+    require(usbAmount <= IUsb(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = _calcRedeemByUsbBelowAARS(usbAmount);
     uint256 netRedeemAmount = _doRedeem(assetOutAmount, S, usbAmount, 0);
@@ -296,12 +296,12 @@ contract Vault is IVault, Context, ReentrancyGuard {
   /* ========== Other FUNCTIONS ========== */
 
   function usbToLeveragedTokens(uint256 usbAmount) external nonReentrant noneZeroValue(usbAmount) onUserAction(false) {  
-    require(usbAmount <= IUSB(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
+    require(usbAmount <= IUsb(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
     require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || _vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
 
     (Constants.VaultState memory S, uint256 leveragedTokenAmount) = _calcUsbToLeveragedTokens(usbAmount);
     
-    uint256 usbSharesAmount = IUSB(_usbToken).burn(_msgSender(), usbAmount);
+    uint256 usbSharesAmount = IUsb(_usbToken).burn(_msgSender(), usbAmount);
     _usbTotalShares = _usbTotalShares.sub(usbSharesAmount);
     emit UsbBurned(_msgSender(), usbAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
 
@@ -470,7 +470,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     TokensTransfer.transferTokens(_assetToken, _msgSender(), address(this), assetAmount);
 
     if (usbOutAmount > 0) {
-      uint256 usbSharesAmount = IUSB(_usbToken).mint(_msgSender(), usbOutAmount);
+      uint256 usbSharesAmount = IUsb(_usbToken).mint(_msgSender(), usbOutAmount);
       _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
       emit UsbMinted(_msgSender(), assetAmount, usbOutAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
     }
@@ -502,7 +502,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     ptyPoolAboveAARU.addStakingYields(feesToPtyPoolAboveAARU);
 
     if (usbAmount > 0) {
-      uint256 usbBurnShares = IUSB(_usbToken).burn(_msgSender(), usbAmount);
+      uint256 usbBurnShares = IUsb(_usbToken).burn(_msgSender(), usbAmount);
       _usbTotalShares = _usbTotalShares.sub(usbBurnShares);
       emit UsbBurned(_msgSender(), usbAmount, usbBurnShares, S.P_ETH, S.P_ETH_DECIMALS);
     }
@@ -540,7 +540,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     _assetTotalAmount = _assetTotalAmount.sub(deltaAssetAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), deltaAssetAmount);
 
-    uint256 usbBurnShares = IUSB(_usbToken).burn(address(ptyPoolBelowAARS), deltaUsbAmount);
+    uint256 usbBurnShares = IUsb(_usbToken).burn(address(ptyPoolBelowAARS), deltaUsbAmount);
     _usbTotalShares = _usbTotalShares.sub(usbBurnShares);
     emit UsbBurned(address(ptyPoolBelowAARS), deltaUsbAmount, usbBurnShares, S.P_ETH, S.P_ETH_DECIMALS);
 
@@ -564,7 +564,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     }
 
     uint256 deltaUsbAmount = deltaAssetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
-    uint256 usbSharesAmount = IUSB(_usbToken).mint(address(ptyPoolAboveAARU), deltaUsbAmount);
+    uint256 usbSharesAmount = IUsb(_usbToken).mint(address(ptyPoolAboveAARU), deltaUsbAmount);
     _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
     emit UsbMinted(_msgSender(), deltaAssetAmount, deltaUsbAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
 
@@ -590,7 +590,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     }
 
     if (usbOutAmount > 0) {
-      IUSB(_usbToken).rebase(usbOutAmount);
+      IUsb(_usbToken).rebase(usbOutAmount);
     }
 
     if (leveragedTokenOutAmount > 0) {
