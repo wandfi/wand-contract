@@ -9,6 +9,6 @@ interface IVaultFactory {
 
   function assetTokens() external view returns (address[] memory);
   
-  function addVault(address assetToken, address assetPriceFeed, address leveragedToken, bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues) external;
+  function addVault(address vaultCalculator, address assetToken, address assetPriceFeed, address leveragedToken, bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues) external;
 
 }

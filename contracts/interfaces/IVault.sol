@@ -23,17 +23,9 @@ interface IVault {
 
   function vaultPhase() external view returns (Constants.VaultPhase);
 
+  function vaultState() external view returns (Constants.VaultState memory);
+
   function AAR() external view returns (uint256);
 
   function AARDecimals() external view returns (uint256);
-
-  function calcMintPairsAtStabilityPhase(uint256 assetAmount) external view returns (uint256, uint256);
-
-  function calcMintPairsAtAdjustmentPhase(uint256 assetAmount) external view returns (uint256, uint256);
-
-  function calcMintUsbAboveAARU(uint256 assetAmount) external view returns (uint256);
-
-  function calcMintLeveragedTokensBelowAARS(uint256 assetAmount) external view returns (uint256);
-
-  function calcPairdLeveragedTokenAmount(uint256 usbAmount) external view returns (uint256);
 }

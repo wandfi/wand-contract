@@ -61,11 +61,11 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   /* ========== Asset Pool Operations ========== */
 
   function addVault(
-    address assetToken, address assetPriceFeed, address leveragedToken,
+    address vaultCalculator, address assetToken, address assetPriceFeed, address leveragedToken,
     bytes32[] memory vaultParams, uint256[] memory vaultParamsValues
   ) external onlyInitialized nonReentrant onlyOwner {
 
-    IVaultFactory(_vaultFactory).addVault(assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues);
+    IVaultFactory(_vaultFactory).addVault(vaultCalculator, assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues);
   }
 
   /* ============== MODIFIERS =============== */

@@ -8,7 +8,7 @@ import {
   PriceFeedMock__factory,
   WandProtocol__factory,
   ProtocolSettings__factory,
-  USB__factory,
+  Usb__factory,
   VaultFactory__factory,
   Vault,
   ERC20__factory,
@@ -80,7 +80,7 @@ export async function deployContractsFixture() {
   const USBFactory = await ethers.getContractFactory('Usb');
   expect(USBFactory.bytecode.length / 2).lessThan(maxContractSize);
   const Usb = await USBFactory.deploy(wandProtocol.address);
-  const usbToken = USB__factory.connect(Usb.address, provider);
+  const usbToken = Usb__factory.connect(Usb.address, provider);
 
   const VaultFactoryFactory = await ethers.getContractFactory('VaultFactory');
   expect(VaultFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -113,7 +113,7 @@ export async function deployUniswapUsbEthPool(signer: SignerWithAddress, usbAddr
   const UniswapV2Router02 = await ethers.getContractFactory('UniswapV2Router02');
   const UniswapV2Router02Contract = await UniswapV2Router02.deploy(uniswapV2Factory.address, weth.address);
   const uniswapV2Router02 = UniswapV2Router02__factory.connect(UniswapV2Router02Contract.address, provider);
-  const usbToken = USB__factory.connect(usbAddress, provider);
+  const usbToken = Usb__factory.connect(usbAddress, provider);
   const uniPairDeadline = (await time.latest()) + ONE_DAY_IN_SECS;
   await expect(usbToken.connect(signer).approve(uniswapV2Router02.address, initUsbAmount)).not.to.be.reverted;
   // Note: Update this value to the code hash used in test/UniswapV2Router02.sol:UniswapV2Library.pairFor()
@@ -135,8 +135,8 @@ export async function dumpVaultState(vault: Vault) {
   const assetTokenERC20 = ERC20__factory.connect(await vault.assetToken(), provider);
   const assetSymbol = (await vault.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
   const priceInfo = await vault.assetTokenPrice();
-  const usbToken = USB__factory.connect(await vault.usbToken(), provider);
-  const ethxToken = USB__factory.connect(await vault.leveragedToken(), provider);
+  const usbToken = Usb__factory.connect(await vault.usbToken(), provider);
+  const ethxToken = Usb__factory.connect(await vault.leveragedToken(), provider);
 
   const aar = await vault.AAR();
   const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await vault.AARDecimals());

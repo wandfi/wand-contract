@@ -46,7 +46,6 @@ library Constants {
     uint256 aarBelowSafeLineTime;
     uint256 settingsDecimals;
 
-    // uint256 Delta_USB;
     uint256 aar_;
     uint256 r;
   }

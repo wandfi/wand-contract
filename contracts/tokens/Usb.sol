@@ -223,7 +223,7 @@ contract Usb is IUsb, Ownable, ReentrancyGuard {
     emit TransferShares(from, to, sharesAmount);
   }
 
-  modifier onlyVault() {
+  modifier onlyVault() virtual {
     require(IVaultFactory(IWandProtocol(wandProtocol).vaultFactory()).isVault(_msgSender()), "Caller is not a Vault contract");
     _;
   }
