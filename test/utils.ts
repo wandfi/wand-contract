@@ -10,6 +10,7 @@ import {
   ProtocolSettings__factory,
   Usb__factory,
   VaultFactory__factory,
+  VaultCalculator__factory,
   Vault,
   ERC20__factory,
   RebasableERC20Mock__factory,
@@ -26,6 +27,11 @@ const { provider } = ethers;
 export const ONE_DAY_IN_SECS = 24 * 60 * 60;
 
 export const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+
+export const enum PtyPoolType {
+  RedeemByUsbBelowAARS = 0,
+  MintUsbAboveAARU = 1
+}
 
 export const maxContractSize = 24576;
 
@@ -59,7 +65,7 @@ export async function deployContractsFixture() {
    *  - Register USB/VaultFactory to WandProtocol
    * 
    *  - Create Vaults
-   *    - Deploy LeveragedToken (WandProtocol.addVault)
+   *    - Deploy LeveragedToken
    *    - Create Vault
    *    - Set Vault to LeveragedToken
    *    - Create PtyPools
@@ -88,6 +94,11 @@ export async function deployContractsFixture() {
   const VaultFactory = await VaultFactoryFactory.deploy(wandProtocol.address);
   const vaultFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
 
+  const VaultCalculatorFactory = await ethers.getContractFactory('VaultCalculator');
+  expect(VaultCalculatorFactory.bytecode.length / 2).lessThan(maxContractSize);
+  const VaultCalculator = await VaultCalculatorFactory.deploy();
+  const vaultCalculator = VaultCalculator__factory.connect(VaultCalculator.address, provider);
+
   const Vault = await ethers.getContractFactory('Vault');
   expect(Vault.bytecode.length / 2).lessThan(maxContractSize);
   console.log(`Vault code size: ${Vault.bytecode.length / 2} bytes`);
@@ -100,7 +111,12 @@ export async function deployContractsFixture() {
   let trans = await wandProtocol.connect(Alice).initialize(usbToken.address, vaultFactory.address);
   await trans.wait();
 
-  return { Alice, Bob, Caro, Dave, Ivy, erc20, wbtc, stETH, ethPriceFeed, wbtcPriceFeed, wandProtocol, settings, usbToken, vaultFactory };
+  return {
+    Alice, Bob, Caro, Dave, Ivy,
+    erc20, wbtc, stETH, usbToken,
+    ethPriceFeed, wbtcPriceFeed,
+    wandProtocol, settings, vaultFactory, vaultCalculator
+  };
 }
 
 export async function deployUniswapUsbEthPool(signer: SignerWithAddress, usbAddress: string, initUsbAmount: BigNumber, initEthAmount: BigNumber) {

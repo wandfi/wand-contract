@@ -105,8 +105,6 @@ describe('Usb', () => {
     expect(await usb.totalShares()).to.equal(ethers.utils.parseUnits('145', await usb.decimals()));
     expect(await usb.totalSupply()).to.equal(ethers.utils.parseUnits('290', await usb.decimals()));
 
-
-
   });
 
 });

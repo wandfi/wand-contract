@@ -28,9 +28,11 @@ contract PtyPool is Ownable, ReentrancyGuard {
   address internal _stakingYieldsToken;
   address internal _matchingYieldsToken;
 
-  uint256 internal _totalStakingBalance;
   uint256 internal _totalStakingShares;
   mapping(address => uint256) internal _userStakingShares;
+
+  // For MintUsbAboveAARU only.
+  uint256 internal _totalStakingAssetBalance;
 
   uint256 internal _stakingYieldsPerShare;
   mapping(address => uint256) internal _userStakingYieldsPerSharePaid;
@@ -93,7 +95,15 @@ contract PtyPool is Ownable, ReentrancyGuard {
   }
 
   function totalStakingBalance() public view returns (uint256) {
-    return _totalStakingBalance;
+    require(poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS || poolType == Constants.PtyPoolType.MintUsbAboveAARU, "Unsupported PtyPoolType");
+    
+    if (poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS) {
+      require(_stakingToken == _vault.usbToken(), "Staking token should be USB");
+      return IERC20(_stakingToken).balanceOf(address(this));
+    }
+    else {
+      return _totalStakingAssetBalance;
+    }
   }
 
   function userStakingShares(address account) public view returns (uint256) {
@@ -117,18 +127,18 @@ contract PtyPool is Ownable, ReentrancyGuard {
   }
 
   function getStakingSharesByBalance(uint256 stakingBalance) public view returns (uint256) {
-    if (_totalStakingBalance == 0) return stakingBalance;
+    if (totalStakingBalance() == 0) return stakingBalance;
 
     return stakingBalance
       .mul(_totalStakingShares)
-      .div(_totalStakingBalance);
+      .div(totalStakingBalance());
   }
 
   function getStakingBalanceByShares(uint256 stakingShares) public view returns (uint256) {
     if (_totalStakingShares == 0) return 0;
   
     return stakingShares
-      .mul(_totalStakingBalance)
+      .mul(totalStakingBalance())
       .div(_totalStakingShares);
   }
 
@@ -143,6 +153,10 @@ contract PtyPool is Ownable, ReentrancyGuard {
     _totalStakingShares = _totalStakingShares.add(sharesAmount);
     _userStakingShares[_msgSender()] = _userStakingShares[_msgSender()].add(sharesAmount);
 
+    if (poolType == Constants.PtyPoolType.MintUsbAboveAARU) {
+      _totalStakingAssetBalance = _totalStakingAssetBalance.add(amount);
+    }
+
     TokensTransfer.transferTokens(_stakingToken, _msgSender(), address(this), amount);
     emit Staked(_msgSender(), amount);
   }
@@ -156,6 +170,9 @@ contract PtyPool is Ownable, ReentrancyGuard {
     uint256 sharesAmount = getStakingSharesByBalance(amount);
     _totalStakingShares = _totalStakingShares.sub(sharesAmount);
     _userStakingShares[_msgSender()] = _userStakingShares[_msgSender()].sub(sharesAmount);
+    if (poolType == Constants.PtyPoolType.MintUsbAboveAARU) {
+      _totalStakingAssetBalance = _totalStakingAssetBalance.sub(amount);
+    }
 
     TokensTransfer.transferTokens(_stakingToken, address(this), _msgSender(), amount);
     emit Withdrawn(_msgSender(), amount);
@@ -250,7 +267,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
   /* ========== MODIFIERS ========== */
 
   modifier onlyVault() {
-    require(_msgSender() == address(_vault), "Caller is not _vault");
+    require(_msgSender() == address(_vault), "Caller is not Vault");
     _;
   }
 
