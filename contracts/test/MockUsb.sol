@@ -4,7 +4,7 @@ pragma solidity ^0.8.18;
 import "../tokens/Usb.sol";
 
 contract MockUsb is Usb {
-  constructor() Usb(address(0)) {}
+  constructor() Usb(msg.sender) {}
 
   modifier onlyVault() override {
     _checkOwner();

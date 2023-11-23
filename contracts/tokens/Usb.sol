@@ -115,7 +115,7 @@ contract Usb is IUsb, Ownable, ReentrancyGuard {
 
   /* ================= IUsb Functions ================ */
 
-  function mint(address to, uint256 amount) public nonReentrant override onlyVault returns (uint256) {
+  function mint(address to, uint256 amount) external nonReentrant onlyVault returns (uint256) {
     require(to != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
@@ -134,7 +134,7 @@ contract Usb is IUsb, Ownable, ReentrancyGuard {
     emit Rebased(addedSupply);
   }
 
-  function burn(address account, uint256 amount) public nonReentrant override onlyVault returns (uint256) {
+  function burn(address account, uint256 amount) external nonReentrant onlyVault returns (uint256) {
     require(account != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
@@ -147,14 +147,14 @@ contract Usb is IUsb, Ownable, ReentrancyGuard {
     return sharesAmount;
   }
 
-  function transferShares(address to, uint256 sharesAmount) public nonReentrant returns (uint256) {
+  function transferShares(address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
     _transferShares(_msgSender(), to, sharesAmount);
     uint256 tokensAmount = getBalanceByShares(sharesAmount);
     _emitTransferEvents(_msgSender(), to, tokensAmount, sharesAmount);
     return tokensAmount;
   }
 
-  function transferSharesFrom(address sender, address to, uint256 sharesAmount) public nonReentrant returns (uint256) {
+  function transferSharesFrom(address sender, address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
     uint256 tokensAmount = getBalanceByShares(sharesAmount);
     _spendAllowance(sender, _msgSender(), tokensAmount);
     _transferShares(sender, to, sharesAmount);
