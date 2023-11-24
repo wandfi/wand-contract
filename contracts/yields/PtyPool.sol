@@ -4,10 +4,10 @@ pragma solidity ^0.8.18;
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
@@ -92,6 +92,10 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   function machingYieldsToken() public view returns (address) {
     return _matchingYieldsToken;
+  }
+
+  function totalStakingShares() public view returns (uint256) {
+    return _totalStakingShares;
   }
 
   function totalStakingBalance() public view returns (uint256) {
@@ -209,6 +213,14 @@ contract PtyPool is Ownable, ReentrancyGuard {
     }
   }
 
+  /**
+   * @notice Useful for Pty Pools Below AARS, since matching out tokens and yields tokens are all asset tokens.
+   */
+  function getMatchingTokensAndYields() external nonReentrant {
+    getMatchingOutTokens();
+    getMatchingYields();
+  }
+
   function exit() external {
     withdraw(userStakingBalance(_msgSender()));
     getStakingYields();
@@ -223,7 +235,6 @@ contract PtyPool is Ownable, ReentrancyGuard {
     require(_totalStakingShares > 0, "No user stakes");
 
     _stakingYieldsPerShare = _stakingYieldsPerShare.add(yieldsAmount.mul(1e18).div(_totalStakingShares));
-    TokensTransfer.transferTokens(_stakingYieldsToken, _msgSender(), address(this), yieldsAmount);
     emit StakingYieldsAdded(yieldsAmount);
   }
 

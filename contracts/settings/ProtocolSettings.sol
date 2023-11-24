@@ -45,10 +45,10 @@ contract ProtocolSettings is IProtocolSettings, Ownable, ReentrancyGuard {
     _upsertParamConfig("AARU", 2 * 10 ** 10, 10 ** 10, 10 ** 11);
     // Circuit Breaker AAR. Default 110%, [100%, 1000%]
     _upsertParamConfig("AARC", 11 * 10 ** 9, 10 ** 10, 10 ** 11);
-    // Price Trigger Yield pool, min $USB dust amount. Default 5 $USB, [0, 1000]
-    _upsertParamConfig("PtyPoolMinUsbAmount", 5 * 10 ** 10, 0, 1000 * 10 ** 10);
-    // Price Trigger Yield pool, min asset dust amount. Default 0.001, [0, 1000]
-    _upsertParamConfig("PtyPoolMinAssetAmount", 10 ** 7, 0, 1000 * 10 ** 10);
+    // Price Trigger Yield pool, min $USB dust amount. Default 10 $USB, [0, 1000]
+    _upsertParamConfig("PtyPoolMinUsbAmount", 10 * 10 ** 10, 0, 1000 * 10 ** 10);
+    // Price Trigger Yield pool, min asset dust amount. Default 0.1, [0, 1000]
+    _upsertParamConfig("PtyPoolMinAssetAmount", 10 ** 9, 0, 1000 * 10 ** 10);
   }
 
   /* ============== VIEWS =============== */

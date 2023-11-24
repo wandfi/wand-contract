@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./Constants.sol";
+import "../interfaces/IPtyPool.sol";
 import "../interfaces/IVault.sol";
 
 contract VaultCalculator {
@@ -141,6 +143,48 @@ contract VaultCalculator {
       return 0;
     }
     return S.RateR.mul(block.timestamp.sub(S.aarBelowSafeLineTime)).div(1 hours);
+  }
+
+  function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, uint256 minUsbAmount, address ptyPoolBelowAARS) public view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = vault.vaultState();
+
+    // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
+    // uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
+    //   S.M_ETH.mul(S.P_ETH)
+    // ).div(
+    //   S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
+    // ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
+
+    // ΔUSB = (Musb-eth * AART - M_ETH * P_ETH) / (AART - 1)
+    uint256 deltaUsbAmount = S.M_USB_ETH.mul(S.AART).sub(
+      S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).div(10 ** S.P_ETH_DECIMALS)
+    ).div(S.AART.sub(10 ** S.AARDecimals)).div(10 ** S.AARDecimals);
+
+    uint256 ptyPoolUsbBalance = IERC20(vault.usbToken()).balanceOf(ptyPoolBelowAARS);
+    if (ptyPoolUsbBalance <= minUsbAmount) {
+      return (S, 0);
+    }
+    deltaUsbAmount = deltaUsbAmount > ptyPoolUsbBalance.sub(minUsbAmount) ? ptyPoolUsbBalance.sub(minUsbAmount) : deltaUsbAmount;
+    return (S, deltaUsbAmount);
+  }
+
+  function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, uint256 minAssetAmount, address ptyPoolAboveAARU) public view returns (Constants.VaultState memory, uint256) {
+    Constants.VaultState memory S = vault.vaultState();
+
+    // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
+    uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
+      S.M_ETH.mul(S.P_ETH)
+    ).div(
+      S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
+    ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
+
+    // uint256 minAssetAmount = _vaultParamValue("PtyPoolMinAssetAmount");
+    uint256 ptyPoolAssetBalance = IPtyPool(ptyPoolAboveAARU).totalStakingBalance();
+    if (deltaAssetAmount >= ptyPoolAssetBalance || deltaAssetAmount + minAssetAmount >= ptyPoolAssetBalance) {
+      deltaAssetAmount = ptyPoolAssetBalance;
+    }
+
+    return (S, deltaAssetAmount);
   }
 
 }

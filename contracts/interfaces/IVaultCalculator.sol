@@ -25,4 +25,8 @@ interface IVaultCalculator {
   function calcRedeemByUsbBelowAARS(IVault vault, uint256 usbAmount) external view returns (Constants.VaultState memory, uint256);
 
   function calcUsbToLeveragedTokens(IVault vault, uint256 usbAmount) external view returns (Constants.VaultState memory, uint256);
+
+  function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, uint256 minUsbAmount, address ptyPoolBelowAARS) external view returns (Constants.VaultState memory, uint256);
+
+  function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, uint256 minAssetAmount, address ptyPoolAboveAARU) external view returns (Constants.VaultState memory, uint256);
 }

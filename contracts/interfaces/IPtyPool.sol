@@ -5,6 +5,8 @@ interface IPtyPool {
 
   function vault() external view returns (address);
 
+  function totalStakingShares() external view returns (uint256);
+
   function totalStakingBalance() external view returns (uint256);
 
   function addStakingYields(uint256 yieldsAmount) external;

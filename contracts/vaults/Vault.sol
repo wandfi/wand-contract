@@ -29,6 +29,11 @@ contract Vault is IVault, Context, ReentrancyGuard {
   IPtyPool public ptyPoolBelowAARS;
   IPtyPool public ptyPoolAboveAARU;
 
+  uint256 internal _accruedStakingYieldsForPtyPoolBelowAARS;
+  uint256 internal _accruedMatchingYieldsForPtyPoolBelowAARS;
+  uint256 internal _accruedStakingYieldsForPtyPoolAboveAARU;
+  uint256 internal _accruedMatchingYieldsForPtyPoolAboveAARU;
+  
   address internal immutable _assetToken;
   address internal immutable _assetTokenPriceFeed;
   address internal immutable _usbToken;
@@ -254,10 +259,8 @@ contract Vault is IVault, Context, ReentrancyGuard {
 
   function setPtyPools(address _ptyPoolBelowAARS, address _ptyPoolAboveAARU) external nonReentrant onlyOwner {
     require(_ptyPoolBelowAARS != address(0) && _ptyPoolAboveAARU != address(0), "Zero address detected");
-    require(ptyPoolBelowAARS == IPtyPool(address(0)), "PtyPoolBelowAARS already set");
-    require(ptyPoolAboveAARU == IPtyPool(address(0)), "PtyPoolAboveAARU already set");
-    require(ptyPoolBelowAARS.vault() == address(this), "Invalid ptyPoolBelowAARS vault to set");
-    require(ptyPoolAboveAARU.vault() == address(this), "Invalid ptyPoolAboveAARU vault to set");
+    require(ptyPoolBelowAARS == IPtyPool(address(0)) && ptyPoolAboveAARU == IPtyPool(address(0)), "PtyPools already set");
+    require(IPtyPool(_ptyPoolBelowAARS).vault() == address(this) && IPtyPool(_ptyPoolAboveAARU).vault() == address(this), "Invalid vault");
     
     ptyPoolBelowAARS = IPtyPool(_ptyPoolBelowAARS);
     ptyPoolAboveAARU = IPtyPool(_ptyPoolAboveAARU);
@@ -335,11 +338,19 @@ contract Vault is IVault, Context, ReentrancyGuard {
     TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), netRedeemAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), settings.treasury(), feesToTreasury);
 
-    TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), feesToPtyPoolBelowAARS);
-    ptyPoolBelowAARS.addMatchingYields(feesToPtyPoolBelowAARS);
+    _accruedMatchingYieldsForPtyPoolBelowAARS = _accruedMatchingYieldsForPtyPoolBelowAARS.add(feesToPtyPoolBelowAARS);
+    if (ptyPoolBelowAARS.totalStakingShares() > 0) {
+      TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), _accruedMatchingYieldsForPtyPoolBelowAARS);
+      ptyPoolBelowAARS.addMatchingYields(_accruedMatchingYieldsForPtyPoolBelowAARS);
+      _accruedMatchingYieldsForPtyPoolBelowAARS = 0;
+    }
 
-    TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolAboveAARU), feesToPtyPoolAboveAARU);
-    ptyPoolAboveAARU.addStakingYields(feesToPtyPoolAboveAARU);
+    _accruedStakingYieldsForPtyPoolAboveAARU = _accruedStakingYieldsForPtyPoolAboveAARU.add(feesToPtyPoolAboveAARU);
+    if (ptyPoolAboveAARU.totalStakingShares() > 0) {
+      TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolAboveAARU), _accruedStakingYieldsForPtyPoolAboveAARU);
+      ptyPoolAboveAARU.addStakingYields(_accruedStakingYieldsForPtyPoolAboveAARU);
+      _accruedStakingYieldsForPtyPoolAboveAARU = 0;
+    }
 
     if (usbAmount > 0) {
       uint256 usbBurnShares = IUsb(_usbToken).burn(_msgSender(), usbAmount);
@@ -356,25 +367,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function _ptyPoolMatchBelowAARS() internal {
-    Constants.VaultState memory S = _getVaultState();
-
-    // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
-    // uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
-    //   S.M_ETH.mul(S.P_ETH)
-    // ).div(
-    //   S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
-    // ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
-
-    // ΔUSB = (Musb-eth * AART - M_ETH * P_ETH) / (AART - 1)
-    uint256 deltaUsbAmount = S.M_USB_ETH.mul(S.AART).sub(
-      S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).div(10 ** S.P_ETH_DECIMALS)
-    ).div(S.AART.sub(10 ** S.AARDecimals)).div(10 ** S.AARDecimals);
-
-    uint256 minUsbAmount = _vaultParamValue("PtyPoolMinUsbAmount");
-    uint256 ptyPoolUsbBalance = IERC20(_usbToken).balanceOf(address(ptyPoolBelowAARS));
-    if (deltaUsbAmount >= ptyPoolUsbBalance || deltaUsbAmount + minUsbAmount >= ptyPoolUsbBalance) {
-      deltaUsbAmount = ptyPoolUsbBalance;
-    }
+    (Constants.VaultState memory S, uint256 deltaUsbAmount) = vaultCalculator.calcDeltaUsbForPtyPoolMatchBelowAARS(this, _vaultParamValue("PtyPoolMinUsbAmount"), address(ptyPoolBelowAARS));
 
     uint256 deltaAssetAmount = deltaUsbAmount.mul(10 ** S.P_ETH_DECIMALS).div(S.P_ETH);
     _assetTotalAmount = _assetTotalAmount.sub(deltaAssetAmount);
@@ -388,20 +381,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function _ptyPoolMatchAboveAARU() internal {
-    Constants.VaultState memory S = _getVaultState();
-
-    // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
-    uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
-      S.M_ETH.mul(S.P_ETH)
-    ).div(
-      S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
-    ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
-
-    uint256 minAssetAmount = _vaultParamValue("PtyPoolMinAssetAmount");
-    uint256 ptyPoolAssetBalance = ptyPoolAboveAARU.totalStakingBalance();
-    if (deltaAssetAmount >= ptyPoolAssetBalance || deltaAssetAmount + minAssetAmount >= ptyPoolAssetBalance) {
-      deltaAssetAmount = ptyPoolAssetBalance;
-    }
+    (Constants.VaultState memory S, uint256 deltaAssetAmount) = vaultCalculator.calcDeltaAssetForPtyPoolMatchAboveAARU(this, _vaultParamValue("PtyPoolMinAssetAmount"), address(ptyPoolAboveAARU));
 
     uint256 deltaUsbAmount = deltaAssetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
     uint256 usbSharesAmount = IUsb(_usbToken).mint(address(ptyPoolAboveAARU), deltaUsbAmount);
@@ -436,12 +416,22 @@ contract Vault is IVault, Context, ReentrancyGuard {
     if (leveragedTokenOutAmount > 0) {
       ILeveragedToken(_leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
       uint256 toPtyPoolBelowAARS = leveragedTokenOutAmount.div(2);
-      TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolBelowAARS), toPtyPoolBelowAARS);
-      ptyPoolBelowAARS.addStakingYields(toPtyPoolBelowAARS);
+
+      _accruedStakingYieldsForPtyPoolBelowAARS = _accruedStakingYieldsForPtyPoolBelowAARS.add(toPtyPoolBelowAARS);
+      if (ptyPoolBelowAARS.totalStakingShares() > 0) {
+        TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolBelowAARS), _accruedStakingYieldsForPtyPoolBelowAARS);
+        ptyPoolBelowAARS.addStakingYields(_accruedStakingYieldsForPtyPoolBelowAARS);
+        _accruedStakingYieldsForPtyPoolBelowAARS = 0;
+      }
 
       uint256 toPtyPoolAboveAARU = leveragedTokenOutAmount.sub(toPtyPoolBelowAARS);
-      TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolAboveAARU), toPtyPoolAboveAARU);
-      ptyPoolAboveAARU.addMatchingYields(toPtyPoolAboveAARU);
+
+      _accruedMatchingYieldsForPtyPoolAboveAARU = _accruedMatchingYieldsForPtyPoolAboveAARU.add(toPtyPoolAboveAARU);
+      if (ptyPoolAboveAARU.totalStakingShares() > 0) {
+        TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolAboveAARU), _accruedMatchingYieldsForPtyPoolAboveAARU);
+        ptyPoolAboveAARU.addMatchingYields(_accruedMatchingYieldsForPtyPoolAboveAARU);
+        _accruedMatchingYieldsForPtyPoolAboveAARU = 0;
+      }
     }
 
     emit YieldsSettlement(usbOutAmount, leveragedTokenOutAmount);
