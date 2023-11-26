@@ -7,7 +7,7 @@ contract MockUsb is Usb {
   constructor() Usb(msg.sender) {}
 
   modifier onlyVault() override {
-    _checkOwner();
+    // _checkOwner();
     _;
   }
 }

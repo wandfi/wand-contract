@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "../interfaces/ILeveragedToken.sol";
 import "../interfaces/IPtyPool.sol";
+import "../interfaces/IUsb.sol";
 import "../interfaces/IVault.sol";
 import "../libs/Constants.sol";
+import "../libs/TokensTransfer.sol";
 
 contract MockVault is IVault {
   address internal immutable _assetToken;
   address internal immutable _usbToken;
+  address internal immutable _leveragedToken;
+
   Constants.VaultPhase internal _vaultPhase;
 
   IPtyPool public ptyPoolBelowAARS;
@@ -15,10 +20,12 @@ contract MockVault is IVault {
 
   constructor(
     address _assetToken_,
-    address _usbToken_
+    address _usbToken_,
+    address _leveragedToken_
   ) {
     _assetToken = _assetToken_;
     _usbToken = _usbToken_;
+    _leveragedToken = _leveragedToken_;
     _vaultPhase = Constants.VaultPhase.Empty;
   }
 
@@ -46,10 +53,48 @@ contract MockVault is IVault {
     ptyPoolAboveAARU = IPtyPool(_ptyPoolAboveAARU);
   }
 
-  /* ========== Test Functions ========== */
+  /* ========== Mock Functions ========== */
 
-  function testSetVaultPhase(Constants.VaultPhase _vaultPhase_) external {
+  function mockSetVaultPhase(Constants.VaultPhase _vaultPhase_) external {
     _vaultPhase = _vaultPhase_;
   }
+
+  function mockAddStakingYieldsToPtyPoolBelowAARS(uint256 leveragedTokenAmount) external {
+    ILeveragedToken(_leveragedToken).mint(address(this), leveragedTokenAmount);
+    TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolBelowAARS), leveragedTokenAmount);
+    ptyPoolBelowAARS.addStakingYields(leveragedTokenAmount);
+  }
+
+  function mockAddMatchingYieldsToPtyPoolBelowAARS(uint256 assetAmount) payable external {
+    TokensTransfer.transferTokens(_assetToken, msg.sender, address(this), assetAmount);
+    TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), assetAmount);
+    ptyPoolBelowAARS.addMatchingYields(assetAmount);
+  }
+
+  function mockMatchedPtyPoolBelowAARS(uint256 deltaAssetAmount, uint256 deltaUsbAmount) payable external {
+    TokensTransfer.transferTokens(_assetToken, msg.sender, address(this), deltaAssetAmount);
+    TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), deltaAssetAmount);
+
+    IUsb(_usbToken).burn(address(ptyPoolBelowAARS), deltaUsbAmount);
+    ptyPoolBelowAARS.notifyMatchedBelowAARS(deltaAssetAmount);
+  }
+
+  function mockAddStakingYieldsToPtyPoolAboveAARU(uint256 assetAmount) external {
+    TokensTransfer.transferTokens(_assetToken, msg.sender, address(this), assetAmount);
+    TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolAboveAARU), assetAmount);
+    ptyPoolAboveAARU.addStakingYields(assetAmount);
+  }
+
+  function mockAddMatchingYieldsToPtyPoolAboveAARU(uint256 leveragedTokenAmount) external {
+    ILeveragedToken(_leveragedToken).mint(address(this), leveragedTokenAmount);
+    TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolAboveAARU), leveragedTokenAmount);
+    ptyPoolAboveAARU.addMatchingYields(leveragedTokenAmount);
+  }
+
+  function mockMatchedPtyPoolAboveAARU(uint256 deltaAssetAmount, uint256 deltaUsbAmount) external {
+    uint256 usbSharesAmount = IUsb(_usbToken).mint(address(ptyPoolAboveAARU), deltaUsbAmount);
+    ptyPoolAboveAARU.notifyMatchedAboveAARU(deltaAssetAmount, usbSharesAmount);
+  }
+
 
 }

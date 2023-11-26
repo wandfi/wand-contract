@@ -33,6 +33,13 @@ export const enum PtyPoolType {
   MintUsbAboveAARU = 1
 }
 
+export const enum VaultPhase {
+  Empty = 0,
+  Stability = 1,
+  AdjustmentBelowAARS = 2,
+  AdjustmentAboveAARU = 3
+}
+
 export const maxContractSize = 24576;
 
 export async function deployContractsFixture() {

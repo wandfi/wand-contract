@@ -72,6 +72,8 @@ contract PtyPool is Ownable, ReentrancyGuard {
     _matchingYieldsToken = _matchingYieldsToken_;
   }
 
+  receive() external payable virtual {}
+
   /* ========== VIEWS ========== */
 
   function vault() public view returns (address) {
@@ -191,7 +193,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     }
   }
 
-  function getMatchingYields() public nonReentrant updateStakingYields(_msgSender()) {
+  function getMatchingYields() public nonReentrant updateMatchingYields(_msgSender()) {
     uint256 userYields = _userMatchingYields[_msgSender()];
     if (userYields > 0) {
       _userMatchingYields[_msgSender()] = 0;
@@ -204,7 +206,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     }
   }
 
-  function getMatchingOutTokens() public nonReentrant updateStakingYields(_msgSender()) {
+  function getMatchingOutTokens() public nonReentrant updateTargetTokens(_msgSender()) {
     uint256 userYields = _userTargetTokenShares[_msgSender()];
     if (userYields > 0) {
       _userTargetTokenShares[_msgSender()] = 0;
@@ -216,7 +218,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
   /**
    * @notice Useful for Pty Pools Below AARS, since matching out tokens and yields tokens are all asset tokens.
    */
-  function getMatchingTokensAndYields() external nonReentrant {
+  function getMatchingTokensAndYields() external {
     getMatchingOutTokens();
     getMatchingYields();
   }
@@ -246,7 +248,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     emit MatchingYieldsAdded(yieldsAmount);
   }
 
-  function notifyMatchedBelowAARS(uint256 assetAmountAdded) external nonReentrant onlyVault {
+  function notifyMatchedBelowAARS(uint256 assetAmountAdded) external nonReentrant updateTargetTokens(address(0)) onlyVault {
     require(poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS, "Invalid pool type");
     require(_vault.vaultPhase() == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
 
@@ -259,7 +261,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     }
   }
 
-  function notifyMatchedAboveAARU(uint256 assetAmountMatched, uint256 usbSharesReceived) external nonReentrant onlyVault {
+  function notifyMatchedAboveAARU(uint256 assetAmountMatched, uint256 usbSharesReceived) external nonReentrant updateTargetTokens(address(0)) onlyVault {
     require(poolType == Constants.PtyPoolType.MintUsbAboveAARU, "Invalid pool type");
     require(_vault.vaultPhase() == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
