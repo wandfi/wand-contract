@@ -88,6 +88,8 @@ contract Vault is IVault, Context, ReentrancyGuard {
     _vaultPhase = Constants.VaultPhase.Empty;
   }
 
+  receive() external payable {}
+
   /* ================= VIEWS ================ */
 
   function usbToken() public view returns (address) {

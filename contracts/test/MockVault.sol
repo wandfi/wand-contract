@@ -29,6 +29,8 @@ contract MockVault is IVault {
     _vaultPhase = Constants.VaultPhase.Empty;
   }
 
+  receive() external payable {}
+
   /* ========== IVault Functions ========== */
 
   function usbToken() external view override returns (address) {
@@ -79,7 +81,7 @@ contract MockVault is IVault {
     ptyPoolBelowAARS.notifyMatchedBelowAARS(deltaAssetAmount);
   }
 
-  function mockAddStakingYieldsToPtyPoolAboveAARU(uint256 assetAmount) external {
+  function mockAddStakingYieldsToPtyPoolAboveAARU(uint256 assetAmount) payable external {
     TokensTransfer.transferTokens(_assetToken, msg.sender, address(this), assetAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolAboveAARU), assetAmount);
     ptyPoolAboveAARU.addStakingYields(assetAmount);

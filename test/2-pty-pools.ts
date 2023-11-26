@@ -268,4 +268,106 @@ describe('PytPool', () => {
   
   });
 
+  it('PytPoolAboveAARU works', async () => {
+
+    const { Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
+    const { usb, vault, ethx, ptyPoolAboveAARU } = await loadFixture(deployVaultsAndPtyPoolsFixture);
+
+    /**
+     * Alice stakes 20 $ETH to ptyPoolAboveAARU, and got 20 Pty LP; Bob stakes 10 $ETH to ptyPoolAboveAARU, and got 10 Pty LP
+     * 
+     * ptyPoolAboveAARU
+     *  LP Shares: total 30, Alice 20, Bob 10
+     */
+    await expect(ptyPoolAboveAARU.connect(Alice).stake(ethers.utils.parseEther('20'), {value: ethers.utils.parseUnits('20')}))
+      .to.changeEtherBalances([Alice.address, ptyPoolAboveAARU.address], [ethers.utils.parseEther('-20'), ethers.utils.parseEther('20')])
+      .to.emit(ptyPoolAboveAARU, 'Staked').withArgs(Alice.address, ethers.utils.parseUnits('20', await usb.decimals()));
+    await expect(ptyPoolAboveAARU.connect(Bob).stake(ethers.utils.parseEther('10'), {value: ethers.utils.parseUnits('10')}))
+      .to.changeEtherBalances([Bob.address, ptyPoolAboveAARU.address], [ethers.utils.parseEther('-10'), ethers.utils.parseEther('10')])
+      .to.emit(ptyPoolAboveAARU, 'Staked').withArgs(Bob.address, ethers.utils.parseUnits('10', await usb.decimals()));
+    expect(await ptyPoolAboveAARU.userStakingShares(Alice.address)).to.equal(ethers.utils.parseEther('20'));
+    expect(await ptyPoolAboveAARU.userStakingBalance(Alice.address)).to.equal(ethers.utils.parseEther('20'));
+    expect(await ptyPoolAboveAARU.userStakingShares(Bob.address)).to.equal(ethers.utils.parseEther('10'));
+    expect(await ptyPoolAboveAARU.userStakingBalance(Bob.address)).to.equal(ethers.utils.parseEther('10'));
+    expect(await ptyPoolAboveAARU.totalStakingBalance()).to.equal(ethers.utils.parseEther('30'));
+
+    /**
+     * Vault add 3 $ETH staking yields
+     * 
+     * ptyPoolAboveAARU
+     *  LP Shares: total 30, Alice 20, Bob 10
+     * Staking Yields ($ETH)
+     *  Alice: 2, Bob: 1 
+     */
+    await expect(vault.connect(Alice).mockAddStakingYieldsToPtyPoolAboveAARU(ethers.utils.parseEther('3'), {value: ethers.utils.parseUnits('3')}))
+      .to.changeEtherBalances([Alice.address, ptyPoolAboveAARU.address], [ethers.utils.parseEther('-3'), ethers.utils.parseEther('3')])
+      .to.emit(ptyPoolAboveAARU, 'StakingYieldsAdded').withArgs(ethers.utils.parseEther('3'));
+    expect(await ptyPoolAboveAARU.earnedStakingYields(Alice.address)).to.equal(ethers.utils.parseEther('2'));
+    expect(await ptyPoolAboveAARU.earnedStakingYields(Bob.address)).to.equal(ethers.utils.parseEther('1'));
+
+    /**
+     * Vault add 30 $ETHx matching yields
+     */
+    await expect(vault.connect(Alice).mockAddMatchingYieldsToPtyPoolAboveAARU(ethers.utils.parseUnits('30', await ethx.decimals())))
+      .to.emit(ethx, 'Transfer').withArgs(vault.address, ptyPoolAboveAARU.address, ethers.utils.parseUnits('30', await ethx.decimals()))
+      .to.emit(ptyPoolAboveAARU, 'MatchingYieldsAdded').withArgs(ethers.utils.parseUnits('30', await ethx.decimals()));
+    expect(await ptyPoolAboveAARU.earnedMatchingYields(Alice.address)).to.equal(ethers.utils.parseUnits('0', await ethx.decimals()));
+    expect(await ptyPoolAboveAARU.earnedMatchingYields(Bob.address)).to.equal(ethers.utils.parseUnits('0', await ethx.decimals()));
+
+    /**
+     * Vault match 27 $ETH to 270 $USB
+     * 
+     * ptyPoolAboveAARU
+     *  LP Shares: total 30, Alice 20, Bob 10
+     * Staking Yields ($ETH)
+     *  Alice: 2, Bob: 1 
+     * Matched Tokens ($USB)
+     *  Total: 270, Alice: 180, Bob: 90
+     * Matching Yields ($ETHx) also distributed, so:
+     *  Alice: 20, Bob: 10
+     */
+    await expect(vault.connect(Alice).mockMatchedPtyPoolAboveAARU(ethers.utils.parseEther('27'), ethers.utils.parseUnits('270', await usb.decimals()))).to.be.rejectedWith('Vault not at adjustment above AARU phase');
+    await expect(vault.connect(Alice).mockSetVaultPhase(VaultPhase.AdjustmentAboveAARU)).not.to.be.rejected;
+    await expect(vault.connect(Alice).mockMatchedPtyPoolAboveAARU(ethers.utils.parseEther('27'), ethers.utils.parseUnits('270', await usb.decimals())))
+      .to.changeEtherBalances([Alice.address, ptyPoolAboveAARU.address], [ethers.utils.parseEther('-27'), ethers.utils.parseEther('27')])
+      .to.changeTokenBalances(usb, [ptyPoolAboveAARU.address], [ethers.utils.parseUnits('270', await usb.decimals())])
+      .to.emit(ptyPoolAboveAARU, 'MatchedTokensAdded').withArgs(ethers.utils.parseUnits('270', await usb.decimals()));
+    expect(await ptyPoolAboveAARU.totalStakingBalance()).to.equal(ethers.utils.parseEther('3'));
+    expect(await ptyPoolAboveAARU.earnedMatchingYields(Alice.address)).to.equal(ethers.utils.parseUnits('20', await ethx.decimals()));
+    expect(await ptyPoolAboveAARU.earnedMatchingYields(Bob.address)).to.equal(ethers.utils.parseUnits('10', await ethx.decimals()));
+    expect(await ptyPoolAboveAARU.earnedMatchedToken(Alice.address)).to.equal(ethers.utils.parseUnits('180', await usb.decimals()));
+    expect(await ptyPoolAboveAARU.earnedMatchedToken(Bob.address)).to.equal(ethers.utils.parseUnits('90', await usb.decimals()));
+
+    /**
+     * Alice exit all stakings.
+     * 
+     * ptyPoolAboveAARU
+     *  Total balance ($ETH): 3 - 2 = 1, Alice 2 - 2 = 0, Bob 1
+     *  LP Shares: total 30 - 20 = 10, Alice 20 - 20 = 0, Bob 10
+     * Staking Yields ($ETH)
+     *  Alice: 2 => 0, Bob: 1 
+     * Matched Tokens ($USB)
+     *  Alice: 180 => 0, Bob: 90
+     * Matching Yields ($ETHx) also distributed, so:
+     *  Alice: 20 => 0, Bob: 10
+     */
+    await expect(ptyPoolAboveAARU.connect(Alice).exit())
+      .to.changeEtherBalances([Alice.address, ptyPoolAboveAARU.address], [ethers.utils.parseEther('4'), ethers.utils.parseEther('-4')])
+      .to.changeTokenBalances(usb, [Alice.address, ptyPoolAboveAARU.address], [ethers.utils.parseUnits('180', await usb.decimals()), ethers.utils.parseUnits('-180', await usb.decimals())])
+      .to.changeTokenBalances(ethx, [Alice.address, ptyPoolAboveAARU.address], [ethers.utils.parseUnits('20', await ethx.decimals()), ethers.utils.parseUnits('-20', await ethx.decimals())])
+      .to.emit(ptyPoolAboveAARU, 'Withdrawn').withArgs(Alice.address, ethers.utils.parseEther('2'))
+      .to.emit(ptyPoolAboveAARU, 'StakingYieldsPaid').withArgs(Alice.address, ethers.utils.parseEther('2'))
+      .to.emit(ptyPoolAboveAARU, 'MatchedTokenPaid').withArgs(Alice.address, ethers.utils.parseUnits('180', await usb.decimals()))
+      .to.emit(ptyPoolAboveAARU, 'MatchingYieldsPaid').withArgs(Alice.address, ethers.utils.parseUnits('20', await ethx.decimals()));
+    
+    /**
+     * Caro stakes 10 $ETH to ptyPoolAboveAARU, and got 100 Pty LP
+     */
+    await expect(ptyPoolAboveAARU.connect(Caro).stake(ethers.utils.parseEther('10'), {value: ethers.utils.parseUnits('10')}))
+      .to.changeEtherBalances([Caro.address, ptyPoolAboveAARU.address], [ethers.utils.parseEther('-10'), ethers.utils.parseEther('10')])
+      .to.emit(ptyPoolAboveAARU, 'Staked').withArgs(Caro.address, ethers.utils.parseUnits('10', await usb.decimals()));
+    expect(await ptyPoolAboveAARU.userStakingShares(Caro.address)).to.equal(ethers.utils.parseEther('100'));
+
+  });
+
 });

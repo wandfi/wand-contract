@@ -72,7 +72,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     _matchingYieldsToken = _matchingYieldsToken_;
   }
 
-  receive() external payable virtual {}
+  receive() external payable {}
 
   /* ========== VIEWS ========== */
 
@@ -197,11 +197,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     uint256 userYields = _userMatchingYields[_msgSender()];
     if (userYields > 0) {
       _userMatchingYields[_msgSender()] = 0;
-      if (poolType == Constants.PtyPoolType.RedeemByUsbBelowAARS) {
-        TokensTransfer.transferTokens(_matchingYieldsToken, address(this), _msgSender(), userYields);
-      } else if (poolType == Constants.PtyPoolType.MintUsbAboveAARU) {
-        IUsb(_matchingYieldsToken).transferShares(_msgSender(), userYields);
-      }
+      TokensTransfer.transferTokens(_matchingYieldsToken, address(this), _msgSender(), userYields);
       emit MatchingYieldsPaid(_msgSender(), userYields);
     }
   }
@@ -232,7 +228,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function addStakingYields(uint256 yieldsAmount) external nonReentrant updateStakingYields(address(0)) onlyVault {
+  function addStakingYields(uint256 yieldsAmount) external payable nonReentrant updateStakingYields(address(0)) onlyVault {
     require(yieldsAmount > 0, "Too small yields amount");
     require(_totalStakingShares > 0, "No user stakes");
 
@@ -265,6 +261,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
     require(poolType == Constants.PtyPoolType.MintUsbAboveAARU, "Invalid pool type");
     require(_vault.vaultPhase() == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
 
+    _totalStakingAssetBalance = _totalStakingAssetBalance.sub(assetAmountMatched);
     TokensTransfer.transferTokens(_stakingToken, address(this), _msgSender(), assetAmountMatched);
 
     _targetTokensPerShare = _targetTokensPerShare.add(usbSharesReceived.mul(1e18).div(_totalStakingShares));
