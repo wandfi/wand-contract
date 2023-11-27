@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../interfaces/IUsb.sol";
-import "../interfaces/IVaultFactory.sol";
 import "../interfaces/IWandProtocol.sol";
 
 contract Usb is IUsb, Ownable, ReentrancyGuard {
@@ -224,7 +223,7 @@ contract Usb is IUsb, Ownable, ReentrancyGuard {
   }
 
   modifier onlyVault() virtual {
-    require(IVaultFactory(IWandProtocol(wandProtocol).vaultFactory()).isVault(_msgSender()), "Caller is not a Vault contract");
+    require (IWandProtocol(wandProtocol).isVault(_msgSender()), "Caller is not a Vault contract");
     _;
   }
 

@@ -33,12 +33,40 @@ contract MockVault is IVault {
 
   /* ========== IVault Functions ========== */
 
+  function AARDecimals() external pure returns (uint256) {
+    return 0;
+  }
+
   function usbToken() external view override returns (address) {
     return _usbToken;
   }
 
   function assetToken() external view override returns (address) {
     return _assetToken;
+  }
+
+  function assetTokenPriceFeed() public pure returns (address) {
+    return address(0);
+  }
+
+  function assetTotalAmount() external pure returns (uint256) {
+    return 0;
+  }
+
+  function assetTokenPrice() external pure returns (uint256, uint256) {
+    return (0, 0);
+  }
+
+  function leveragedToken() external view returns (address) {
+    return _leveragedToken;
+  }
+
+  function usbTotalSupply() external pure returns (uint256) {
+    return 0;
+  }
+
+  function getParamValue(bytes32 param) external pure returns (uint256) {
+    return 0;
   }
 
   function vaultPhase() external view override returns (Constants.VaultPhase) {

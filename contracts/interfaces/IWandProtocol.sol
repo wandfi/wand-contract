@@ -9,5 +9,5 @@ interface IWandProtocol {
 
   function usbToken() external view returns (address);
 
-  function vaultFactory() external view returns (address);
+  function isVault(address vaultAddress) external view returns (bool);
 }

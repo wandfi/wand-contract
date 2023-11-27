@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
 import "./interfaces/IVault.sol";
-import "./interfaces/IVaultFactory.sol";
 import "./interfaces/IWandProtocol.sol";
 import "./settings/ProtocolSettings.sol";
 
@@ -15,9 +14,11 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   address internal immutable _settings;
-
   address internal _usbToken;
-  address internal _vaultFactory;
+
+  address[] internal _assetTokens;
+  mapping(address => address) internal _assetTokenToVaults;
+  mapping(address => address) internal _vaultToAssetTokens;
 
   bool public initialized;
 
@@ -40,32 +41,43 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
     return _usbToken;
   }
 
-  function vaultFactory() public view override returns (address) {
-    return _vaultFactory;
-  }
-
   /* ========== Initialization Operations ========= */
 
-  function initialize(address _usbToken_, address _vaultFactory_) external nonReentrant onlyOwner {
+  function initialize(address _usbToken_) external nonReentrant onlyOwner {
     require(!initialized, "Already initialized");
     require(_usbToken_ != address(0), "Zero address detected");
-    require(_vaultFactory_ != address(0), "Zero address detected");
 
     _usbToken = _usbToken_;
-    _vaultFactory = _vaultFactory_;
 
     initialized = true;
     emit Initialized();
   }
 
-  /* ========== Asset Pool Operations ========== */
+  /* ========== Vault Operations ========== */
 
-  function addVault(
-    address vaultCalculator, address assetToken, address assetPriceFeed, address leveragedToken,
-    bytes32[] memory vaultParams, uint256[] memory vaultParamsValues
-  ) external onlyInitialized nonReentrant onlyOwner {
+  function addVault(IVault vault) external nonReentrant onlyOwner onlyInitialized {
+    address assetToken = vault.assetToken();
+    require(_assetTokenToVaults[assetToken] == address(0), "Vault already exists");
 
-    IVaultFactory(_vaultFactory).addVault(vaultCalculator, assetToken, assetPriceFeed, leveragedToken, vaultParams, vaultParamsValues);
+    _assetTokens.push(assetToken);
+    _assetTokenToVaults[assetToken] = address(vault);
+    _vaultToAssetTokens[address(vault)] = assetToken;
+
+    emit VaultAdded(assetToken, vault.assetTokenPriceFeed(), _assetTokenToVaults[assetToken]);
+  }
+
+  function assetTokens() public view returns (address[] memory) {
+    return _assetTokens;
+  }
+
+  function isVault(address vaultAddress) external view returns (bool) {
+    require(vaultAddress != address(0), "Zero address detected");
+    return _vaultToAssetTokens[vaultAddress] != address(0);
+  }
+
+  function getVaultAddress(address assetToken) external view returns (address) {
+    require(_assetTokenToVaults[assetToken] != address(0), "Invalid asset token");
+    return _assetTokenToVaults[assetToken];
   }
 
   /* ============== MODIFIERS =============== */
@@ -78,5 +90,7 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
   /* =============== EVENTS ============= */
 
   event Initialized();
+
+  event VaultAdded(address indexed assetToken, address assetPriceFeed, address vault);
 
 }

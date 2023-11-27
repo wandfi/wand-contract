@@ -41,8 +41,6 @@ library Constants {
     uint256 AARC;
     uint256 AARDecimals;
     uint256 RateR;
-    uint256 BasisR;
-    uint256 BasisR2;
     uint256 aarBelowSafeLineTime;
     uint256 settingsDecimals;
 

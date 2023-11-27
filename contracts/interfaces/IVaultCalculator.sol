@@ -6,6 +6,10 @@ import "./IVault.sol";
 
 interface IVaultCalculator {
 
+  function AAR(IVault vault) external view returns (uint256);
+
+  function getVaultState(IVault vault, uint256 stableAssetPrice, uint256 aarBelowSafeLineTime, uint256 settingsDecimals) external view returns (Constants.VaultState memory);
+
   function calcMintPairsAtStabilityPhase(IVault vault, uint256 assetAmount) external view returns (Constants.VaultState memory, uint256, uint256);
 
   function calcMintPairsAtAdjustmentPhase(IVault vault, uint256 assetAmount) external view returns (Constants.VaultState memory, uint256, uint256);
@@ -28,5 +32,5 @@ interface IVaultCalculator {
 
   function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, uint256 minUsbAmount, address ptyPoolBelowAARS) external view returns (Constants.VaultState memory, uint256);
 
-  function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, uint256 minAssetAmount, address ptyPoolAboveAARU) external view returns (Constants.VaultState memory, uint256);
+  function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, address ptyPoolAboveAARU) external view returns (Constants.VaultState memory, uint256);
 }

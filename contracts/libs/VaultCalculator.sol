@@ -4,17 +4,56 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./Constants.sol";
+import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPtyPool.sol";
 import "../interfaces/IVault.sol";
 
 contract VaultCalculator {
   using SafeMath for uint256;
 
+  /**
+   * @dev AAReth = (M_ETH * P_ETH / Musb-eth) * 100%
+   */
+  function AAR(IVault vault) public view returns (uint256) {
+    uint256 assetTotalAmount = vault.assetTotalAmount();
+    if (assetTotalAmount == 0) {
+      return 0;
+    }
+    if (vault.usbTotalSupply() == 0) {
+      return type(uint256).max;
+    }
+    (uint256 assetTokenPrice, uint256 assetTokenPriceDecimals) = vault.assetTokenPrice();
+    return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** vault.AARDecimals()).div(vault.usbTotalSupply());
+  }
+
+  function getVaultState(IVault vault, uint256 stableAssetPrice, uint256 aarBelowSafeLineTime, uint256 settingsDecimals) public view returns (Constants.VaultState memory) {
+    Constants.VaultState memory S;
+    S.P_ETH_i = stableAssetPrice;
+    S.M_ETH = vault.assetTotalAmount();
+    (S.P_ETH, S.P_ETH_DECIMALS) = vault.assetTokenPrice();
+    S.M_USB_ETH = vault.usbTotalSupply();
+    S.M_ETHx = IERC20(vault.leveragedToken()).totalSupply();
+    S.aar = AAR(vault);
+    S.AART = vault.getParamValue("AART");
+    S.AARS = vault.getParamValue("AARS");
+    S.AARU = vault.getParamValue("AARU");
+    S.AARC = vault.getParamValue("AARC");
+    S.AARDecimals = vault.AARDecimals();
+    S.RateR = vault.getParamValue("RateR");
+    S.aarBelowSafeLineTime = aarBelowSafeLineTime;
+    S.settingsDecimals = settingsDecimals;
+
+    return S;
+  }
+
   function calcMintPairsAtStabilityPhase(IVault vault, uint256 assetAmount) public view returns (Constants.VaultState memory, uint256, uint256) {
     Constants.VaultPhase vaultPhase = vault.vaultPhase();
     require(vaultPhase == Constants.VaultPhase.Empty || vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
 
     Constants.VaultState memory S = vault.vaultState();
+    if (vaultPhase == Constants.VaultPhase.Empty) {
+      (S.P_ETH_i, ) = IPriceFeed(vault.assetTokenPriceFeed()).latestPrice();
+    }
 
     // ΔUSB = ΔETH * P_ETH_i * 1 / AART_eth
     // ΔETHx = ΔETH * (1 - 1 / AART_eth) = ΔETH * (AART_eth - 1) / AART_eth
@@ -168,7 +207,7 @@ contract VaultCalculator {
     return (S, deltaUsbAmount);
   }
 
-  function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, uint256 minAssetAmount, address ptyPoolAboveAARU) public view returns (Constants.VaultState memory, uint256) {
+  function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, address ptyPoolAboveAARU) public view returns (Constants.VaultState memory, uint256) {
     Constants.VaultState memory S = vault.vaultState();
 
     // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
@@ -178,7 +217,7 @@ contract VaultCalculator {
       S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
     ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
 
-    // uint256 minAssetAmount = _vaultParamValue("PtyPoolMinAssetAmount");
+    uint256 minAssetAmount = vault.getParamValue("PtyPoolMinAssetAmount");
     uint256 ptyPoolAssetBalance = IPtyPool(ptyPoolAboveAARU).totalStakingBalance();
     if (deltaAssetAmount >= ptyPoolAssetBalance || deltaAssetAmount + minAssetAmount >= ptyPoolAssetBalance) {
       deltaAssetAmount = ptyPoolAssetBalance;

@@ -9,7 +9,6 @@ import {
   WandProtocol__factory,
   ProtocolSettings__factory,
   Usb__factory,
-  VaultFactory__factory,
   VaultCalculator__factory,
   Vault,
   ERC20__factory,
@@ -93,13 +92,7 @@ export async function deployContractsFixture() {
   const USBFactory = await ethers.getContractFactory('Usb');
   expect(USBFactory.bytecode.length / 2).lessThan(maxContractSize);
   const Usb = await USBFactory.deploy(wandProtocol.address);
-  const usbToken = Usb__factory.connect(Usb.address, provider);
-
-  const VaultFactoryFactory = await ethers.getContractFactory('VaultFactory');
-  expect(VaultFactoryFactory.bytecode.length / 2).lessThan(maxContractSize);
-  console.log(`VaultFactory code size: ${VaultFactoryFactory.bytecode.length / 2} bytes`);
-  const VaultFactory = await VaultFactoryFactory.deploy(wandProtocol.address);
-  const vaultFactory = VaultFactory__factory.connect(VaultFactory.address, provider);
+  const usb = Usb__factory.connect(Usb.address, provider);
 
   const VaultCalculatorFactory = await ethers.getContractFactory('VaultCalculator');
   expect(VaultCalculatorFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -115,14 +108,14 @@ export async function deployContractsFixture() {
   // const ETHx = await LeveragedTokenFactory.deploy(wandProtocol.address, "ETHx Token", "ETHx");
   // const ethx = LeveragedToken__factory.connect(ETHx.address, provider);
 
-  let trans = await wandProtocol.connect(Alice).initialize(usbToken.address, vaultFactory.address);
+  let trans = await wandProtocol.connect(Alice).initialize(usb.address);
   await trans.wait();
 
   return {
     Alice, Bob, Caro, Dave, Ivy,
-    erc20, wbtc, stETH, usbToken,
+    erc20, wbtc, stETH, usb,
     ethPriceFeed, wbtcPriceFeed,
-    wandProtocol, settings, vaultFactory, vaultCalculator
+    wandProtocol, settings, vaultCalculator
   };
 }
 
@@ -157,20 +150,20 @@ export async function dumpVaultState(vault: Vault) {
 
   const assetTokenERC20 = ERC20__factory.connect(await vault.assetToken(), provider);
   const assetSymbol = (await vault.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
-  const priceInfo = await vault.assetTokenPrice();
   const usbToken = Usb__factory.connect(await vault.usbToken(), provider);
   const ethxToken = Usb__factory.connect(await vault.leveragedToken(), provider);
 
-  const aar = await vault.AAR();
-  const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await vault.AARDecimals());
+  const state = await vault.vaultState();
+  const priceInfo = await vault.assetTokenPrice();
 
   console.log(`${assetSymbol} Vault:`);
   console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await vault.assetTotalAmount(), 18)}`);
   console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits(priceInfo[0], priceInfo[1])}`);
+  console.log(`  P_${assetSymbol}_i: ${ethers.utils.formatUnits(state.P_ETH_i, priceInfo[1])}`);
   console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await vault.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
-  console.log(`  AAR: ${AAR}`);
+  console.log(`  AAR: ${state.aar}`);
   console.log(`  APY: ${ethers.utils.formatUnits(await vault.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
   console.log(`  Phase: ${await vault.vaultPhase()}`);
 }
@@ -180,37 +173,43 @@ export async function dumpContracts(wandProtocolAddress: string) {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
-  console.log(`  VaultFactory: ${await wandProtocol.vaultFactory()}`);
 
-  const vaultFactory = VaultFactory__factory.connect(await wandProtocol.vaultFactory(), provider);
-  const assetTokens = await vaultFactory.assetTokens();
+  const assetTokens = await wandProtocol.assetTokens();
   console.log(`Vaults:`);
   for (let i = 0; i < assetTokens.length; i++) {
     const assetToken = assetTokens[i];
     const isETH = assetToken == nativeTokenAddress;
     const assetTokenERC20 = ERC20__factory.connect(assetToken, provider);
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
-    const vaultAddress = await vaultFactory.getVaultAddress(assetToken);
+    const vaultAddress = await wandProtocol.getVaultAddress(assetToken);
     const vault = Vault__factory.connect(vaultAddress, provider);
     const leveragedToken = ERC20__factory.connect(await vault.leveragedToken(), provider);
     const ptyPoolBelowAARS = PtyPool__factory.connect(await vault.ptyPoolBelowAARS(), provider);
     const ptyPoolAboveAARU = PtyPool__factory.connect(await vault.ptyPoolAboveAARU(), provider);
     console.log(`  $${assetSymbol} Vault`);
     console.log(`    Vault Address: ${vaultAddress}`);
-    console.log(`    Asset Token: ${assetToken}`);
+    console.log(`    Asset Token (${await getTokenSymbol(assetToken)}): ${assetToken}`);
     console.log(`    Asset Price Feed: ${await vault.assetTokenPriceFeed()}`);
     console.log(`    $${await leveragedToken.symbol()} Token: ${leveragedToken.address}`);
     console.log(`    Pty Pool Below AARS: ${ptyPoolBelowAARS.address}`);
-    console.log(`       Staking Token: ${await ptyPoolBelowAARS.stakingToken()}`);
-    console.log(`       Target Token: ${await ptyPoolBelowAARS.targetToken()}`);
-    console.log(`       Staking Yield Token: ${await ptyPoolBelowAARS.stakingYieldsToken()}`);
-    console.log(`       Matching Yield Token: ${await ptyPoolBelowAARS.machingYieldsToken()}`);
+    console.log(`       Staking Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingToken())}): ${await ptyPoolBelowAARS.stakingToken()}`);
+    console.log(`       Target Token (${await getTokenSymbol(await ptyPoolBelowAARS.targetToken())}): ${await ptyPoolBelowAARS.targetToken()}`);
+    console.log(`       Staking Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingYieldsToken())}): ${await ptyPoolBelowAARS.stakingYieldsToken()}`);
+    console.log(`       Matching Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.machingYieldsToken())}): ${await ptyPoolBelowAARS.machingYieldsToken()}`);
     console.log(`    Pty Pool Above AARU: ${ptyPoolAboveAARU.address}`);
-    console.log(`       Staking Token: ${await ptyPoolAboveAARU.stakingToken()}`);
-    console.log(`       Target Token: ${await ptyPoolAboveAARU.targetToken()}`);
-    console.log(`       Staking Yield Token: ${await ptyPoolAboveAARU.stakingYieldsToken()}`);
-    console.log(`       Matching Yield Token: ${await ptyPoolAboveAARU.machingYieldsToken()}`);
+    console.log(`       Staking Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingToken())}): ${await ptyPoolAboveAARU.stakingToken()}`);
+    console.log(`       Target Token (${await getTokenSymbol(await ptyPoolBelowAARS.targetToken())}): ${await ptyPoolAboveAARU.targetToken()}`);
+    console.log(`       Staking Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingYieldsToken())}): ${await ptyPoolAboveAARU.stakingYieldsToken()}`);
+    console.log(`       Matching Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.machingYieldsToken())}): ${await ptyPoolAboveAARU.machingYieldsToken()}`);
   }
+}
+
+async function getTokenSymbol(tokenAddr: string) {
+  if (tokenAddr == nativeTokenAddress) {
+    return '$ETH';
+  }
+  const erc20 = ERC20__factory.connect(tokenAddr, provider);
+  return `$${await erc20.symbol()}`;
 }
 
 export function expandTo18Decimals(n: number) {

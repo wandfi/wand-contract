@@ -3,14 +3,13 @@ pragma solidity ^0.8.18;
 
 import "hardhat/console.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
-import "../interfaces/IWandProtocol.sol";
 import "../interfaces/ILeveragedToken.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IProtocolSettings.sol";
@@ -18,8 +17,9 @@ import "../interfaces/IPtyPool.sol";
 import "../interfaces/IUsb.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IVaultCalculator.sol";
+import "../interfaces/IWandProtocol.sol";
 
-contract Vault is IVault, Context, ReentrancyGuard {
+contract Vault is IVault, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -62,7 +62,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     address _assetTokenPriceFeed_,
     address _leveragedToken_,
     bytes32[] memory assetPoolParams, uint256[] memory assetPoolParamsValues
-  )  {
+  ) Ownable() {
     require(
       _wandProtocol != address(0) && _vaultCalculator != address(0) && _assetToken_ != address(0) && _assetTokenPriceFeed_ != address(0) && _leveragedToken_ != address(0), 
       "Zero address detected"
@@ -70,7 +70,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
     require(assetPoolParams.length == assetPoolParamsValues.length, "Invalid params length");
 
     wandProtocol = IWandProtocol(_wandProtocol);
-    require(msg.sender == wandProtocol.vaultFactory(), "Vault should only be created by factory contract");
+    require(msg.sender == wandProtocol.protocolOwner(), "Vault should only be created by contract owner");
 
     vaultCalculator = IVaultCalculator(_vaultCalculator);
     _assetToken = _assetToken_;
@@ -136,22 +136,11 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function vaultState() public view returns (Constants.VaultState memory) {
-    return _getVaultState();
+    return vaultCalculator.getVaultState(this, _stableAssetPrice, _aarBelowSafeLineTime, _settingsDecimals);
   }
 
-  /**
-   * @notice Current adequency ratio of the pool
-   * @dev AAReth = (M_ETH * P_ETH / Musb-eth) * 100%
-   */
   function AAR() public view returns (uint256) {
-    if (_assetTotalAmount == 0) {
-      return 0;
-    }
-    if (usbTotalSupply() == 0) {
-      return type(uint256).max;
-    }
-    (uint256 _assetTokenPrice, uint256 _assetTokenPriceDecimals) = assetTokenPrice();
-    return _assetTotalAmount.mul(_assetTokenPrice).div(10 ** _assetTokenPriceDecimals).mul(10 ** AARDecimals()).div(usbTotalSupply());
+    return vaultCalculator.AAR(this);
   }
 
   function AARDecimals() public pure returns (uint256) {
@@ -161,30 +150,22 @@ contract Vault is IVault, Context, ReentrancyGuard {
   /* ========== Mint FUNCTIONS ========== */
 
   function mintPairsAtStabilityPhase(uint256 assetAmount) external payable nonReentrant noneZeroValue(assetAmount) onUserAction(true) {
-    require(_vaultPhase == Constants.VaultPhase.Stability, "Vault not at stable phase");
-
     (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = vaultCalculator.calcMintPairsAtStabilityPhase(this, assetAmount);
 
     _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
   function mintPairsAtAdjustmentPhase(uint256 assetAmount) external payable nonReentrant noneZeroValue(assetAmount) onUserAction(true) {
-    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment phase");
-
     (Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) = vaultCalculator.calcMintPairsAtAdjustmentPhase(this, assetAmount);
     _doMint(assetAmount, S, usbOutAmount, leveragedTokenOutAmount);
   }
 
   function mintUSBAboveAARU(uint256 assetAmount) external payable nonReentrant noneZeroValue(assetAmount) onUserAction(true) {
-    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
-
     (Constants.VaultState memory S, uint256 usbOutAmount) = vaultCalculator.calcMintUsbAboveAARU(this, assetAmount);
     _doMint(assetAmount, S, usbOutAmount, 0);
   }
 
   function mintLeveragedTokensBelowAARS(uint256 assetAmount) external payable nonReentrant noneZeroValue(assetAmount) onUserAction(true) {
-    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
-
     (Constants.VaultState memory S, uint256 leveragedTokenOutAmount) = vaultCalculator.calcMintLeveragedTokensBelowAARS(this, assetAmount);
     _doMint(assetAmount, S, 0, leveragedTokenOutAmount);
   }
@@ -287,29 +268,6 @@ contract Vault is IVault, Context, ReentrancyGuard {
     return settings.paramDefaultValue(param);
   }
 
-  function _getVaultState() internal view returns (Constants.VaultState memory) {
-    Constants.VaultState memory S;
-    S.P_ETH_i = _stableAssetPrice;
-    S.M_ETH = _assetTotalAmount;
-    (S.P_ETH, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
-    S.P_ETH_DECIMALS = IPriceFeed(_assetTokenPriceFeed).decimals();
-    S.M_USB_ETH = usbTotalSupply();
-    S.M_ETHx = IERC20(_leveragedToken).totalSupply();
-    S.aar = AAR();
-    S.AART = _vaultParamValue("AART");
-    S.AARS = _vaultParamValue("AARS");
-    S.AARU = _vaultParamValue("AARU");
-    S.AARC = _vaultParamValue("AARC");
-    S.AARDecimals = AARDecimals();
-    S.RateR = _vaultParamValue("RateR");
-    S.BasisR = _vaultParamValue("BasisR");
-    S.BasisR2 = _vaultParamValue("BasisR2");
-    S.aarBelowSafeLineTime = _aarBelowSafeLineTime;
-    S.settingsDecimals = _settingsDecimals;
-
-    return S;
-  }
-
   function _doMint(uint256 assetAmount, Constants.VaultState memory S, uint256 usbOutAmount, uint256 leveragedTokenOutAmount) internal {
     _assetTotalAmount = _assetTotalAmount.add(assetAmount);
     TokensTransfer.transferTokens(_assetToken, _msgSender(), address(this), assetAmount);
@@ -383,7 +341,7 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   function _ptyPoolMatchAboveAARU() internal {
-    (Constants.VaultState memory S, uint256 deltaAssetAmount) = vaultCalculator.calcDeltaAssetForPtyPoolMatchAboveAARU(this, _vaultParamValue("PtyPoolMinAssetAmount"), address(ptyPoolAboveAARU));
+    (Constants.VaultState memory S, uint256 deltaAssetAmount) = vaultCalculator.calcDeltaAssetForPtyPoolMatchAboveAARU(this, address(ptyPoolAboveAARU));
 
     uint256 deltaUsbAmount = deltaAssetAmount.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS);
     uint256 usbSharesAmount = IUsb(_usbToken).mint(address(ptyPoolAboveAARU), deltaUsbAmount);
@@ -440,11 +398,6 @@ contract Vault is IVault, Context, ReentrancyGuard {
   }
 
   /* ============== MODIFIERS =============== */
-
-  modifier onlyOwner() {
-    require(_msgSender() == wandProtocol.protocolOwner(), "Caller is not owner");
-    _;
-  }
 
   modifier noneZeroValue(uint256 value) {
     require(value > 0, "Value must be greater than 0");
