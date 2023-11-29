@@ -8,7 +8,7 @@ interface IVaultCalculator {
 
   function AAR(IVault vault) external view returns (uint256);
 
-  function getVaultState(IVault vault, uint256 stableAssetPrice, uint256 aarBelowSafeLineTime, uint256 settingsDecimals) external view returns (Constants.VaultState memory);
+  function getVaultState(IVault vault, uint256 stableAssetPrice, uint256 settingsDecimals) external view returns (Constants.VaultState memory);
 
   function calcMintPairsAtStabilityPhase(IVault vault, uint256 assetAmount) external view returns (Constants.VaultState memory, uint256, uint256);
 
@@ -30,7 +30,7 @@ interface IVaultCalculator {
 
   function calcUsbToLeveragedTokens(IVault vault, uint256 usbAmount) external view returns (Constants.VaultState memory, uint256);
 
-  function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, uint256 minUsbAmount, address ptyPoolBelowAARS) external view returns (Constants.VaultState memory, uint256);
+  function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, address ptyPoolBelowAARS) external view returns (Constants.VaultState memory, uint256);
 
   function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, address ptyPoolAboveAARU) external view returns (Constants.VaultState memory, uint256);
 }

@@ -26,5 +26,9 @@ interface IVault {
   function vaultState() external view returns (Constants.VaultState memory);
 
   function getParamValue(bytes32 param) external view returns (uint256);
+
+  function AARBelowSafeLineTime() external view returns (uint256);
+
+  function AARBelowCircuitBreakerLineTime() external view returns (uint256);
   
 }

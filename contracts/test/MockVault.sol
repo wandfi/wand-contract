@@ -65,7 +65,7 @@ contract MockVault is IVault {
     return 0;
   }
 
-  function getParamValue(bytes32 param) external pure returns (uint256) {
+  function getParamValue(bytes32) external pure returns (uint256) {
     return 0;
   }
 
@@ -81,6 +81,14 @@ contract MockVault is IVault {
   function setPtyPools(address _ptyPoolBelowAARS, address _ptyPoolAboveAARU) external {
     ptyPoolBelowAARS = IPtyPool(_ptyPoolBelowAARS);
     ptyPoolAboveAARU = IPtyPool(_ptyPoolAboveAARU);
+  }
+
+  function AARBelowSafeLineTime() public pure returns (uint256) {
+    return 0;
+  }
+
+  function AARBelowCircuitBreakerLineTime() public pure returns (uint256) {
+    return 0;
   }
 
   /* ========== Mock Functions ========== */

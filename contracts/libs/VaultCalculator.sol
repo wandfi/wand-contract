@@ -26,7 +26,7 @@ contract VaultCalculator {
     return assetTotalAmount.mul(assetTokenPrice).div(10 ** assetTokenPriceDecimals).mul(10 ** vault.AARDecimals()).div(vault.usbTotalSupply());
   }
 
-  function getVaultState(IVault vault, uint256 stableAssetPrice, uint256 aarBelowSafeLineTime, uint256 settingsDecimals) public view returns (Constants.VaultState memory) {
+  function getVaultState(IVault vault, uint256 stableAssetPrice, uint256 settingsDecimals) public view returns (Constants.VaultState memory) {
     Constants.VaultState memory S;
     S.P_ETH_i = stableAssetPrice;
     S.M_ETH = vault.assetTotalAmount();
@@ -40,7 +40,7 @@ contract VaultCalculator {
     S.AARC = vault.getParamValue("AARC");
     S.AARDecimals = vault.AARDecimals();
     S.RateR = vault.getParamValue("RateR");
-    S.aarBelowSafeLineTime = aarBelowSafeLineTime;
+    S.AARBelowSafeLineTime = vault.AARBelowSafeLineTime();
     S.settingsDecimals = settingsDecimals;
 
     return S;
@@ -167,6 +167,7 @@ contract VaultCalculator {
     require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
 
     Constants.VaultState memory S = vault.vaultState();
+    require(S.aar >= S.AARC || (block.timestamp.sub(vault.AARBelowCircuitBreakerLineTime()) >= vault.getParamValue("CircuitBreakPeriod")), "AAR Below Circuit Breaker AAR Threshold");
 
     // ΔETHx = ΔUSB * M_ETHx * (1 + r) / (M_ETH * P_ETH - Musb-eth)
     uint256 leveragedTokenOutAmount = usbAmount.mul(S.M_ETHx).mul((10 ** S.settingsDecimals).add(_r(S))).div(
@@ -178,13 +179,13 @@ contract VaultCalculator {
   // 𝑟 = vault.RateR() × 𝑡(h𝑟𝑠), since aar drop below 1.3;
   // r = 0 since aar above 2;
   function _r(Constants.VaultState memory S) internal view returns (uint256) {
-    if (S.aarBelowSafeLineTime == 0) {
+    if (S.AARBelowSafeLineTime == 0) {
       return 0;
     }
-    return S.RateR.mul(block.timestamp.sub(S.aarBelowSafeLineTime)).div(1 hours);
+    return S.RateR.mul(block.timestamp.sub(S.AARBelowSafeLineTime)).div(1 hours);
   }
 
-  function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, uint256 minUsbAmount, address ptyPoolBelowAARS) public view returns (Constants.VaultState memory, uint256) {
+  function calcDeltaUsbForPtyPoolMatchBelowAARS(IVault vault, address ptyPoolBelowAARS) public view returns (Constants.VaultState memory, uint256) {
     Constants.VaultState memory S = vault.vaultState();
 
     // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
@@ -199,6 +200,7 @@ contract VaultCalculator {
       S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).div(10 ** S.P_ETH_DECIMALS)
     ).div(S.AART.sub(10 ** S.AARDecimals)).div(10 ** S.AARDecimals);
 
+    uint256 minUsbAmount = vault.getParamValue("PtyPoolMinUsbAmount");
     uint256 ptyPoolUsbBalance = IERC20(vault.usbToken()).balanceOf(ptyPoolBelowAARS);
     if (ptyPoolUsbBalance <= minUsbAmount) {
       return (S, 0);

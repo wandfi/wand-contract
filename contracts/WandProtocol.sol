@@ -4,7 +4,6 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
 import "./interfaces/IVault.sol";
 import "./interfaces/IWandProtocol.sol";

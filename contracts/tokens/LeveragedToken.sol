@@ -34,7 +34,8 @@ contract LeveragedToken is Ownable, ERC20, ReentrancyGuard {
   /* ============== MODIFIERS =============== */
 
   modifier onlyVault() {
-    require(vault != address(0) && vault == _msgSender(), "Caller is not Vault");
+    require(vault != address(0), "Vault not set");
+    require(vault == _msgSender(), "Caller is not Vault");
     _;
   }
 

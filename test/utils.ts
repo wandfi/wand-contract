@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import { BigNumber } from 'ethers';
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
@@ -32,7 +33,7 @@ export const enum PtyPoolType {
   MintUsbAboveAARU = 1
 }
 
-export const enum VaultPhase {
+export enum VaultPhase {
   Empty = 0,
   Stability = 1,
   AdjustmentBelowAARS = 2,
@@ -100,8 +101,8 @@ export async function deployContractsFixture() {
   const vaultCalculator = VaultCalculator__factory.connect(VaultCalculator.address, provider);
 
   const Vault = await ethers.getContractFactory('Vault');
-  expect(Vault.bytecode.length / 2).lessThan(maxContractSize);
   console.log(`Vault code size: ${Vault.bytecode.length / 2} bytes`);
+  expect(Vault.bytecode.length / 2).lessThan(maxContractSize);
 
   // const LeveragedTokenFactory = await ethers.getContractFactory('LeveragedToken');
   // expect(LeveragedTokenFactory.bytecode.length / 2).lessThan(maxContractSize);
@@ -163,9 +164,11 @@ export async function dumpVaultState(vault: Vault) {
   console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
   console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await vault.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
-  console.log(`  AAR: ${state.aar}`);
-  console.log(`  APY: ${ethers.utils.formatUnits(await vault.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
-  console.log(`  Phase: ${await vault.vaultPhase()}`);
+  console.log(`  AAR: ${numberToPercent(_.toNumber(ethers.utils.formatUnits(state.aar.toString(), await settings.decimals())))}`);
+  console.log(`  APY: ${numberToPercent(_.toNumber(ethers.utils.formatUnits(await vault.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())))}`);
+  console.log(`  Phase: ${VaultPhase[await vault.vaultPhase()]}`);
+  console.log(`  AARBelowSafeLineTime: ${await vault.AARBelowSafeLineTime()}`);
+  console.log(`  AARBelowCircuitBreakerLineTime: ${await vault.AARBelowCircuitBreakerLineTime()}`);
 }
 
 export async function dumpContracts(wandProtocolAddress: string) {
@@ -223,4 +226,12 @@ export function expectBigNumberEquals(expected: BigNumber, actual: BigNumber) {
     console.log(`BigNumber does not equal. expected: ${expected.toString()}, actual: ${actual.toString()}`);
   }
   expect(equals).to.be.true;
+}
+
+export function numberToPercent(num: number) {
+  return new Intl.NumberFormat('default', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(num);
 }

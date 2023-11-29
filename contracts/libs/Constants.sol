@@ -41,11 +41,8 @@ library Constants {
     uint256 AARC;
     uint256 AARDecimals;
     uint256 RateR;
-    uint256 aarBelowSafeLineTime;
+    uint256 AARBelowSafeLineTime;
     uint256 settingsDecimals;
-
-    uint256 aar_;
-    uint256 r;
   }
 
   enum PtyPoolType {

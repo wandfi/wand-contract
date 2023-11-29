@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
@@ -21,7 +20,6 @@ import "../interfaces/IWandProtocol.sol";
 
 contract Vault is IVault, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
-  using EnumerableSet for EnumerableSet.Bytes32Set;
 
   IWandProtocol public immutable wandProtocol;
   IProtocolSettings public immutable settings;
@@ -40,7 +38,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   address internal immutable _leveragedToken;
 
   uint256 internal immutable _settingsDecimals;
-  EnumerableSet.Bytes32Set internal _vaultParamsSet;
+  mapping(bytes32 => bool) internal _vaultParamsSet;
   mapping(bytes32 => uint256) internal _vaultParams;
 
   uint256 internal _assetTotalAmount;
@@ -136,7 +134,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   }
 
   function vaultState() public view returns (Constants.VaultState memory) {
-    return vaultCalculator.getVaultState(this, _stableAssetPrice, _aarBelowSafeLineTime, _settingsDecimals);
+    return vaultCalculator.getVaultState(this, _stableAssetPrice, _settingsDecimals);
   }
 
   function AAR() public view returns (uint256) {
@@ -145,6 +143,14 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
   function AARDecimals() public pure returns (uint256) {
     return Constants.PROTOCOL_DECIMALS;
+  }
+
+  function AARBelowSafeLineTime() public view returns (uint256) {
+    return _aarBelowSafeLineTime;
+  }
+
+  function AARBelowCircuitBreakerLineTime() public view returns (uint256) {
+    return _aarBelowCircuitBreakerLineTime;
   }
 
   /* ========== Mint FUNCTIONS ========== */
@@ -197,7 +203,6 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   }
 
   function redeemByLeveragedTokenAboveAARU(uint256 leveragedTokenAmount) external payable nonReentrant noneZeroValue(leveragedTokenAmount) onUserAction(true) {
-    require(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment above AARU phase");
     require(leveragedTokenAmount <= ILeveragedToken(_leveragedToken).balanceOf(_msgSender()), "Not enough leveraged token balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = vaultCalculator.calcRedeemByLeveragedTokenAboveAARU(this, leveragedTokenAmount);
@@ -207,7 +212,6 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   }
 
   function redeemByUsbBelowAARS(uint256 usbAmount) external payable nonReentrant noneZeroValue(usbAmount) onUserAction(true) {
-    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS, "Vault not at adjustment below AARS phase");
     require(usbAmount <= IUsb(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
 
     (Constants.VaultState memory S, uint256 assetOutAmount) = vaultCalculator.calcRedeemByUsbBelowAARS(this, usbAmount);
@@ -220,7 +224,6 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
   function usbToLeveragedTokens(uint256 usbAmount) external nonReentrant noneZeroValue(usbAmount) onUserAction(false) {  
     require(usbAmount <= IUsb(_usbToken).balanceOf(_msgSender()), "Not enough USB balance");
-    require(_vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || _vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
 
     (Constants.VaultState memory S, uint256 leveragedTokenAmount) = vaultCalculator.calcUsbToLeveragedTokens(this, usbAmount);
     
@@ -254,7 +257,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   function _updateParam(bytes32 param, uint256 value) internal {
     require(settings.isValidParam(param, value), "Invalid param or value");
 
-    _vaultParamsSet.add(param);
+    _vaultParamsSet[param] = true;
     _vaultParams[param] = value;
     emit UpdateParamValue(param, value);
   }
@@ -262,7 +265,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   function _vaultParamValue(bytes32 param) internal view returns (uint256) {
     require(param.length > 0, "Empty param name");
 
-    if (_vaultParamsSet.contains(param)) {
+    if (_vaultParamsSet[param]) {
       return _vaultParams[param];
     }
     return settings.paramDefaultValue(param);
@@ -327,7 +330,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   }
 
   function _ptyPoolMatchBelowAARS() internal {
-    (Constants.VaultState memory S, uint256 deltaUsbAmount) = vaultCalculator.calcDeltaUsbForPtyPoolMatchBelowAARS(this, _vaultParamValue("PtyPoolMinUsbAmount"), address(ptyPoolBelowAARS));
+    (Constants.VaultState memory S, uint256 deltaUsbAmount) = vaultCalculator.calcDeltaUsbForPtyPoolMatchBelowAARS(this, address(ptyPoolBelowAARS));
 
     uint256 deltaAssetAmount = deltaUsbAmount.mul(10 ** S.P_ETH_DECIMALS).div(S.P_ETH);
     _assetTotalAmount = _assetTotalAmount.sub(deltaAssetAmount);
@@ -413,9 +416,8 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     uint256 previousAAR = AAR();
     if (_vaultPhase == Constants.VaultPhase.Empty) {
       (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+      _vaultPhase = Constants.VaultPhase.Stability;
     }
-    _vaultPhase = Constants.VaultPhase.Stability;
-    Constants.VaultPhase previousPhase = _vaultPhase;
 
     _;
 
@@ -423,27 +425,28 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     uint256 AART = _vaultParamValue("AART");
     uint256 AARS = _vaultParamValue("AARS");
     uint256 AARU = _vaultParamValue("AARU");
-    if (previousPhase == Constants.VaultPhase.Stability) {
-      if (afterAAR > AARU) {
-        _vaultPhase = Constants.VaultPhase.AdjustmentAboveAARU;
-      }
-      else if (afterAAR < AARS) {
-        _vaultPhase = Constants.VaultPhase.AdjustmentBelowAARS;
+    uint256 AARC = _vaultParamValue("AARC");
+    if (afterAAR > AARU) {
+      _vaultPhase = Constants.VaultPhase.AdjustmentAboveAARU;
+      _aarBelowSafeLineTime = 0;
+    }
+    else if (afterAAR < AARS) {
+      _vaultPhase = Constants.VaultPhase.AdjustmentBelowAARS;
+      if (previousAAR >= AARS) {
         _aarBelowSafeLineTime = block.timestamp;
       }
     }
-    else if (previousPhase == Constants.VaultPhase.AdjustmentBelowAARS) {
-      if (afterAAR > AART) {
-        _vaultPhase = Constants.VaultPhase.Stability;
-        (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
-        _aarBelowSafeLineTime = 0;
-      }
+    else if ((previousAAR < AARS && afterAAR >= AART) || (previousAAR > AARU && afterAAR <= AART)) {
+      _vaultPhase = Constants.VaultPhase.Stability;
+      (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+      _aarBelowSafeLineTime = 0;
     }
-    else if (previousPhase == Constants.VaultPhase.AdjustmentAboveAARU) {
-      if (afterAAR < AART) {
-        _vaultPhase = Constants.VaultPhase.Stability;
-        (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
-      }
+
+    if (previousAAR >= AARC && afterAAR < AARC) {
+      _aarBelowCircuitBreakerLineTime = block.timestamp;
+    }
+    else if (previousAAR < AARC && afterAAR >= AARC) {
+      _aarBelowCircuitBreakerLineTime = 0;
     }
 
     if (settleYields) {
@@ -455,13 +458,13 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
     if (afterAAR < AARS) {
       require(ptyPoolBelowAARS != IPtyPool(address(0)), "PtyPoolBelowAARS not set");
-      if (ptyPoolBelowAARS.totalStakingBalance() > 0) {
+      if (ptyPoolBelowAARS.totalStakingBalance() > _vaultParamValue("PtyPoolMinUsbAmount")) {
         _ptyPoolMatchBelowAARS();
       }
     }
     else if (afterAAR > AARU) {
       require(ptyPoolAboveAARU != IPtyPool(address(0)), "PtyPoolAboveAARU not set");
-      if (ptyPoolAboveAARU.totalStakingBalance() > 0) {
+      if (ptyPoolAboveAARU.totalStakingBalance() > _vaultParamValue("PtyPoolMinAssetAmount")) {
         _ptyPoolMatchAboveAARU();
       }
     }
