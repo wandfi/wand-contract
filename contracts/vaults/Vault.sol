@@ -50,6 +50,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
   uint256 internal _lastYieldsSettlementTime;
 
+  uint256 internal _previousAAR;
   uint256 internal _aarBelowSafeLineTime;
   uint256 internal _aarBelowCircuitBreakerLineTime;
 
@@ -232,7 +233,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     emit UsbBurned(_msgSender(), usbAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
 
     ILeveragedToken(_leveragedToken).mint(_msgSender(), leveragedTokenAmount);
-    emit LeveragedTokenMinted(_msgSender(), usbAmount, leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
+    emit LeveragedTokenMinted(_msgSender(), 0, leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
 
     emit UsbToLeveragedTokens(_msgSender(), usbAmount, leveragedTokenAmount, S.P_ETH, S.P_ETH_DECIMALS);
   }
@@ -299,17 +300,20 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
     uint256 netRedeemAmount = assetAmount.sub(totalFees);
     TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), netRedeemAmount);
-    TokensTransfer.transferTokens(_assetToken, address(this), settings.treasury(), feesToTreasury);
+    if (feesToTreasury > 0) {
+      TokensTransfer.transferTokens(_assetToken, address(this), settings.treasury(), feesToTreasury);
+    }
+    // console.log('_doRedeem, asset: %s, feesToTreasury: %s, netRedeemAmount: %s', totalFees, feesToTreasury, netRedeemAmount);
 
     _accruedMatchingYieldsForPtyPoolBelowAARS = _accruedMatchingYieldsForPtyPoolBelowAARS.add(feesToPtyPoolBelowAARS);
-    if (ptyPoolBelowAARS.totalStakingShares() > 0) {
+    if (_accruedMatchingYieldsForPtyPoolBelowAARS > 0 && ptyPoolBelowAARS.totalStakingShares() > 0) {
       TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), _accruedMatchingYieldsForPtyPoolBelowAARS);
       ptyPoolBelowAARS.addMatchingYields(_accruedMatchingYieldsForPtyPoolBelowAARS);
       _accruedMatchingYieldsForPtyPoolBelowAARS = 0;
     }
 
     _accruedStakingYieldsForPtyPoolAboveAARU = _accruedStakingYieldsForPtyPoolAboveAARU.add(feesToPtyPoolAboveAARU);
-    if (ptyPoolAboveAARU.totalStakingShares() > 0) {
+    if (_accruedStakingYieldsForPtyPoolAboveAARU > 0 && ptyPoolAboveAARU.totalStakingShares() > 0) {
       TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolAboveAARU), _accruedStakingYieldsForPtyPoolAboveAARU);
       ptyPoolAboveAARU.addStakingYields(_accruedStakingYieldsForPtyPoolAboveAARU);
       _accruedStakingYieldsForPtyPoolAboveAARU = 0;
@@ -413,7 +417,6 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   }
 
   modifier onUserAction(bool settleYields) {
-    uint256 previousAAR = AAR();
     if (_vaultPhase == Constants.VaultPhase.Empty) {
       (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
       _vaultPhase = Constants.VaultPhase.Stability;
@@ -432,20 +435,20 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     }
     else if (afterAAR < AARS) {
       _vaultPhase = Constants.VaultPhase.AdjustmentBelowAARS;
-      if (previousAAR >= AARS) {
+      if (_previousAAR >= AARS) {
         _aarBelowSafeLineTime = block.timestamp;
       }
     }
-    else if ((previousAAR < AARS && afterAAR >= AART) || (previousAAR > AARU && afterAAR <= AART)) {
+    else if ((_previousAAR < AARS && afterAAR >= AART) || (_previousAAR > AARU && afterAAR <= AART)) {
       _vaultPhase = Constants.VaultPhase.Stability;
       (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
       _aarBelowSafeLineTime = 0;
     }
 
-    if (previousAAR >= AARC && afterAAR < AARC) {
+    if (_previousAAR >= AARC && afterAAR < AARC) {
       _aarBelowCircuitBreakerLineTime = block.timestamp;
     }
-    else if (previousAAR < AARC && afterAAR >= AARC) {
+    else if (_previousAAR < AARC && afterAAR >= AARC) {
       _aarBelowCircuitBreakerLineTime = 0;
     }
 
@@ -468,6 +471,8 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
         _ptyPoolMatchAboveAARU();
       }
     }
+
+    _previousAAR = afterAAR;
   }
 
   /* =============== EVENTS ============= */
@@ -475,7 +480,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
   event UpdateParamValue(bytes32 indexed param, uint256 value);
   
   event UsbMinted(address indexed user, uint256 assetTokenAmount, uint256 usbTokenAmount, uint256 usbSharesAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event LeveragedTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 xTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event LeveragedTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 leveragedTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   
   event UsbBurned(address indexed user, uint256 usbTokenAmount, uint256 usbSharesAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
   event LeveragedTokenBurned(address indexed user, uint256 leveragedTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);

@@ -41,6 +41,7 @@ contract VaultCalculator {
     S.AARDecimals = vault.AARDecimals();
     S.RateR = vault.getParamValue("RateR");
     S.AARBelowSafeLineTime = vault.AARBelowSafeLineTime();
+    S.AARBelowCircuitBreakerLineTime = vault.AARBelowCircuitBreakerLineTime();
     S.settingsDecimals = settingsDecimals;
 
     return S;
@@ -151,8 +152,8 @@ contract VaultCalculator {
     Constants.VaultState memory S = vault.vaultState();
 
     if (S.aar < (10 ** S.AARDecimals)) {
-      // ΔETH = ΔUSB * M_ETHx / Musb-eth
-      uint256 assetOutAmount = usbAmount.mul(S.M_ETHx).div(S.M_USB_ETH);
+      // ΔETH = ΔUSB * M_ETH / Musb-eth
+      uint256 assetOutAmount = usbAmount.mul(S.M_ETH).div(S.M_USB_ETH);
       return (S, assetOutAmount);
     }
     else {
@@ -167,12 +168,12 @@ contract VaultCalculator {
     require(vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS || vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU, "Vault not at adjustment phase");
 
     Constants.VaultState memory S = vault.vaultState();
-    require(S.aar >= S.AARC || (block.timestamp.sub(vault.AARBelowCircuitBreakerLineTime()) >= vault.getParamValue("CircuitBreakPeriod")), "AAR Below Circuit Breaker AAR Threshold");
+    require(S.aar >= S.AARC || (block.timestamp.sub(S.AARBelowCircuitBreakerLineTime) >= vault.getParamValue("CircuitBreakPeriod")), "Conditional Discount Purchase suspended");
 
     // ΔETHx = ΔUSB * M_ETHx * (1 + r) / (M_ETH * P_ETH - Musb-eth)
     uint256 leveragedTokenOutAmount = usbAmount.mul(S.M_ETHx).mul((10 ** S.settingsDecimals).add(_r(S))).div(
       S.M_ETH.mul(S.P_ETH).div(10 ** S.P_ETH_DECIMALS).sub(S.M_USB_ETH)
-    );
+    ).div(10 ** S.settingsDecimals);
     return (S, leveragedTokenOutAmount);
   }
 

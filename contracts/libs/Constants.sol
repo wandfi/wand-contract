@@ -42,6 +42,7 @@ library Constants {
     uint256 AARDecimals;
     uint256 RateR;
     uint256 AARBelowSafeLineTime;
+    uint256 AARBelowCircuitBreakerLineTime;
     uint256 settingsDecimals;
   }
 
