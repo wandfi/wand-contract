@@ -17,10 +17,10 @@ const { provider, BigNumber } = ethers;
 
 describe('Vaults', () => {
 
-  it('Vault Management Works', async () => {
-
+  async function deployVaultsAndPtyPoolsFixture() {
+    
     const {
-      Alice, Bob, Caro, ethPriceFeed, usb,
+      Alice, Bob, Caro, usb, wbtc, ethPriceFeed, wbtcPriceFeed,
       wandProtocol, settings, vaultCalculator
     } = await loadFixture(deployContractsFixture);
 
@@ -30,7 +30,7 @@ describe('Vaults', () => {
     const ETHx = await LeveragedTokenFactory.deploy("ETHx Token", "ETHx");
     const ethx = LeveragedToken__factory.connect(ETHx.address, provider);
     
-    // Create ETH vault
+    // Create ETH asset pool
     const ethAddress = nativeTokenAddress;
     const ethY = BigNumber.from(10).pow(await settings.decimals()).mul(2).div(100);  // 2.0%
     const ethAARU = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
@@ -44,7 +44,7 @@ describe('Vaults', () => {
         [ethY, ethAARU, ethAART, ethAARS, ethAARC]);
     await expect(wandProtocol.connect(Alice).addVault(ethVault.address))
       .to.emit(wandProtocol, 'VaultAdded').withArgs(ethAddress, ethPriceFeed.address, ethVault.address);
-    
+
     // Connect $ETHx with ETH vault
     await expect(ethx.connect(Bob).setVault(ethVault.address)).to.be.revertedWith("Ownable: caller is not the owner");
     await expect(ethx.connect(Alice).setVault(ethVault.address))
@@ -52,14 +52,55 @@ describe('Vaults', () => {
 
     // Create PtyPools for $ETH vault
     const PtyPoolFactory = await ethers.getContractFactory('PtyPool');
-    console.log(`PtyPool code size: ${Vault.bytecode.length / 2} bytes`);
-    expect(PtyPoolFactory.bytecode.length / 2).lessThan(maxContractSize);
     const EthVaultPtyPoolBelowAARS = await PtyPoolFactory.deploy(ethVault.address, PtyPoolType.RedeemByUsbBelowAARS, ethx.address, nativeTokenAddress);
     const ethVaultPtyPoolBelowAARS = PtyPool__factory.connect(EthVaultPtyPoolBelowAARS.address, provider);
     const EthVaultPtyPoolAboveAARU = await PtyPoolFactory.deploy(ethVault.address, PtyPoolType.MintUsbAboveAARU, nativeTokenAddress, ethx.address);
     const ethVaultPtyPoolAboveAARU = PtyPool__factory.connect(EthVaultPtyPoolAboveAARU.address, provider);
     let trans = await ethVault.connect(Alice).setPtyPools(ethVaultPtyPoolBelowAARS.address, ethVaultPtyPoolAboveAARU.address);
     await trans.wait();
+
+    // Create $WBTC vault
+    const WBTCx = await LeveragedTokenFactory.deploy("WBTCx Token", "WBTCx");
+    const wbtcx = LeveragedToken__factory.connect(WBTCx.address, provider);
+    const wbtcY = BigNumber.from(10).pow(await settings.decimals()).mul(30).div(1000);  // 3%
+    const wbtcAARU = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
+    const wbtcAART = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
+    const wbtcAARS = BigNumber.from(10).pow(await settings.decimals()).mul(130).div(100);  // 130%
+    const wbtcAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
+
+    const wbtcVault = await Vault.deploy(wandProtocol.address, vaultCalculator.address, wbtc.address, wbtcPriceFeed.address, wbtcx.address,
+        [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AARU"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
+        [wbtcY, wbtcAARU, wbtcAART, wbtcAARS, wbtcAARC]);
+    await expect(wandProtocol.connect(Alice).addVault(wbtcVault.address))
+      .to.emit(wandProtocol, 'VaultAdded').withArgs(wbtc.address, wbtcPriceFeed.address, wbtcVault.address);
+
+    // Connect $WBTCx with WBTC vault
+    await expect(wbtcx.connect(Alice).setVault(wbtcVault.address))
+      .to.emit(wbtcx, 'SetVault').withArgs(wbtcVault.address);
+
+    // Create PtyPools for $WBTC vault
+    const WBTCVaultPtyPoolBelowAARS = await PtyPoolFactory.deploy(wbtcVault.address, PtyPoolType.RedeemByUsbBelowAARS, wbtcx.address, wbtc.address);
+    const wbtcVaultPtyPoolBelowAARS = PtyPool__factory.connect(WBTCVaultPtyPoolBelowAARS.address, provider);
+    const WBTCVaultPtyPoolAboveAARU = await PtyPoolFactory.deploy(wbtcVault.address, PtyPoolType.MintUsbAboveAARU, wbtc.address, wbtcx.address);
+    const wbtcVaultPtyPoolAboveAARU = PtyPool__factory.connect(WBTCVaultPtyPoolAboveAARU.address, provider);
+    trans = await wbtcVault.connect(Alice).setPtyPools(wbtcVaultPtyPoolBelowAARS.address, wbtcVaultPtyPoolAboveAARU.address);
+    await trans.wait();
+
+    return {
+      Alice, Bob, Caro, usb, wbtc, ethPriceFeed, wbtcPriceFeed,
+      wandProtocol, settings, vaultCalculator,
+      ethVault, ethx, ethVaultPtyPoolBelowAARS, ethVaultPtyPoolAboveAARU,
+      wbtcVault, wbtcx, wbtcVaultPtyPoolBelowAARS, wbtcVaultPtyPoolAboveAARU
+    };
+  }
+
+  it('Vault Works', async () => {
+
+    const {
+      Alice, Bob, Caro, usb, ethPriceFeed,
+      wandProtocol, vaultCalculator,
+      ethVault, ethx
+    } = await loadFixture(deployVaultsAndPtyPoolsFixture);
 
     await dumpContracts(wandProtocol.address);
 

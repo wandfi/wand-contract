@@ -19,7 +19,8 @@ import {
   UniswapV2Factory__factory,
   UniswapV2Router02__factory,
   UniswapV2Pair__factory,
-  PtyPool__factory
+  PtyPool__factory,
+  LeveragedToken__factory
 } from '../typechain';
 
 const { provider } = ethers;
@@ -186,7 +187,7 @@ export async function dumpContracts(wandProtocolAddress: string) {
     const assetSymbol = isETH ? 'ETH' : await assetTokenERC20.symbol();
     const vaultAddress = await wandProtocol.getVaultAddress(assetToken);
     const vault = Vault__factory.connect(vaultAddress, provider);
-    const leveragedToken = ERC20__factory.connect(await vault.leveragedToken(), provider);
+    const leveragedToken = LeveragedToken__factory.connect(await vault.leveragedToken(), provider);
     const ptyPoolBelowAARS = PtyPool__factory.connect(await vault.ptyPoolBelowAARS(), provider);
     const ptyPoolAboveAARU = PtyPool__factory.connect(await vault.ptyPoolAboveAARU(), provider);
     console.log(`  $${assetSymbol} Vault`);
@@ -194,6 +195,7 @@ export async function dumpContracts(wandProtocolAddress: string) {
     console.log(`    Asset Token (${await getTokenSymbol(assetToken)}): ${assetToken}`);
     console.log(`    Asset Price Feed: ${await vault.assetTokenPriceFeed()}`);
     console.log(`    $${await leveragedToken.symbol()} Token: ${leveragedToken.address}`);
+    console.log(`       Vault: ${await leveragedToken.vault()}`);
     console.log(`    Pty Pool Below AARS: ${ptyPoolBelowAARS.address}`);
     console.log(`       Staking Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingToken())}): ${await ptyPoolBelowAARS.stakingToken()}`);
     console.log(`       Target Token (${await getTokenSymbol(await ptyPoolBelowAARS.targetToken())}): ${await ptyPoolBelowAARS.targetToken()}`);
