@@ -94,7 +94,7 @@ describe('Vaults', () => {
     };
   }
 
-  it('Vault Works', async () => {
+  it('Vault Mint & Redeem & Conditional Discount Purchase Works', async () => {
 
     const {
       Alice, Bob, Caro, usb, ethPriceFeed,
@@ -633,6 +633,16 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevEthBalance.add(expectedEthOut), await provider.getBalance(Alice.address));
     expectBigNumberEquals(prevEthxBlance.sub(ethxAmount), await ethx.balanceOf(Alice.address));
 
+
+  });
+
+  it('Vault Fees & Price Trigger Yields Works', async () => {
+
+    const {
+      Alice, Bob, Caro, usb, ethPriceFeed, wandProtocol, vaultCalculator, ethVault, ethx
+    } = await loadFixture(deployVaultsAndPtyPoolsFixture);
+
+    await dumpContracts(wandProtocol.address);
 
   });
 
