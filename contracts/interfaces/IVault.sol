@@ -11,6 +11,8 @@ interface IVault {
 
   function assetToken() external view returns (address);
 
+  function assetTokenDecimals() external view returns (uint8);
+
   function assetTokenPriceFeed() external view returns (address);
 
   function assetTokenPrice() external view returns (uint256, uint256);

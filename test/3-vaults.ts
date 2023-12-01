@@ -5,7 +5,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import {
-  maxContractSize, nativeTokenAddress, PtyPoolType,
+  maxContractSize, nativeTokenAddress, PtyPoolType, ONE_DAY_IN_SECS,
   deployContractsFixture, dumpContracts, dumpVaultState, expectBigNumberEquals
 } from './utils';
 import { 
@@ -20,7 +20,7 @@ describe('Vaults', () => {
   async function deployVaultsAndPtyPoolsFixture() {
     
     const {
-      Alice, Bob, Caro, usb, wbtc, ethPriceFeed, wbtcPriceFeed,
+      Alice, Bob, Caro, usb, stETH, wbtc, ethPriceFeed, stethPriceFeed, wbtcPriceFeed,
       wandProtocol, settings, vaultCalculator
     } = await loadFixture(deployContractsFixture);
 
@@ -59,6 +59,34 @@ describe('Vaults', () => {
     let trans = await ethVault.connect(Alice).setPtyPools(ethVaultPtyPoolBelowAARS.address, ethVaultPtyPoolAboveAARU.address);
     await trans.wait();
 
+    // Create $stETH vault
+    const stETHxToken = await LeveragedTokenFactory.deploy("stETHx Token", "stETHx");
+    const stethx = LeveragedToken__factory.connect(stETHxToken.address, provider);
+    const stETHY = BigNumber.from(10).pow(await settings.decimals()).mul(2).div(100);  // 2%
+    const stETHAARU = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
+    const stETHAART = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
+    const stETHAARS = BigNumber.from(10).pow(await settings.decimals()).mul(130).div(100);  // 130%
+    const stETHAARC = BigNumber.from(10).pow(await settings.decimals()).mul(110).div(100);  // 110%
+
+    const stethVault = await Vault.deploy(wandProtocol.address, vaultCalculator.address, stETH.address, stethPriceFeed.address, stethx.address,
+        [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AARU"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
+        [stETHY, stETHAARU, stETHAART, stETHAARS, stETHAARC]);
+    await expect(wandProtocol.connect(Alice).addVault(stethVault.address))
+      .to.emit(wandProtocol, 'VaultAdded').withArgs(stETH.address, stethPriceFeed.address, stethVault.address);
+
+    // Connect $stethx with $stETH vault
+    await expect(stethx.connect(Bob).setVault(stethVault.address)).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(stethx.connect(Alice).setVault(stethVault.address))
+      .to.emit(stethx, 'SetVault').withArgs(stethVault.address);
+    
+    // Create PtyPools for $stETH vault
+    const stETHVaultPtyPoolBelowAARS = await PtyPoolFactory.deploy(stethVault.address, PtyPoolType.RedeemByUsbBelowAARS, stethx.address, stETH.address);
+    const stethVaultPtyPoolBelowAARS = PtyPool__factory.connect(stETHVaultPtyPoolBelowAARS.address, provider);
+    const stETHVaultPtyPoolAboveAARU = await PtyPoolFactory.deploy(stethVault.address, PtyPoolType.MintUsbAboveAARU, stETH.address, stethx.address);
+    const stethVaultPtyPoolAboveAARU = PtyPool__factory.connect(stETHVaultPtyPoolAboveAARU.address, provider);
+    trans = await stethVault.connect(Alice).setPtyPools(stethVaultPtyPoolBelowAARS.address, stethVaultPtyPoolAboveAARU.address);
+    await trans.wait();
+
     // Create $WBTC vault
     const WBTCx = await LeveragedTokenFactory.deploy("WBTCx Token", "WBTCx");
     const wbtcx = LeveragedToken__factory.connect(WBTCx.address, provider);
@@ -87,9 +115,10 @@ describe('Vaults', () => {
     await trans.wait();
 
     return {
-      Alice, Bob, Caro, usb, wbtc, ethPriceFeed, wbtcPriceFeed,
+      Alice, Bob, Caro, usb, stETH, wbtc, ethPriceFeed, stethPriceFeed, wbtcPriceFeed,
       wandProtocol, settings, vaultCalculator,
       ethVault, ethx, ethVaultPtyPoolBelowAARS, ethVaultPtyPoolAboveAARU,
+      stethVault, stethx, stethVaultPtyPoolBelowAARS, stethVaultPtyPoolAboveAARU,
       wbtcVault, wbtcx, wbtcVaultPtyPoolBelowAARS, wbtcVaultPtyPoolAboveAARU
     };
   }
@@ -114,7 +143,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'UpdateParamValue').withArgs(ethers.utils.formatBytes32String("C"), 0);
 
     /**
-     * Asset Pool State: M_ETH = 0, M_USB = 0, M_ETHx = 0, P_ETH = $2000
+     * Vault State: M_ETH = 0, M_USB = 0, M_ETHx = 0, P_ETH = $2000
      * Alice deposit 2 ETH to mint $USB and $ETHx
      * Expected out:
      *  ΔUSB = ΔETH * P_ETH_i * 1 / AART = 2 * 2000 * 1 / 150% = 2666.7
@@ -137,7 +166,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'LeveragedTokenMinted').withArgs(Alice.address, ethDepositAmount, expectedEthxAmount, ethPrice, await ethPriceFeed.decimals());
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 2.0
      *  P_ETH: 2000.0
      *  P_ETH_i: 2000.0
@@ -170,7 +199,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'LeveragedTokenMinted').withArgs(Bob.address, ethDepositAmount, expectedEthxAmount, ethPrice, await ethPriceFeed.decimals());
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 3.0
      *  P_ETH: 2200.0
      *  P_ETH_i: 2000.0
@@ -203,7 +232,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'LeveragedTokenMinted').withArgs(Caro.address, ethDepositAmount, expectedEthxAmount, ethPrice, await ethPriceFeed.decimals());
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 7.0
      *  P_ETH: 1800.0
      *  P_ETH_i: 2000.0
@@ -240,7 +269,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'LeveragedTokenMinted').withArgs(Alice.address, ethDepositAmount, expectedEthxAmount, ethPrice, await ethPriceFeed.decimals());
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 11.0
      *  P_ETH: 3000.0
      *  P_ETH_i: 2000.0
@@ -267,7 +296,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'UsbMinted').withArgs(Alice.address, ethDepositAmount, expectedUsbAmount, anyValue, ethPrice, await ethPriceFeed.decimals());
    
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 12.0
      *  P_ETH: 3000.0
      *  P_ETH_i: 2000.0
@@ -304,7 +333,7 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevEthxBlance.add(expectedEthxAmount), ethxBlance);
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 12.0
      *  P_ETH: 3000.0
      *  P_ETH_i: 2000.0
@@ -334,7 +363,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'UsbMinted').withArgs(Alice.address, ethDepositAmount, expectedUsbAmount, anyValue, ethPrice, await ethPriceFeed.decimals());
    
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 14.0
      *  P_ETH: 1800.0
      *  P_ETH_i: 2000.0
@@ -363,7 +392,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'LeveragedTokenMinted').withArgs(Alice.address, ethDepositAmount, anyValue, ethPrice, await ethPriceFeed.decimals());
  
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 15.0
      *  P_ETH: 1800.0
      *  P_ETH_i: 2000.0
@@ -403,7 +432,7 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevEthxBlance.add(expectedEthxAmount), ethxBlance);
     
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 16.0
      *  P_ETH: 1500.0
      *  P_ETH_i: 2000.0
@@ -442,7 +471,7 @@ describe('Vaults', () => {
       .to.emit(ethVault, 'UsbToLeveragedTokens').withArgs(Alice.address, usbAmount, anyValue, ethPrice, await ethPriceFeed.decimals());
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 16.0
      *  P_ETH: 1500.0
      *  P_ETH_i: 2000.0
@@ -476,7 +505,7 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevEthBalance.add(expectedEthOut), await provider.getBalance(Alice.address));
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 15.250052079719759483
      *  P_ETH: 1200.0
      *  P_ETH_i: 2000.0
@@ -509,7 +538,7 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevEthBalance.add(expectedEthOut), await provider.getBalance(Alice.address));
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 14.773861603529283293
      *  P_ETH: 2100.0
      *  P_ETH_i: 2100.0
@@ -545,7 +574,7 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevEthxBlance.sub(expectedEthxAmount), await ethx.balanceOf(Alice.address));
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 14.773861603529283293
      *  P_ETH: 2100.0
      *  P_ETH_i: 2100.0
@@ -581,7 +610,7 @@ describe('Vaults', () => {
     expectBigNumberEquals(prevUsbBlance.sub(expectedUsbAmount), await usb.balanceOf(Alice.address));
 
     /**
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 12.480478342493062243
      *  P_ETH: 2100.0
      *  P_ETH_i: 2100.0
@@ -597,7 +626,7 @@ describe('Vaults', () => {
      * Set ETH price to $2800, AAR ~= 213%
      * Alice deposits 0.1 $ETH to mint $USB and $ETHx, also updating vault state to AdjustmentAboveAARU
      * 
-     * Asset Pool State:
+     * Vault State:
      *  M_ETH: 12.580478342493062243
      *  P_ETH: 2800.0
      *  P_ETH_i: 2100.0
@@ -636,13 +665,176 @@ describe('Vaults', () => {
 
   });
 
-  it('Vault Fees & Price Trigger Yields Works', async () => {
+  it.only('Vault Fees & Price Trigger Yields Works', async () => {
 
     const {
-      Alice, Bob, Caro, usb, ethPriceFeed, wandProtocol, vaultCalculator, ethVault, ethx
+      Alice, Bob, Caro, usb, stETH, wbtc, ethPriceFeed, stethPriceFeed, wbtcPriceFeed,
+      wandProtocol, vaultCalculator, ethVault, ethx, stethVault, stethx, wbtcVault, wbtcx,
+      ethVaultPtyPoolBelowAARS, ethVaultPtyPoolAboveAARU, stethVaultPtyPoolBelowAARS, stethVaultPtyPoolAboveAARU
     } = await loadFixture(deployVaultsAndPtyPoolsFixture);
 
     await dumpContracts(wandProtocol.address);
+
+    // Day 0
+    const genesisTime = await time.latest();
+
+    stETH.connect(Alice).mint(Alice.address, ethers.utils.parseUnits('100', await stETH.decimals()));
+    stETH.connect(Alice).mint(Bob.address, ethers.utils.parseUnits('100', await stETH.decimals()));
+    wbtc.connect(Alice).mint(Alice.address, ethers.utils.parseUnits('100', await wbtc.decimals()));
+    wbtc.connect(Alice).mint(Bob.address, ethers.utils.parseUnits('100', await wbtc.decimals()));
+
+    /**
+     * Set $ETH price to $2000, $stETH price to $2000, $WBTC price to $30000
+     * Alice depoist 10 ETH to ethVault, 10 stETH to stethVault, 10 WBTC to wbtcVault
+     */
+    let ethPrice = ethers.utils.parseUnits('2000', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    let stethPrice = ethers.utils.parseUnits('2000', await stethPriceFeed.decimals());
+    await expect(stethPriceFeed.connect(Alice).mockPrice(stethPrice)).not.to.be.reverted;
+    let wbtcPrice = ethers.utils.parseUnits('30000', await wbtcPriceFeed.decimals());
+    await expect(wbtcPriceFeed.connect(Alice).mockPrice(wbtcPrice)).not.to.be.reverted;
+    stETH.connect(Alice).approve(stethVault.address, ethers.utils.parseUnits('10', await stETH.decimals()));
+    wbtc.connect(Alice).approve(wbtcVault.address, ethers.utils.parseUnits('10', await wbtc.decimals()));
+    await expect(ethVault.connect(Alice).mintPairsAtStabilityPhase(ethers.utils.parseEther('10'), {value: ethers.utils.parseEther('10')})).not.to.be.reverted;
+    await expect(stethVault.connect(Alice).mintPairsAtStabilityPhase(ethers.utils.parseEther('10'))).not.to.be.reverted;
+    await expect(wbtcVault.connect(Alice).mintPairsAtStabilityPhase(ethers.utils.parseEther('10'))).not.to.be.reverted;
+
+    /**
+     * $ETH / $stETH Vault State:
+     *  M_ETH: 10
+     *  P_ETH: 2000.0
+     *  P_ETH_i: 2000.0
+     *  M_USB: 226666.666666666666666666
+     *  M_USB_ETH: 13333.333333333333333333
+     *  M_ETHx: 3.333333333333333333
+     *  AAR: 150%
+     *  APY: 2.00%
+     *  Phase: Stability
+     *  AARBelowSafeLineTime: 0
+     *  AARBelowCircuitBreakerLineTime: 0
+     * 
+     * $ETH Vault:
+     *  PtyPoolBelowAARS: Alice stakes 100000 $USB, Bob stakes 10000 $USB
+     *  PtyPoolAboveAARU: Alice stakes 1 $ETH, Bob stakes 0.5 $ETH
+     */
+    await dumpVaultState(ethVault);
+    // await dumpVaultState(stethVault);
+    await expect(usb.connect(Alice).transfer(Bob.address, ethers.utils.parseUnits('15000', await usb.decimals()))).not.to.be.reverted;
+    await expect(usb.connect(Alice).approve(ethVaultPtyPoolBelowAARS.address, ethers.utils.parseUnits('100000', await usb.decimals()))).not.to.be.rejected;
+    await expect(ethVaultPtyPoolBelowAARS.connect(Alice).stake(ethers.utils.parseUnits('100000', await usb.decimals()))).not.to.be.reverted;
+    await expect(usb.connect(Bob).approve(ethVaultPtyPoolBelowAARS.address, ethers.utils.parseUnits('10000', await usb.decimals()))).not.to.be.rejected;
+    await expect(ethVaultPtyPoolBelowAARS.connect(Bob).stake(ethers.utils.parseUnits('10000', await usb.decimals()))).not.to.be.reverted;
+    await expect(ethVaultPtyPoolAboveAARU.connect(Alice).stake(ethers.utils.parseEther('1'), {value: ethers.utils.parseUnits('1')})).not.to.be.reverted;
+    await expect(ethVaultPtyPoolAboveAARU.connect(Bob).stake(ethers.utils.parseEther('0.5'), {value: ethers.utils.parseUnits('0.5')})).not.to.be.reverted;
+
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 10);
+
+    /**
+     * 10 days later, Bob deposit 10 $ETH:
+     *  $ETH yields (ΔETH): 10 * 2% * 10 / 365 = 0.00547945205
+     *  $USB yields:  ΔUSB = ΔETH * P_ETH_i * 1 / AART_eth = 0.00547945205 * 2000 * 1 / 150% = 7.30593606667
+     *  $ETHx yeilds: ΔETHx = ΔETH * (1 - 1 / AART_eth) = ΔETH * (AART_eth - 1) / AART_eth = 0.00547945205 * (150% - 100%) / 150% = 0.00182648401
+     *  PtyPoolBelowAARS:
+     *    Staking yields added: ΔETHx / 2 = 0.000913242005
+     *  PtyPoolAboveAARU:
+     *    Matching yields added: ΔETHx / 2 = 0.000913242005
+     * 
+     * Bob's mint out:
+     *  ΔUSB = ΔETH * P_ETH_i * 1 / AART = 10 * 2000 * 1 / 150% = 13333.3333333
+     *  ΔETHx = ΔETH * (1 - 1 / AART) = 10 * (1 - 1 / 150%) = 3.33333333333
+     */
+    let expectedRebasedUsb = ethers.utils.parseUnits('7.30593606667', await usb.decimals());
+    let expectedPtyPoolBelowAARSStakingYields = ethers.utils.parseUnits('0.000913242005', await ethx.decimals());
+    let expectedPtyPoolAboveAARUMatchingYields = ethers.utils.parseUnits('0.000913242005', await ethx.decimals());
+    let ethDepositAmount = ethers.utils.parseEther('10');
+    let expectedUsbAmount = ethers.utils.parseUnits('13333.3333333', await usb.decimals());
+    let expectedEthxAmount = ethers.utils.parseUnits('3.33333333333', await ethx.decimals());
+    let calcOut = await vaultCalculator.calcMintPairsAtStabilityPhase(ethVault.address, ethDepositAmount);
+    let usbTotalSupply = await usb.totalSupply();
+    let usbAliceBalance = await usb.balanceOf(Alice.address);
+    let usbPtyPoolBelowAARSBalance = await usb.balanceOf(ethVaultPtyPoolBelowAARS.address);
+    await expect(ethVault.connect(Bob).mintPairsAtStabilityPhase(ethDepositAmount, {value: ethDepositAmount}))
+      .to.emit(ethVault, 'YieldsSettlement').withArgs(anyValue, anyValue)
+      .to.emit(ethVaultPtyPoolBelowAARS, 'StakingYieldsAdded').withArgs(anyValue)
+      .to.emit(ethVaultPtyPoolAboveAARU, 'MatchingYieldsAdded').withArgs(anyValue);
+    expectBigNumberEquals(usbTotalSupply.add(expectedUsbAmount).add(expectedRebasedUsb), await usb.totalSupply());
+    expectBigNumberEquals(usbAliceBalance.add(usbAliceBalance.mul(expectedRebasedUsb).div(usbTotalSupply)), await usb.balanceOf(Alice.address));
+    // console.log(usbAliceBalance, await usb.balanceOf(Alice.address));
+    expectBigNumberEquals(usbPtyPoolBelowAARSBalance.add(usbPtyPoolBelowAARSBalance.mul(expectedRebasedUsb).div(usbTotalSupply)), await usb.balanceOf(ethVaultPtyPoolBelowAARS.address));
+    expectBigNumberEquals(expectedPtyPoolBelowAARSStakingYields, await ethx.balanceOf(ethVaultPtyPoolBelowAARS.address));
+    expectBigNumberEquals(expectedPtyPoolAboveAARUMatchingYields, await ethx.balanceOf(ethVaultPtyPoolAboveAARU.address));
+    expectBigNumberEquals(expectedPtyPoolBelowAARSStakingYields.mul(10).div(11), await ethVaultPtyPoolBelowAARS.earnedStakingYields(Alice.address));
+    expectBigNumberEquals(expectedPtyPoolBelowAARSStakingYields.mul(1).div(11), await ethVaultPtyPoolBelowAARS.earnedStakingYields(Bob.address));
+
+    /**
+     * $ETH / $stETH Vault State:
+     *  M_ETH: 20
+     *  P_ETH: 2000.0
+     *  P_ETH_i: 2000.0
+     *  M_USB: 240007.305859969558598665
+     *  M_USB_ETH: 26667.478428885506510962
+     *  M_ETHx: 6.668493131659056315
+     *  AAR: 149.995434%
+     *  APY: 2.00%
+     *  Phase: Stability
+     *  AARBelowSafeLineTime: 0
+     *  AARBelowCircuitBreakerLineTime: 0
+     * 
+     * $ETH Vault:
+     *  PtyPoolBelowAARS: Alice stakes 100000 $USB, Bob stakes 10000 $USB
+     *    Total staking yields: 0.000913242005 $ETHx
+     *  PtyPoolAboveAARU: Alice stakes 1 $ETH, Bob stakes 0.5 $ETH
+     *    Total matching yields: 0.000913242005 $ETHx
+     * 
+     * 10 days later, $ETH price drop to 1500:
+     *  AAR = 20 * 1500 / 240007.305859969558598665 = 124.998958%
+     * 
+     * Alice redeems with 1000 $USB and xx $ETHx
+     *  $ETH yields (ΔETH): 20 * 2% * 10 / 365 = 0.0109589041
+     *  $USB yields:  ΔUSB = ΔETH * P_ETH_i * 1 / AART_eth = 0.0109589041 * 2000 * 1 / 150% = 14.6118721333
+     *  $ETHx yeilds: ΔETHx = ΔETH * (1 - 1 / AART_eth) = ΔETH * (AART_eth - 1) / AART_eth = 0.0109589041 * (150% - 100%) / 150% = 0.00365296803
+     *  PtyPoolBelowAARS:
+     *    Staking yields added: 0.000913242005 + 0.00182648401 = 0.002739726015
+     *  PtyPoolAboveAARU:
+     *    Matching yields added: 0.000913242005 + 0.00182648401 = 0.002739726015
+     * 
+     * After Alice's redeem, AAR drop below AARS, triggering PtyPoolBelowAARS match:
+     *    ΔUSB: 10901.007386
+     *    Matching Asset (ΔETH): 7.26733825735
+     */
+    await dumpVaultState(ethVault);
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 20);
+    let usbAmount = ethers.utils.parseUnits('1000', await usb.decimals());
+    let pairedEthxAmount = await vaultCalculator.calcPairdLeveragedTokenAmount(ethVault.address, usbAmount);
+    ethPrice = ethers.utils.parseUnits('1500', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    usbTotalSupply = await usb.totalSupply();
+    await expect(ethVault.connect(Alice).redeemByPairsWithExpectedUSBAmount(usbAmount))
+      .to.emit(ethVault, 'YieldsSettlement').withArgs(anyValue, anyValue)
+      .to.emit(ethVaultPtyPoolBelowAARS, 'StakingYieldsAdded').withArgs(anyValue)
+      .to.emit(ethVaultPtyPoolAboveAARU, 'MatchingYieldsAdded').withArgs(anyValue)
+      .to.emit(ethVaultPtyPoolBelowAARS, 'MatchedTokensAdded').withArgs(anyValue);
+    console.log(usbTotalSupply, await usb.totalSupply());
+
+   /**
+     * $ETH / $stETH Vault State:
+     *  M_ETH: 6.41197322825562447
+     *  P_ETH: 1500.0.0
+     *  P_ETH_i: 1500.0
+     *  M_USB: 219764.843363146745089355
+     *  M_USB_ETH: 6411.973228255624469238
+     *  M_ETHx: 6.422085227838380214
+     *  AAR: 150.00%
+     *  APY: 2.00%
+     *  Phase: Stability
+     *  AARBelowSafeLineTime: 0
+     *  AARBelowCircuitBreakerLineTime: 0
+     *
+     * Set $ETH price to $2500, AAR > AARU
+     * 
+     */
+
+    await dumpVaultState(ethVault);
 
   });
 

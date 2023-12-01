@@ -55,6 +55,9 @@ export async function deployContractsFixture() {
   const EthPriceFeedMock = await PriceFeedMockFactory.deploy("ETH", 6);
   const ethPriceFeed = PriceFeedMock__factory.connect(EthPriceFeedMock.address, provider);
 
+  const stETHPriceFeedMock = await PriceFeedMockFactory.deploy("stETH", 6);
+  const stethPriceFeed = PriceFeedMock__factory.connect(stETHPriceFeedMock.address, provider);
+
   const WBTCPriceFeedMock = await PriceFeedMockFactory.deploy("WBTC", 6);
   const wbtcPriceFeed = PriceFeedMock__factory.connect(WBTCPriceFeedMock.address, provider);
 
@@ -110,7 +113,7 @@ export async function deployContractsFixture() {
   return {
     Alice, Bob, Caro, Dave, Ivy,
     erc20, wbtc, stETH, usb,
-    ethPriceFeed, wbtcPriceFeed,
+    ethPriceFeed, stethPriceFeed, wbtcPriceFeed,
     wandProtocol, settings, vaultCalculator
   };
 }
@@ -146,6 +149,7 @@ export async function dumpContracts(wandProtocolAddress: string) {
   console.log(`WandProtocol: ${wandProtocol.address}`);
   console.log(`  $USB Token: ${await wandProtocol.usbToken()}`);
   console.log(`  ProtocolSettings: ${await wandProtocol.settings()}`);
+  console.log(`  Treasury: ${await ProtocolSettings__factory.connect(await wandProtocol.settings(), provider).treasury()}`);
 
   const assetTokens = await wandProtocol.assetTokens();
   console.log(`Vaults:`);
@@ -171,10 +175,10 @@ export async function dumpContracts(wandProtocolAddress: string) {
     console.log(`       Staking Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingYieldsToken())}): ${await ptyPoolBelowAARS.stakingYieldsToken()}`);
     console.log(`       Matching Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.machingYieldsToken())}): ${await ptyPoolBelowAARS.machingYieldsToken()}`);
     console.log(`    Pty Pool Above AARU: ${ptyPoolAboveAARU.address}`);
-    console.log(`       Staking Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingToken())}): ${await ptyPoolAboveAARU.stakingToken()}`);
-    console.log(`       Target Token (${await getTokenSymbol(await ptyPoolBelowAARS.targetToken())}): ${await ptyPoolAboveAARU.targetToken()}`);
-    console.log(`       Staking Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.stakingYieldsToken())}): ${await ptyPoolAboveAARU.stakingYieldsToken()}`);
-    console.log(`       Matching Yield Token (${await getTokenSymbol(await ptyPoolBelowAARS.machingYieldsToken())}): ${await ptyPoolAboveAARU.machingYieldsToken()}`);
+    console.log(`       Staking Token (${await getTokenSymbol(await ptyPoolAboveAARU.stakingToken())}): ${await ptyPoolAboveAARU.stakingToken()}`);
+    console.log(`       Target Token (${await getTokenSymbol(await ptyPoolAboveAARU.targetToken())}): ${await ptyPoolAboveAARU.targetToken()}`);
+    console.log(`       Staking Yield Token (${await getTokenSymbol(await ptyPoolAboveAARU.stakingYieldsToken())}): ${await ptyPoolAboveAARU.stakingYieldsToken()}`);
+    console.log(`       Matching Yield Token (${await getTokenSymbol(await ptyPoolAboveAARU.machingYieldsToken())}): ${await ptyPoolAboveAARU.machingYieldsToken()}`);
   }
 }
 

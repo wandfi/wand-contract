@@ -45,6 +45,10 @@ contract MockVault is IVault {
     return _assetToken;
   }
 
+  function assetTokenDecimals() public pure returns (uint8) {
+    return 18;
+  }
+
   function assetTokenPriceFeed() public pure returns (address) {
     return address(0);
   }

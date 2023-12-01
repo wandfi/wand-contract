@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../libs/Constants.sol";
@@ -109,6 +110,13 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
 
   function assetToken() public view returns (address) {
     return _assetToken;
+  }
+
+  function assetTokenDecimals() public view returns (uint8) {
+    if (_assetToken == Constants.NATIVE_TOKEN) {
+      return 18;
+    }
+    return IERC20Metadata(_assetToken).decimals();
   }
 
   function assetTokenPriceFeed() public view returns (address) {
@@ -339,6 +347,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     uint256 deltaAssetAmount = deltaUsbAmount.mul(10 ** S.P_ETH_DECIMALS).div(S.P_ETH);
     _assetTotalAmount = _assetTotalAmount.sub(deltaAssetAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), deltaAssetAmount);
+    console.log('_ptyPoolMatchBelowAARS, deltaUsbAmount: %s, deltaAssetAmount: %s', deltaUsbAmount, deltaAssetAmount);
 
     uint256 usbBurnShares = IUsb(_usbToken).burn(address(ptyPoolBelowAARS), deltaUsbAmount);
     _usbTotalShares = _usbTotalShares.sub(usbBurnShares);
@@ -358,22 +367,21 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     ptyPoolAboveAARU.notifyMatchedAboveAARU(deltaAssetAmount, usbSharesAmount);
   }
 
-  function _doSettleYields() internal {
-    uint256 timeElapsed = block.timestamp.sub(_lastYieldsSettlementTime);
-    uint256 Y = _vaultParamValue("Y");
-    uint256 deltaAssetAmount = timeElapsed.mul(Y).mul(_assetTotalAmount).div(365 days).div(10 ** _settingsDecimals);
-    if (deltaAssetAmount == 0) {
-      return;
-    }
-
-    Constants.VaultState memory S;
+  function _doSettleYields(uint256 yieldsBaseAssetAmount ) internal {
     uint256 usbOutAmount = 0;
     uint256 leveragedTokenOutAmount = 0;
-    if(_vaultPhase == Constants.VaultPhase.Stability) {
-      (S, usbOutAmount, leveragedTokenOutAmount) = vaultCalculator.calcMintPairsAtStabilityPhase(this, deltaAssetAmount);
-    }
-    else if(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS) {
-      (, usbOutAmount, leveragedTokenOutAmount) = vaultCalculator.calcMintPairsAtAdjustmentPhase(this, deltaAssetAmount);
+
+    uint256 timeElapsed = block.timestamp.sub(_lastYieldsSettlementTime);
+    uint256 Y = _vaultParamValue("Y");
+    uint256 deltaAssetAmount = timeElapsed.mul(Y).mul(yieldsBaseAssetAmount).div(365 days).div(10 ** _settingsDecimals);
+    if (deltaAssetAmount > 0) {
+      Constants.VaultState memory S;
+      if(_vaultPhase == Constants.VaultPhase.Stability) {
+        (S, usbOutAmount, leveragedTokenOutAmount) = vaultCalculator.calcMintPairsAtStabilityPhase(this, deltaAssetAmount);
+      }
+      else if(_vaultPhase == Constants.VaultPhase.AdjustmentAboveAARU || _vaultPhase == Constants.VaultPhase.AdjustmentBelowAARS) {
+        (, usbOutAmount, leveragedTokenOutAmount) = vaultCalculator.calcMintPairsAtAdjustmentPhase(this, deltaAssetAmount);
+      }
     }
 
     if (usbOutAmount > 0) {
@@ -381,27 +389,29 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     }
 
     if (leveragedTokenOutAmount > 0) {
-      ILeveragedToken(_leveragedToken).mint(_msgSender(), leveragedTokenOutAmount);
       uint256 toPtyPoolBelowAARS = leveragedTokenOutAmount.div(2);
-
       _accruedStakingYieldsForPtyPoolBelowAARS = _accruedStakingYieldsForPtyPoolBelowAARS.add(toPtyPoolBelowAARS);
-      if (ptyPoolBelowAARS.totalStakingShares() > 0) {
-        TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolBelowAARS), _accruedStakingYieldsForPtyPoolBelowAARS);
-        ptyPoolBelowAARS.addStakingYields(_accruedStakingYieldsForPtyPoolBelowAARS);
-        _accruedStakingYieldsForPtyPoolBelowAARS = 0;
-      }
-
       uint256 toPtyPoolAboveAARU = leveragedTokenOutAmount.sub(toPtyPoolBelowAARS);
-
       _accruedMatchingYieldsForPtyPoolAboveAARU = _accruedMatchingYieldsForPtyPoolAboveAARU.add(toPtyPoolAboveAARU);
-      if (ptyPoolAboveAARU.totalStakingShares() > 0) {
-        TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolAboveAARU), _accruedMatchingYieldsForPtyPoolAboveAARU);
-        ptyPoolAboveAARU.addMatchingYields(_accruedMatchingYieldsForPtyPoolAboveAARU);
-        _accruedMatchingYieldsForPtyPoolAboveAARU = 0;
-      }
     }
 
-    emit YieldsSettlement(usbOutAmount, leveragedTokenOutAmount);
+    if (_accruedStakingYieldsForPtyPoolBelowAARS > 0 && ptyPoolBelowAARS.totalStakingShares() > 0) {
+      ILeveragedToken(_leveragedToken).mint(address(this), _accruedStakingYieldsForPtyPoolBelowAARS);
+      TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolBelowAARS), _accruedStakingYieldsForPtyPoolBelowAARS);
+      ptyPoolBelowAARS.addStakingYields(_accruedStakingYieldsForPtyPoolBelowAARS);
+      _accruedStakingYieldsForPtyPoolBelowAARS = 0;
+    }
+
+    if (_accruedMatchingYieldsForPtyPoolAboveAARU > 0 && ptyPoolAboveAARU.totalStakingShares() > 0) {
+      ILeveragedToken(_leveragedToken).mint(address(this), _accruedMatchingYieldsForPtyPoolAboveAARU);
+      TokensTransfer.transferTokens(_leveragedToken, address(this), address(ptyPoolAboveAARU), _accruedMatchingYieldsForPtyPoolAboveAARU);
+      ptyPoolAboveAARU.addMatchingYields(_accruedMatchingYieldsForPtyPoolAboveAARU);
+      _accruedMatchingYieldsForPtyPoolAboveAARU = 0;
+    }
+
+    if (usbOutAmount > 0 || leveragedTokenOutAmount > 0) {
+      emit YieldsSettlement(usbOutAmount, leveragedTokenOutAmount);
+    }
   }
 
   /* ============== MODIFIERS =============== */
@@ -416,15 +426,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     _;
   }
 
-  modifier onUserAction(bool settleYields) {
-    if (_vaultPhase == Constants.VaultPhase.Empty) {
-      (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
-      _vaultPhase = Constants.VaultPhase.Stability;
-    }
-
-    _;
-
-    uint256 afterAAR = AAR();
+  function _updateStateOnUserAction(uint256 previousAAR, uint256 afterAAR) internal {
     uint256 AART = _vaultParamValue("AART");
     uint256 AARS = _vaultParamValue("AARS");
     uint256 AARU = _vaultParamValue("AARU");
@@ -435,44 +437,67 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     }
     else if (afterAAR < AARS) {
       _vaultPhase = Constants.VaultPhase.AdjustmentBelowAARS;
-      if (_previousAAR >= AARS) {
+      if (previousAAR >= AARS) {
         _aarBelowSafeLineTime = block.timestamp;
       }
     }
-    else if ((_previousAAR < AARS && afterAAR >= AART) || (_previousAAR > AARU && afterAAR <= AART)) {
+    else if ((previousAAR < AARS && afterAAR >= AART) || (previousAAR > AARU && afterAAR <= AART)) {
       _vaultPhase = Constants.VaultPhase.Stability;
       (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
       _aarBelowSafeLineTime = 0;
     }
 
-    if (_previousAAR >= AARC && afterAAR < AARC) {
+    if (previousAAR >= AARC && afterAAR < AARC) {
       _aarBelowCircuitBreakerLineTime = block.timestamp;
     }
-    else if (_previousAAR < AARC && afterAAR >= AARC) {
+    else if (previousAAR < AARC && afterAAR >= AARC) {
       _aarBelowCircuitBreakerLineTime = 0;
     }
+  }
+
+  modifier onUserAction(bool settleYields) {
+    if (_vaultPhase == Constants.VaultPhase.Empty) {
+      (_stableAssetPrice, ) = IPriceFeed(_assetTokenPriceFeed).latestPrice();
+      _vaultPhase = Constants.VaultPhase.Stability;
+    }
+    uint256 yieldsBaseAssetAmount = _assetTotalAmount;
+
+    _;
 
     if (settleYields) {
       if (_lastYieldsSettlementTime != 0) {
-        _doSettleYields();
+        _doSettleYields(yieldsBaseAssetAmount );
       }
       _lastYieldsSettlementTime = block.timestamp;
     }
 
-    if (afterAAR < AARS) {
+    uint256 afterAAR = AAR();
+    _updateStateOnUserAction(_previousAAR, afterAAR);
+
+    if (afterAAR < _vaultParamValue("AARS")) {
       require(ptyPoolBelowAARS != IPtyPool(address(0)), "PtyPoolBelowAARS not set");
-      if (ptyPoolBelowAARS.totalStakingBalance() > _vaultParamValue("PtyPoolMinUsbAmount")) {
+      uint256 minUsbAmount = _vaultParamValue("PtyPoolMinUsbAmount").mul(10 ** ((IUsb(_usbToken).decimals() - _settingsDecimals)));
+      if (ptyPoolBelowAARS.totalStakingBalance() > minUsbAmount) {
         _ptyPoolMatchBelowAARS();
+        _updateStateOnUserAction(afterAAR, AAR());
       }
     }
-    else if (afterAAR > AARU) {
+    else if (afterAAR > _vaultParamValue("AARU")) {
       require(ptyPoolAboveAARU != IPtyPool(address(0)), "PtyPoolAboveAARU not set");
-      if (ptyPoolAboveAARU.totalStakingBalance() > _vaultParamValue("PtyPoolMinAssetAmount")) {
+      uint256 minAssetAmount = _vaultParamValue("PtyPoolMinAssetAmount");
+      if (assetTokenDecimals() > _settingsDecimals) {
+        minAssetAmount = minAssetAmount.mul(10 ** (assetTokenDecimals() - _settingsDecimals));
+      }
+      else {
+        minAssetAmount = minAssetAmount.div(10 ** (_settingsDecimals - assetTokenDecimals()));
+      }
+      if (ptyPoolAboveAARU.totalStakingBalance() > minAssetAmount) {
         _ptyPoolMatchAboveAARU();
+        _updateStateOnUserAction(afterAAR, AAR());
       }
     }
 
-    _previousAAR = afterAAR;
+    _previousAAR = AAR();
   }
 
   /* =============== EVENTS ============= */

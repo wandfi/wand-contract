@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./Constants.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPtyPool.sol";
+import "../interfaces/IUsb.sol";
 import "../interfaces/IVault.sol";
 
 contract VaultCalculator {
@@ -199,13 +202,16 @@ contract VaultCalculator {
     // ΔUSB = (Musb-eth * AART - M_ETH * P_ETH) / (AART - 1)
     uint256 deltaUsbAmount = S.M_USB_ETH.mul(S.AART).sub(
       S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).div(10 ** S.P_ETH_DECIMALS)
-    ).div(S.AART.sub(10 ** S.AARDecimals)).div(10 ** S.AARDecimals);
+    ).div(S.AART.sub(10 ** S.AARDecimals));
 
     uint256 minUsbAmount = vault.getParamValue("PtyPoolMinUsbAmount");
+    // Convert to $USB decimals
+    minUsbAmount = minUsbAmount.mul(10 ** ((IUsb(vault.usbToken()).decimals() - S.settingsDecimals)));
     uint256 ptyPoolUsbBalance = IERC20(vault.usbToken()).balanceOf(ptyPoolBelowAARS);
     if (ptyPoolUsbBalance <= minUsbAmount) {
       return (S, 0);
     }
+    console.log('calcDeltaUsbForPtyPoolMatchBelowAARS, minUsbAmount: %s, deltaUsbAmount: %s', minUsbAmount, deltaUsbAmount);
     deltaUsbAmount = deltaUsbAmount > ptyPoolUsbBalance.sub(minUsbAmount) ? ptyPoolUsbBalance.sub(minUsbAmount) : deltaUsbAmount;
     return (S, deltaUsbAmount);
   }
@@ -221,6 +227,13 @@ contract VaultCalculator {
     ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
 
     uint256 minAssetAmount = vault.getParamValue("PtyPoolMinAssetAmount");
+    if (vault.assetTokenDecimals() > S.settingsDecimals) {
+      minAssetAmount = minAssetAmount.mul(10 ** (vault.assetTokenDecimals() - S.settingsDecimals));
+    }
+    else {
+      minAssetAmount = minAssetAmount.div(10 ** (S.settingsDecimals - vault.assetTokenDecimals()));
+    }
+
     uint256 ptyPoolAssetBalance = IPtyPool(ptyPoolAboveAARU).totalStakingBalance();
     if (deltaAssetAmount >= ptyPoolAssetBalance || deltaAssetAmount + minAssetAmount >= ptyPoolAssetBalance) {
       deltaAssetAmount = ptyPoolAssetBalance;
