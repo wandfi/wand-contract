@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 import {
   WandProtocol__factory,
   ProtocolSettings__factory,
-  USB__factory,
+  Usb__factory,
   Vault__factory,
   Vault,
   ERC20__factory,
@@ -25,17 +25,17 @@ const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
 const deployer = new ethers.Wallet(privateKey, provider);
 
-const ethPoolAddress = '0x89BBE988c010846b935B07750A6Ff74A8c132534';
-const wbtcPoolAddress = '0x383ba522b4B515f17CA5fd46BA82b9598A02c309';
-const stethxPoolAddress = '0xDD92644966a1B495DFD0225313a9294501e83034';
+const ethVaultAddress = '';
+const wbtcVaultAddress = '';
+const stethVaultAddress = '';
 
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
 
 async function main() {
-  const ethPool = Vault__factory.connect(ethPoolAddress, provider);
-  const wbtcPool = Vault__factory.connect(wbtcPoolAddress, provider);
-  const stethPool = Vault__factory.connect(stethxPoolAddress, provider);
+  const ethPool = Vault__factory.connect(ethVaultAddress, provider);
+  const wbtcPool = Vault__factory.connect(wbtcVaultAddress, provider);
+  const stethPool = Vault__factory.connect(stethVaultAddress, provider);
 
   // Mock $WBTC price to $30000
   const wbtcPriceFeed = PriceFeedMock__factory.connect(await wbtcPool.assetTokenPriceFeed(), provider);
@@ -80,27 +80,27 @@ async function main() {
   // dumpVaultState(wbtcPool);
 }
 
-async function dumpVaultState(assetPool: Vault) {
-  const wandProtocol = WandProtocol__factory.connect(await assetPool.wandProtocol(), provider);
+async function dumpVaultState(vault: Vault) {
+  const wandProtocol = WandProtocol__factory.connect(await vault.wandProtocol(), provider);
   const settings = ProtocolSettings__factory.connect(await wandProtocol.settings(), provider);
 
-  const assetTokenERC20 = ERC20__factory.connect(await assetPool.assetToken(), provider);
-  const assetSymbol = (await assetPool.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
-  const assetPriceFeed = PriceFeedMock__factory.connect(await assetPool.assetTokenPriceFeed(), provider);
-  const usbToken = USB__factory.connect(await assetPool.usbToken(), provider);
-  const ethxToken = USB__factory.connect(await assetPool.leveragedToken(), provider);
+  const assetTokenERC20 = ERC20__factory.connect(await vault.assetToken(), provider);
+  const assetSymbol = (await vault.assetToken() == nativeTokenAddress) ? 'ETH' : await assetTokenERC20.symbol();
+  const assetPriceFeed = PriceFeedMock__factory.connect(await vault.assetTokenPriceFeed(), provider);
+  const usbToken = Usb__factory.connect(await vault.usbToken(), provider);
+  const ethxToken = Usb__factory.connect(await vault.leveragedToken(), provider);
 
-  const aar = await assetPool.AAR();
-  const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await assetPool.AARDecimals());
+  const aar = await vault.AAR();
+  const AAR = (aar == ethers.constants.MaxUint256) ? 'MaxUint256' : ethers.utils.formatUnits(aar, await vault.AARDecimals());
 
   console.log(`$${assetSymbol} Pool:`);
-  console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.assetTotalAmount(), 18)}`);
+  console.log(`  M_${assetSymbol}: ${ethers.utils.formatUnits(await vault.assetTotalAmount(), 18)}`);
   console.log(`  P_${assetSymbol}: ${ethers.utils.formatUnits((await assetPriceFeed.latestPrice())[0], await assetPriceFeed.decimals())}`);
   console.log(`  M_USB: ${ethers.utils.formatUnits(await usbToken.totalSupply(), 18)}`);
-  console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await assetPool.usbTotalSupply(), 18)}`);
+  console.log(`  M_USB_${assetSymbol}: ${ethers.utils.formatUnits(await vault.usbTotalSupply(), 18)}`);
   console.log(`  M_${assetSymbol}x: ${ethers.utils.formatUnits(await ethxToken.totalSupply(), 18)}`);
   console.log(`  AAR: ${AAR}`);
-  console.log(`  APY: ${ethers.utils.formatUnits(await assetPool.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
+  console.log(`  APY: ${ethers.utils.formatUnits(await vault.getParamValue(ethers.utils.formatBytes32String('Y')), await settings.decimals())}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

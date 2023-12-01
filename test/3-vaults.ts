@@ -30,7 +30,7 @@ describe('Vaults', () => {
     const ETHx = await LeveragedTokenFactory.deploy("ETHx Token", "ETHx");
     const ethx = LeveragedToken__factory.connect(ETHx.address, provider);
     
-    // Create ETH asset pool
+    // Create ETH vault
     const ethAddress = nativeTokenAddress;
     const ethY = BigNumber.from(10).pow(await settings.decimals()).mul(2).div(100);  // 2.0%
     const ethAARU = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
@@ -665,7 +665,7 @@ describe('Vaults', () => {
 
   });
 
-  it.only('Vault Fees & Price Trigger Yields Works', async () => {
+  it('Vault Fees & Price Trigger Yields Works', async () => {
 
     const {
       Alice, Bob, Caro, usb, stETH, wbtc, ethPriceFeed, stethPriceFeed, wbtcPriceFeed,
@@ -830,12 +830,26 @@ describe('Vaults', () => {
      *  AARBelowSafeLineTime: 0
      *  AARBelowCircuitBreakerLineTime: 0
      *
-     * Set $ETH price to $2500, AAR > AARU
+     * Set $ETH price to $2100, AAR > AARU
+     * Alice redeems 1 $ETHx, triggering PtyPoolAboveAARU match
      * 
      */
-
     await dumpVaultState(ethVault);
-
+    await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 21);
+    ethPrice = ethers.utils.parseUnits('2100', await ethPriceFeed.decimals());
+    await expect(ethPriceFeed.connect(Alice).mockPrice(ethPrice)).not.to.be.reverted;
+    let ethxAmount = ethers.utils.parseUnits('1', await ethx.decimals());
+    let pairedUsbAmount = await vaultCalculator.calcPairedUsbAmount(ethVault.address, ethxAmount);
+    usbTotalSupply = await usb.totalSupply();
+    // console.log(await ethVaultPtyPoolAboveAARU.totalStakingBalance());
+    await expect(ethVault.connect(Alice).redeemByPairsWithExpectedLeveragedTokenAmount(ethxAmount))
+      .to.emit(ethVault, 'YieldsSettlement').withArgs(anyValue, anyValue)
+      .to.emit(ethVaultPtyPoolBelowAARS, 'StakingYieldsAdded').withArgs(anyValue)
+      .to.emit(ethVaultPtyPoolAboveAARU, 'StakingYieldsAdded').withArgs(anyValue)
+      .to.emit(ethVaultPtyPoolAboveAARU, 'MatchingYieldsAdded').withArgs(anyValue)
+      .to.emit(ethVaultPtyPoolAboveAARU, 'MatchedTokensAdded').withArgs(anyValue);
+    // console.log(await ethVaultPtyPoolAboveAARU.totalStakingBalance());
+    await dumpVaultState(ethVault);
   });
 
 });

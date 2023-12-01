@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -347,7 +347,7 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     uint256 deltaAssetAmount = deltaUsbAmount.mul(10 ** S.P_ETH_DECIMALS).div(S.P_ETH);
     _assetTotalAmount = _assetTotalAmount.sub(deltaAssetAmount);
     TokensTransfer.transferTokens(_assetToken, address(this), address(ptyPoolBelowAARS), deltaAssetAmount);
-    console.log('_ptyPoolMatchBelowAARS, deltaUsbAmount: %s, deltaAssetAmount: %s', deltaUsbAmount, deltaAssetAmount);
+    // console.log('_ptyPoolMatchBelowAARS, deltaUsbAmount: %s, deltaAssetAmount: %s', deltaUsbAmount, deltaAssetAmount);
 
     uint256 usbBurnShares = IUsb(_usbToken).burn(address(ptyPoolBelowAARS), deltaUsbAmount);
     _usbTotalShares = _usbTotalShares.sub(usbBurnShares);
@@ -363,6 +363,8 @@ contract Vault is IVault, Ownable, ReentrancyGuard {
     uint256 usbSharesAmount = IUsb(_usbToken).mint(address(ptyPoolAboveAARU), deltaUsbAmount);
     _usbTotalShares = _usbTotalShares.add(usbSharesAmount);
     emit UsbMinted(_msgSender(), deltaAssetAmount, deltaUsbAmount, usbSharesAmount, S.P_ETH, S.P_ETH_DECIMALS);
+
+    // console.log('_ptyPoolMatchAboveAARU, deltaUsbAmount: %s, deltaAssetAmount: %s', deltaUsbAmount, deltaAssetAmount);
 
     ptyPoolAboveAARU.notifyMatchedAboveAARU(deltaAssetAmount, usbSharesAmount);
   }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -193,12 +193,6 @@ contract VaultCalculator {
     Constants.VaultState memory S = vault.vaultState();
 
     // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
-    // uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
-    //   S.M_ETH.mul(S.P_ETH)
-    // ).div(
-    //   S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
-    // ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
-
     // ΔUSB = (Musb-eth * AART - M_ETH * P_ETH) / (AART - 1)
     uint256 deltaUsbAmount = S.M_USB_ETH.mul(S.AART).sub(
       S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).div(10 ** S.P_ETH_DECIMALS)
@@ -211,7 +205,7 @@ contract VaultCalculator {
     if (ptyPoolUsbBalance <= minUsbAmount) {
       return (S, 0);
     }
-    console.log('calcDeltaUsbForPtyPoolMatchBelowAARS, minUsbAmount: %s, deltaUsbAmount: %s', minUsbAmount, deltaUsbAmount);
+    // console.log('calcDeltaUsbForPtyPoolMatchBelowAARS, minUsbAmount: %s, deltaUsbAmount: %s', minUsbAmount, deltaUsbAmount);
     deltaUsbAmount = deltaUsbAmount > ptyPoolUsbBalance.sub(minUsbAmount) ? ptyPoolUsbBalance.sub(minUsbAmount) : deltaUsbAmount;
     return (S, deltaUsbAmount);
   }
@@ -219,12 +213,10 @@ contract VaultCalculator {
   function calcDeltaAssetForPtyPoolMatchAboveAARU(IVault vault, address ptyPoolAboveAARU) public view returns (Constants.VaultState memory, uint256) {
     Constants.VaultState memory S = vault.vaultState();
 
-    // ΔETH = (Musb-eth * AART - M_ETH * P_ETH) / (P_ETH * (AART - 1))
-    uint256 deltaAssetAmount = S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS).sub(
-      S.M_ETH.mul(S.P_ETH)
-    ).div(
-      S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals))
-    ).div(10 ** S.P_ETH_DECIMALS).div(10 ** S.AARDecimals);
+    // ΔETH = (M_ETH * P_ETH - Musb-eth * AART) / (P_ETH * (AART - 1))
+    uint256 deltaAssetAmount = S.M_ETH.mul(S.P_ETH).mul(10 ** S.AARDecimals).sub(
+      S.M_USB_ETH.mul(S.AART).mul(10 ** S.P_ETH_DECIMALS)
+    ).div(S.P_ETH.mul(S.AART.sub(10 ** S.AARDecimals)));
 
     uint256 minAssetAmount = vault.getParamValue("PtyPoolMinAssetAmount");
     if (vault.assetTokenDecimals() > S.settingsDecimals) {
@@ -235,10 +227,12 @@ contract VaultCalculator {
     }
 
     uint256 ptyPoolAssetBalance = IPtyPool(ptyPoolAboveAARU).totalStakingBalance();
-    if (deltaAssetAmount >= ptyPoolAssetBalance || deltaAssetAmount + minAssetAmount >= ptyPoolAssetBalance) {
-      deltaAssetAmount = ptyPoolAssetBalance;
+    if (ptyPoolAssetBalance <= minAssetAmount) {
+      return (S, 0);
     }
+    // console.log('calcDeltaAssetForPtyPoolMatchAboveAARU, minAssetAmount: %s, deltaAssetAmount: %s', minAssetAmount, deltaAssetAmount);
 
+    deltaAssetAmount = deltaAssetAmount > ptyPoolAssetBalance.sub(minAssetAmount) ? ptyPoolAssetBalance.sub(minAssetAmount) : deltaAssetAmount;
     return (S, deltaAssetAmount);
   }
 
