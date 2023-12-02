@@ -54,15 +54,15 @@ contract WandProtocol is IWandProtocol, Ownable, ReentrancyGuard {
 
   /* ========== Vault Operations ========== */
 
-  function addVault(IVault vault) external nonReentrant onlyOwner onlyInitialized {
-    address assetToken = vault.assetToken();
+  function addVault(address vault) external nonReentrant onlyOwner onlyInitialized {
+    address assetToken = IVault(vault).assetToken();
     require(_assetTokenToVaults[assetToken] == address(0), "Vault already exists");
 
     _assetTokens.push(assetToken);
-    _assetTokenToVaults[assetToken] = address(vault);
-    _vaultToAssetTokens[address(vault)] = assetToken;
+    _assetTokenToVaults[assetToken] = vault;
+    _vaultToAssetTokens[vault] = assetToken;
 
-    emit VaultAdded(assetToken, vault.assetTokenPriceFeed(), _assetTokenToVaults[assetToken]);
+    emit VaultAdded(assetToken, IVault(vault).assetTokenPriceFeed(), _assetTokenToVaults[assetToken]);
   }
 
   function assetTokens() public view returns (address[] memory) {

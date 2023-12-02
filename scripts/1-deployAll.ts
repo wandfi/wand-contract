@@ -41,65 +41,80 @@ const testers = [
   '0xc97B447186c59A5Bb905cb193f15fC802eF3D543',
 ]
 
+const txOpts = {
+  gasLimit: 300000,
+  gasPrice: ethers.utils.parseUnits('30.0', 'gwei')
+}
+
 // mainnet
 // const provider = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${infuraKey}`);
 
 async function main() {
-
   // Deploy Mocked ERC20 tokens and price feeds
   const ERC20MockFactory = await ethers.getContractFactory('ERC20Mock');
   const WBTC = await ERC20MockFactory.deploy('WBTC Token', 'WBTC');
   const wbtc = ERC20Mock__factory.connect(WBTC.address, provider);
+  // const wbtc = ERC20Mock__factory.connect('', provider);
   console.log(`Deployed Mocked WBTC token at ${wbtc.address}`);
 
   const RebasableERC20MockFactory = await ethers.getContractFactory('RebasableERC20Mock');
   const RebasableERC20Mock = await RebasableERC20MockFactory.deploy("Liquid staked Ether 2.0", "stETH");
   const stETH = RebasableERC20Mock__factory.connect(RebasableERC20Mock.address, provider);
+  // const stETH = RebasableERC20Mock__factory.connect('', provider);
   console.log(`Deployed Mocked stETH token at ${stETH.address}`);
 
   const CommonPriceFeedFactory = await ethers.getContractFactory('CommonPriceFeed');
   const commonPriceFeed = await CommonPriceFeedFactory.deploy('ETH', chainlinkETHUSD);
   const ethPriceFeed = PriceFeedMock__factory.connect(commonPriceFeed.address, provider);
+  // const ethPriceFeed = PriceFeedMock__factory.connect('', provider);
   console.log(`Deployed Chainlink PriceFeed for ETH at ${ethPriceFeed.address}`);
 
   const PriceFeedMockFactory = await ethers.getContractFactory('PriceFeedMock');
   const WBTCPriceFeedMock = await PriceFeedMockFactory.deploy('WBTC', 6);
   const wbtcPriceFeed = PriceFeedMock__factory.connect(WBTCPriceFeedMock.address, provider);
+  // const wbtcPriceFeed = PriceFeedMock__factory.connect('', provider);
   console.log(`Deployed Mocked PriceFeed for WBTC at ${wbtcPriceFeed.address}`);
 
   const PriceFeedMockForStETHFactory = await ethers.getContractFactory('PriceFeedMock');
   const stETHPriceFeedMock = await PriceFeedMockForStETHFactory.deploy('stETH', 6);
   const stETHPriceFeed = PriceFeedMock__factory.connect(stETHPriceFeedMock.address, provider);
+  // const stETHPriceFeed = PriceFeedMock__factory.connect('', provider);
   console.log(`Deployed Mocked PriceFeed for stETH at ${stETHPriceFeed.address}`);
 
   // Deploy Wand Protocol core contracts
   const ProtocolSettingsFactory = await ethers.getContractFactory('ProtocolSettings');
   const ProtocolSettings = await ProtocolSettingsFactory.deploy(treasuryAddress);
   const settings = ProtocolSettings__factory.connect(ProtocolSettings.address, provider);
+  // const settings = ProtocolSettings__factory.connect('', provider);
   console.log(`Deployed ProtocolSettings to ${settings.address}`);
 
   const WandProtocolFactory = await ethers.getContractFactory('WandProtocol');
   const WandProtocol = await WandProtocolFactory.deploy(settings.address);
   const wandProtocol = WandProtocol__factory.connect(WandProtocol.address, provider);
+  // const wandProtocol = WandProtocol__factory.connect('', provider);
   console.log(`Deployed WandProtocol to ${wandProtocol.address}`);
 
   const USBFactory = await ethers.getContractFactory('Usb');
   const Usb = await USBFactory.deploy(wandProtocol.address);
   const usbToken = Usb__factory.connect(Usb.address, provider);
+  // const usbToken = Usb__factory.connect('', provider);
   console.log(`Deployed $USB token to ${usbToken.address}`);
 
-  let trans = await wandProtocol.connect(deployer).initialize(usbToken.address);
+  let trans = await wandProtocol.connect(deployer).initialize(usbToken.address, txOpts);
   await trans.wait();
+  console.log(`Initialized WandProtocol with $USB token`);
 
   const VaultCalculatorFactory = await ethers.getContractFactory('VaultCalculator');
   const VaultCalculator = await VaultCalculatorFactory.deploy();
   const vaultCalculator = VaultCalculator__factory.connect(VaultCalculator.address, provider);
+  // const vaultCalculator = VaultCalculator__factory.connect('', provider);
   console.log(`Deployed VaultCalculator to ${vaultCalculator.address} (${VaultCalculatorFactory.bytecode.length / 2} bytes)`);
 
   // Create $ETHx token
   const LeveragedTokenFactory = await ethers.getContractFactory('LeveragedToken');
   const ETHx = await LeveragedTokenFactory.deploy("ETHx Token", "ETHx");
   const ethx = LeveragedToken__factory.connect(ETHx.address, provider);
+  // const ethx = LeveragedToken__factory.connect('', provider);
   console.log(`Deployed $ETHx token to ${ethx.address}`);
   
   // Create $ETH vault
@@ -113,9 +128,10 @@ async function main() {
   const ethVault = await Vault.deploy(wandProtocol.address, vaultCalculator.address, nativeTokenAddress, ethPriceFeed.address, ethx.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AARU"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [ethY, ethAARU, ethAART, ethAARS, ethAARC]);
-  console.log(`Deployed $ETH vault to ${ethVault.address}`);
+  // const ethVault = Vault__factory.connect('', provider);
+  console.log(`Deployed $ETH vault to ${ethVault.address} (${Vault.bytecode.length / 2} bytes)`);
 
-  trans = await wandProtocol.connect(deployer).addVault(ethVault.address);
+  trans = await wandProtocol.connect(deployer).addVault(ethVault.address, txOpts);
   await trans.wait();
   console.log(`Connected $ETH vault to WandProtocol`);
 
@@ -123,14 +139,22 @@ async function main() {
   const PtyPoolFactory = await ethers.getContractFactory('PtyPool');
   const EthVaultPtyPoolBelowAARS = await PtyPoolFactory.deploy(ethVault.address, PtyPoolType.RedeemByUsbBelowAARS, ethx.address, nativeTokenAddress);
   const ethVaultPtyPoolBelowAARS = PtyPool__factory.connect(EthVaultPtyPoolBelowAARS.address, provider);
+  console.log(`Deployed $ETH PtyPoolsBelowAARS at ${ethVaultPtyPoolBelowAARS.address}`);
   const EthVaultPtyPoolAboveAARU = await PtyPoolFactory.deploy(ethVault.address, PtyPoolType.MintUsbAboveAARU, nativeTokenAddress, ethx.address);
   const ethVaultPtyPoolAboveAARU = PtyPool__factory.connect(EthVaultPtyPoolAboveAARU.address, provider);
-  trans = await ethVault.connect(deployer).setPtyPools(ethVaultPtyPoolBelowAARS.address, ethVaultPtyPoolAboveAARU.address);
+  console.log(`Deployed $ETH PtyPoolsAboveAARU at ${ethVaultPtyPoolAboveAARU.address}`);
+  trans = await ethVault.connect(deployer).setPtyPools(ethVaultPtyPoolBelowAARS.address, ethVaultPtyPoolAboveAARU.address, txOpts);
   await trans.wait();
-  console.log(`Connected PtyPools to $ETH vault`);
+  console.log(`Connected PtyPools to $ETH vault. (${PtyPoolFactory.bytecode.length / 2} bytes)`);
+
+  // Connect $ETHx with $ETH vault
+  trans = await ethx.connect(deployer).setVault(ethVault.address, txOpts);
+  await trans.wait();
+  console.log(`Connected $ETH vault to $ETHx`);
 
   // Create $stETH vault
   const stETHxToken = await LeveragedTokenFactory.deploy("stETHx Token", "stETHx");
+  console.log(`Deployed $stETHx token to ${stETHxToken.address}`);
   const stethx = LeveragedToken__factory.connect(stETHxToken.address, provider);
   const stETHY = BigNumber.from(10).pow(await settings.decimals()).mul(2).div(100);  // 2%
   const stETHAARU = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
@@ -141,28 +165,34 @@ async function main() {
   const stethVault = await Vault.deploy(wandProtocol.address, vaultCalculator.address, stETH.address, stETHPriceFeed.address, stethx.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AARU"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [stETHY, stETHAARU, stETHAART, stETHAARS, stETHAARC]);
+  // const stethVault = Vault__factory.connect('', provider);
   console.log(`Deployed $stETH vault to ${stethVault.address}`);
-  trans = await wandProtocol.connect(deployer).addVault(stethVault.address);
+  trans = await wandProtocol.connect(deployer).addVault(stethVault.address, txOpts);
   await trans.wait();
-  console.log(`Connected $stETH vault to WandProtocol`);
+  console.log(`Added $stETH vault to WandProtocol`);
 
   // Connect $stethx with $stETH vault
-  trans = await stethx.connect(deployer).setVault(stethVault.address);
+  trans = await stethx.connect(deployer).setVault(stethVault.address, txOpts);
   await trans.wait();
-  console.log(`Connected $stETH vault to WandProtocol`);
+  console.log(`Connected $stETH vault to $stETHx`);
   
   // Create PtyPools for $stETH vault
   const stETHVaultPtyPoolBelowAARS = await PtyPoolFactory.deploy(stethVault.address, PtyPoolType.RedeemByUsbBelowAARS, stethx.address, stETH.address);
   const stethVaultPtyPoolBelowAARS = PtyPool__factory.connect(stETHVaultPtyPoolBelowAARS.address, provider);
+  console.log(`Deployed $stETH PtyPoolsBelowAARS at ${stethVaultPtyPoolBelowAARS.address}`);
   const stETHVaultPtyPoolAboveAARU = await PtyPoolFactory.deploy(stethVault.address, PtyPoolType.MintUsbAboveAARU, stETH.address, stethx.address);
   const stethVaultPtyPoolAboveAARU = PtyPool__factory.connect(stETHVaultPtyPoolAboveAARU.address, provider);
-  trans = await stethVault.connect(deployer).setPtyPools(stethVaultPtyPoolBelowAARS.address, stethVaultPtyPoolAboveAARU.address);
+  console.log(`Deployed $stETH PtyPoolsAboveAARU at ${stethVaultPtyPoolAboveAARU.address}`);
+  trans = await stethVault.connect(deployer).setPtyPools(stethVaultPtyPoolBelowAARS.address, stethVaultPtyPoolAboveAARU.address, txOpts);
+  // trans = await stethVault.connect(deployer).setPtyPools('', '', { ...txOpts, gasLimit: 300000 });
   await trans.wait();
+  console.log(`Connected PtyPools to $stETH vault. (${PtyPoolFactory.bytecode.length / 2} bytes)`);
 
   // Create $WBTC vault
   const WBTCx = await LeveragedTokenFactory.deploy("WBTCx Token", "WBTCx");
   const wbtcx = LeveragedToken__factory.connect(WBTCx.address, provider);
-  const wbtcY = BigNumber.from(10).pow(await settings.decimals()).mul(30).div(1000);  // 3%
+  console.log(`Deployed $WBTCx token to ${ethx.address}`);
+  const wbtcY = BigNumber.from(10).pow(await settings.decimals()).mul(30).div(1000);  // 2%
   const wbtcAARU = BigNumber.from(10).pow(await settings.decimals()).mul(200).div(100);  // 200%
   const wbtcAART = BigNumber.from(10).pow(await settings.decimals()).mul(150).div(100);  // 150%
   const wbtcAARS = BigNumber.from(10).pow(await settings.decimals()).mul(130).div(100);  // 130%
@@ -171,20 +201,27 @@ async function main() {
   const wbtcVault = await Vault.deploy(wandProtocol.address, vaultCalculator.address, wbtc.address, wbtcPriceFeed.address, wbtcx.address,
       [ethers.utils.formatBytes32String("Y"), ethers.utils.formatBytes32String("AARU"), ethers.utils.formatBytes32String("AART"), ethers.utils.formatBytes32String("AARS"), ethers.utils.formatBytes32String("AARC")],
       [wbtcY, wbtcAARU, wbtcAART, wbtcAARS, wbtcAARC]);
-  trans = await wandProtocol.connect(deployer).addVault(wbtcVault.address);
+  // const wbtcVault = Vault__factory.connect('', provider);
+  console.log(`Deployed $wbtc vault to ${wbtcVault.address} (${Vault.bytecode.length / 2} bytes)`);
+  trans = await wandProtocol.connect(deployer).addVault(wbtcVault.address, { ...txOpts, gasLimit: 300000 });
   await trans.wait();
+  console.log(`Connected $wbtc vault to WandProtocol`);
 
   // Connect $WBTCx with WBTC vault
-  trans = await wbtcx.connect(deployer).setVault(wbtcVault.address);
+  trans = await wbtcx.connect(deployer).setVault(wbtcVault.address, txOpts);
   await trans.wait();
+  console.log(`Connected $wbtc vault to $WBTCx`);
 
   // Create PtyPools for $WBTC vault
   const WBTCVaultPtyPoolBelowAARS = await PtyPoolFactory.deploy(wbtcVault.address, PtyPoolType.RedeemByUsbBelowAARS, wbtcx.address, wbtc.address);
   const wbtcVaultPtyPoolBelowAARS = PtyPool__factory.connect(WBTCVaultPtyPoolBelowAARS.address, provider);
+  console.log(`Deployed $wbtc PtyPoolsBelowAARS at ${wbtcVaultPtyPoolBelowAARS.address}`);
   const WBTCVaultPtyPoolAboveAARU = await PtyPoolFactory.deploy(wbtcVault.address, PtyPoolType.MintUsbAboveAARU, wbtc.address, wbtcx.address);
   const wbtcVaultPtyPoolAboveAARU = PtyPool__factory.connect(WBTCVaultPtyPoolAboveAARU.address, provider);
-  trans = await wbtcVault.connect(deployer).setPtyPools(wbtcVaultPtyPoolBelowAARS.address, wbtcVaultPtyPoolAboveAARU.address);
+  console.log(`Deployed $wbtc PtyPoolsAboveAARU at ${wbtcVaultPtyPoolAboveAARU.address}`);
+  trans = await wbtcVault.connect(deployer).setPtyPools(wbtcVaultPtyPoolBelowAARS.address, wbtcVaultPtyPoolAboveAARU.address, { ...txOpts, gasLimit: 300000 });
   await trans.wait();
+  console.log(`Connected PtyPools to $wbtc vault. (${PtyPoolFactory.bytecode.length / 2} bytes)`);
   
   // Add tester accounts
   for (let i = 0; i < _.size(testers); i++) {
@@ -194,7 +231,7 @@ async function main() {
       console.log(`$WBTC Token: ${tester} is already an admin`);
     }
     else {
-      const trans = await wbtc.connect(deployer).setAdmin(tester, true);
+      const trans = await wbtc.connect(deployer).setAdmin(tester, true, txOpts);
       await trans.wait();
       console.log(`$WBTC Token: ${tester} is now an admin`);
     }
@@ -207,7 +244,7 @@ async function main() {
       console.log(`$WBTC Price Feed: ${tester} is already a tester`);
     }
     else {
-      const trans = await wbtcPriceFeed.connect(deployer).setTester(tester, true);
+      const trans = await wbtcPriceFeed.connect(deployer).setTester(tester, true, txOpts);
       await trans.wait();
       console.log(`$WBTC Price Feed: ${tester} is now a tester`);
     }
@@ -220,7 +257,7 @@ async function main() {
       console.log(`$stETH Token: ${tester} is already an admin`);
     }
     else {
-      const trans = await stETH.connect(deployer).setAdmin(tester, true);
+      const trans = await stETH.connect(deployer).setAdmin(tester, true, txOpts);
       await trans.wait();
       console.log(`$stETH Token: ${tester} is now an admin`);
     }
@@ -233,7 +270,7 @@ async function main() {
       console.log(`$stETH Price Feed: ${tester} is already a tester`);
     }
     else {
-      const trans = await stETHPriceFeed.connect(deployer).setTester(tester, true);
+      const trans = await stETHPriceFeed.connect(deployer).setTester(tester, true, txOpts);
       await trans.wait();
       console.log(`$stETH Price Feed: ${tester} is now a tester`);
     }
@@ -241,12 +278,12 @@ async function main() {
 
   // Step 5: Mock prices for $WBTC and $stETH
   // Mock $WBTC price to $30000
-  trans = await wbtcPriceFeed.connect(deployer).mockPrice(BigNumber.from(30000).mul(BigNumber.from(10).pow(await wbtcPriceFeed.decimals())));
+  trans = await wbtcPriceFeed.connect(deployer).mockPrice(BigNumber.from(30000).mul(BigNumber.from(10).pow(await wbtcPriceFeed.decimals())), txOpts);
   await trans.wait();
   console.log(`Mocked $WBTC price to $30000`);
 
   // Mock $stETH price to $2000
-  trans = await stETHPriceFeed.connect(deployer).mockPrice(BigNumber.from(2000).mul(BigNumber.from(10).pow(await stETHPriceFeed.decimals())));
+  trans = await stETHPriceFeed.connect(deployer).mockPrice(BigNumber.from(2000).mul(BigNumber.from(10).pow(await stETHPriceFeed.decimals())), txOpts);
   await trans.wait();
   console.log(`Mocked $stETH price to $2000`);
 }
