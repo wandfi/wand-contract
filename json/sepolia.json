@@ -1,0 +1,89 @@
+{
+  "ProtocolSettings": {
+    "address": "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
+    "args": ["0xFE18Aa1EFa652660F36Ab84F122CD36108f903B6"]
+  },
+  "WandProtocol": {
+    "address": "0x614352b4028f429168D153bA18DC7FEd667E1B4f",
+    "args": ["0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83"]
+  },
+  "Usb": {
+    "address": "0x3a1EB958e1e870C99DC0D8127CFc2FbC90c3ECFC",
+    "args": ["0x614352b4028f429168D153bA18DC7FEd667E1B4f"]
+  },
+  "VaultCalculator": {
+    "address": "0x4824982Cc17e7c9D51e14E2ed33501A48e5f1044",
+    "args": []
+  },
+  "ETHx": {
+    "address": "0xf6d6C5734A4e9F3783848FB8C7C0212a39DF55e6",
+    "args": ["ETHx Token", "ETHx"]
+  },
+  "ETH_Feed_Mock": {
+    "address": "0x817c5d3B0F44d68bCf8612B11222c9A2683b8c03",
+    "args": [
+      "ETH",
+      {
+        "type": "BigNumber",
+        "hex": "0x12"
+      }
+    ]
+  },
+  "ETH_Vault": {
+    "address": "0x22d4f1A234551a904Ef44B77154D7E255f7df801",
+    "args": [
+      "0x614352b4028f429168D153bA18DC7FEd667E1B4f",
+      "0x4824982Cc17e7c9D51e14E2ed33501A48e5f1044",
+      "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+      "0x817c5d3B0F44d68bCf8612B11222c9A2683b8c03",
+      "0xf6d6C5734A4e9F3783848FB8C7C0212a39DF55e6",
+      [
+        "0x5900000000000000000000000000000000000000000000000000000000000000",
+        "0x4141525500000000000000000000000000000000000000000000000000000000",
+        "0x4141525400000000000000000000000000000000000000000000000000000000",
+        "0x4141525300000000000000000000000000000000000000000000000000000000",
+        "0x4141524300000000000000000000000000000000000000000000000000000000"
+      ],
+      [
+        {
+          "type": "BigNumber",
+          "hex": "0x0bebc200"
+        },
+        {
+          "type": "BigNumber",
+          "hex": "0x04a817c800"
+        },
+        {
+          "type": "BigNumber",
+          "hex": "0x037e11d600"
+        },
+        {
+          "type": "BigNumber",
+          "hex": "0x0306dc4200"
+        },
+        {
+          "type": "BigNumber",
+          "hex": "0x028fa6ae00"
+        }
+      ]
+    ]
+  },
+  "ETH_PtyPoolBelowAARS": {
+    "address": "0xc37dF6905923574AeFEb2aED3Ea3546b4112433a",
+    "args": [
+      "0x22d4f1A234551a904Ef44B77154D7E255f7df801",
+      0,
+      "0xf6d6C5734A4e9F3783848FB8C7C0212a39DF55e6",
+      "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    ]
+  },
+  "ETH_PtyPoolAboveAARU": {
+    "address": "0x69b793e36a041224578253c88B8Ea3C7691c99e1",
+    "args": [
+      "0x22d4f1A234551a904Ef44B77154D7E255f7df801",
+      1,
+      "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+      "0xf6d6C5734A4e9F3783848FB8C7C0212a39DF55e6"
+    ]
+  }
+}

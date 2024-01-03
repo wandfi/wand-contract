@@ -29,8 +29,12 @@ const privateKey: string = process.env.PRIVATE_KEY || "";
 const infuraKey: string = process.env.INFURA_KEY || "";
 
 // Goerli
-const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
-const chainlinkETHUSD = "0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e";
+// const provider = new ethers.providers.JsonRpcProvider(`https://goerli.infura.io/v3/${infuraKey}`);
+// const chainlinkETHUSD = "0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e";
+// const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+// Goerli
+const provider = new ethers.providers.JsonRpcProvider(`https://sepolia.infura.io/v3/${infuraKey}`);
+const chainlinkETHUSD = "0x694AA1769357215DE4FAC081bf1f309aDC325306";
 const nativeTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 const deployer = new ethers.Wallet(privateKey, provider);
@@ -131,7 +135,7 @@ async function main() {
   // const ethVault = Vault__factory.connect('', provider);
   console.log(`Deployed $ETH vault to ${ethVault.address} (${Vault.bytecode.length / 2} bytes)`);
 
-  trans = await wandProtocol.connect(deployer).addVault(ethVault.address, txOpts);
+  trans = await wandProtocol.connect(deployer).addVault(ethVault.address);
   await trans.wait();
   console.log(`Connected $ETH vault to WandProtocol`);
 

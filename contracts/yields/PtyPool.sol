@@ -48,6 +48,10 @@ contract PtyPool is Ownable, ReentrancyGuard {
   mapping(address => uint256) internal _userTargetTokenSharesPerSharePaid;
   mapping(address => uint256) internal _userTargetTokenShares;
 
+  // [[Δtimestamp,stakeYields]]
+  uint256[2][] internal _recentStakeYields;
+  uint256 internal _lastAddStakeYieldsTime;
+  
   /* ========== CONSTRUCTOR ========== */
 
   constructor(
@@ -70,6 +74,7 @@ contract PtyPool is Ownable, ReentrancyGuard {
 
     _stakingYieldsToken = _stakingYieldsToken_;
     _matchingYieldsToken = _matchingYieldsToken_;
+    _lastAddStakeYieldsTime = block.timestamp;
   }
 
   receive() external payable {}
@@ -148,6 +153,10 @@ contract PtyPool is Ownable, ReentrancyGuard {
       .div(_totalStakingShares);
   }
 
+  function getRecentStakeYields() public view returns(uint256[2][] memory){
+    return _recentStakeYields;
+  }
+
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function stake(uint256 amount) external payable nonReentrant 
@@ -219,6 +228,12 @@ contract PtyPool is Ownable, ReentrancyGuard {
     getMatchingYields();
   }
 
+  function claimAll() external {
+    getMatchingOutTokens();
+    getMatchingYields();
+    getStakingYields();
+  }
+
   function exit() external {
     withdraw(userStakingBalance(_msgSender()));
     getStakingYields();
@@ -232,6 +247,15 @@ contract PtyPool is Ownable, ReentrancyGuard {
     require(yieldsAmount > 0, "Too small yields amount");
     require(_totalStakingShares > 0, "No user stakes");
 
+    if(_recentStakeYields.length > 5){
+      for (uint i = 0; i < 5; i++) {
+        _recentStakeYields[i] = _recentStakeYields[i + 1];
+      }
+      _recentStakeYields.pop();
+    }
+    _recentStakeYields.push([block.timestamp - _lastAddStakeYieldsTime, yieldsAmount]);
+    _lastAddStakeYieldsTime = block.timestamp;
+
     _stakingYieldsPerShare = _stakingYieldsPerShare.add(yieldsAmount.mul(1e18).div(_totalStakingShares));
     emit StakingYieldsAdded(yieldsAmount);
   }
@@ -239,7 +263,6 @@ contract PtyPool is Ownable, ReentrancyGuard {
   function addMatchingYields(uint256 yieldsAmount) external nonReentrant updateMatchingYields(address(0)) onlyVault {
     require(yieldsAmount > 0, "Too small yields amount");
     require(_totalStakingShares > 0, "No user stakes");
-
     _accruedMatchingYields = _accruedMatchingYields.add(yieldsAmount);
     emit MatchingYieldsAdded(yieldsAmount);
   }
